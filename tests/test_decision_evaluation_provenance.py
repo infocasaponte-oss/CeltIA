@@ -217,3 +217,29 @@ def test_results_manifest_rejects_missing_structural_provenance(tmp_path):
             assert False,field
         except ValueError:
             pass
+
+
+
+def test_results_manifest_rejects_naive_or_malformed_collection_timestamp(tmp_path):
+    dataset=tmp_path / "dataset.jsonl"
+    dataset.write_text('{"text":"one","expected":"fast","ood":false}\n',encoding="utf-8")
+    results=tmp_path / "results.jsonl"
+    results.write_text("",encoding="utf-8")
+    base={
+        "format_version":RESULT_FORMAT_VERSION,
+        "datasets":[str(dataset)],
+        "backend":{},
+        "policy":{},
+        "status":"complete",
+        "dataset_sha256":dataset_sha256([str(dataset)]),
+        "results_sha256":file_sha256(results),
+        "result_rows":0,
+    }
+    for value in ("2026-01-01T00:00:00","not-a-timestamp"):
+        manifest={**base,"collected_at":value}
+        Path(str(results)+".manifest.json").write_text(json.dumps(manifest),encoding="utf-8")
+        try:
+            validate_results_manifest(results,[str(dataset)])
+            assert False,value
+        except ValueError as exc:
+            assert "collected_at" in str(exc)
