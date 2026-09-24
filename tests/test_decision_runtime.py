@@ -24,3 +24,12 @@ def test_runtime_fails_closed_offline():
         assert False
     except RuntimeError:
         pass
+
+
+def test_runtime_rejects_oversized_context():
+    runtime = CeltIADecisionRuntime(FakeLLM())
+    try:
+        asyncio.run(runtime.decide({"text": "x" * 50001}, [{"id":"x","prompt":"x","type":"boolean"}]))
+        assert False
+    except ValueError as exc:
+        assert "context" in str(exc)
