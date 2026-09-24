@@ -115,10 +115,21 @@ class CeltIADecisionRuntime:
     async def decide_with_usage(self, context, questions):
         request = self._request(context, questions)
         usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
-        per_call_output_tokens = min(
-            self.max_output_tokens,
-            self.max_total_output_tokens // len(request.questions),
-        )
+        minimum_output_tokens=[
+            max(64, 16 + 12 * len(question.candidates()))
+            for question in request.questions
+        ]
+        minimum_total_output_tokens=sum(minimum_output_tokens)
+        if minimum_total_output_tokens > self.max_total_output_tokens:
+            raise ValueError(
+                "decision output budget is too small for the requested candidate set"
+            )
+        remaining_output_tokens=self.max_total_output_tokens-minimum_total_output_tokens
+        extra_per_question=remaining_output_tokens // len(request.questions)
+        output_budgets=[
+            min(self.max_output_tokens, minimum + extra_per_question)
+            for minimum in minimum_output_tokens
+        ]
         total_prompt_chars = 0
         for question in request.questions:
             messages = AsyncLLMDecisionScorer.messages_for(
@@ -136,7 +147,10 @@ class CeltIADecisionRuntime:
                 f"decision prompt budget exceeded: {total_prompt_chars} > {self.max_total_prompt_chars} characters"
             )
 
+        output_budget_iter=iter(output_budgets)
+
         async def chat(messages: list[dict]) -> str:
+            per_call_output_tokens=next(output_budget_iter)
             try:
                 response = await asyncio.wait_for(
                     self.llm.chat(
