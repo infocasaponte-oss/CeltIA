@@ -15,8 +15,48 @@ class CeltIADecisionRuntime:
     """Bridge between the independent CDE core and CeltIA's existing local LLM client."""
 
     def __init__(self, llm, *, abstain_below: float = 0.55, temperature: float = 1.0, reject_suspected_ood: bool = True, ood_entropy_threshold: float = 0.90, ood_margin_threshold: float = 0.10):
+        self.llm = llm
+        self.engine_options = {
+            "abstain_below": abstain_below,
+            "temperature": temperature,
+            "reject_suspected_ood": reject_suspected_ood,
+            "ood_entropy_threshold": ood_entropy_threshold,
+            "ood_margin_threshold": ood_margin_threshold,
+        }
+
+    def _request(self, context, questions) -> DecisionRequest:
+        try:
+            serialized_context = json.dumps(context, ensure_ascii=False)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("context must be JSON-serializable") from exc
+        if len(serialized_context) > self.MAX_CONTEXT_CHARS:
+            raise ValueError("decision context exceeds 50000 serialized characters")
+        if not questions or len(questions) > self.MAX_QUESTIONS:
+            raise ValueError("questions must contain between 1 and 32 items")
+        ids = [q.get("id") for q in questions]
+        if len(ids) != len(set(ids)):
+            raise ValueError("question ids must be unique")
+        return DecisionRequest(
+            context=context,
+            questions=tuple(
+                DecisionQuestion(
+                    id=q["id"],
+                    prompt=q["prompt"],
+                    type=DecisionType(q["type"]),
+                    options=tuple(q.get("options") or ()),
+                    minimum=q.get("minimum"),
+                    maximum=q.get("maximum"),
+                )
+                for q in questions
+            ),
+        )
+
+    async def decide_with_usage(self, context, questions):
+        request = self._request(context, questions)
+        usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+
         async def chat(messages: list[dict]) -> str:
-            response = await llm.chat(
+            response = await self.llm.chat(
                 messages,
                 thinking=False,
                 max_tokens=384,
@@ -31,41 +71,20 @@ class CeltIADecisionRuntime:
             content = (choices[0].get("message") or {}).get("content")
             if not isinstance(content, str) or not content.strip():
                 raise RuntimeError("decision backend returned empty content")
+
+            raw_usage = response.get("usage") or {}
+            prompt_tokens = int(raw_usage.get("prompt_tokens") or max(1, len(json.dumps(messages, ensure_ascii=False)) // 3))
+            completion_tokens = int(raw_usage.get("completion_tokens") or max(1, len(content) // 3))
+            total_tokens = int(raw_usage.get("total_tokens") or (prompt_tokens + completion_tokens))
+            usage["prompt_tokens"] += max(0, prompt_tokens)
+            usage["completion_tokens"] += max(0, completion_tokens)
+            usage["total_tokens"] += max(0, total_tokens)
             return content.strip()
 
-        self.engine = AsyncDecisionEngine(
-            AsyncLLMDecisionScorer(chat),
-            abstain_below=abstain_below,
-            temperature=temperature,
-            reject_suspected_ood=reject_suspected_ood,
-            ood_entropy_threshold=ood_entropy_threshold,
-            ood_margin_threshold=ood_margin_threshold,
-        )
+        engine = AsyncDecisionEngine(AsyncLLMDecisionScorer(chat), **self.engine_options)
+        results = await engine.decide(request)
+        return results, usage
 
     async def decide(self, context, questions):
-        try:
-            serialized_context = json.dumps(context, ensure_ascii=False)
-        except (TypeError, ValueError, OverflowError) as exc:
-            raise ValueError("context must be JSON-serializable") from exc
-        if len(serialized_context) > self.MAX_CONTEXT_CHARS:
-            raise ValueError("decision context exceeds 50000 serialized characters")
-        if not questions or len(questions) > self.MAX_QUESTIONS:
-            raise ValueError("questions must contain between 1 and 32 items")
-        ids = [q.get("id") for q in questions]
-        if len(ids) != len(set(ids)):
-            raise ValueError("question ids must be unique")
-        request = DecisionRequest(
-            context=context,
-            questions=tuple(
-                DecisionQuestion(
-                    id=q["id"],
-                    prompt=q["prompt"],
-                    type=DecisionType(q["type"]),
-                    options=tuple(q.get("options") or ()),
-                    minimum=q.get("minimum"),
-                    maximum=q.get("maximum"),
-                )
-                for q in questions
-            ),
-        )
-        return await self.engine.decide(request)
+        results, _ = await self.decide_with_usage(context, questions)
+        return results
