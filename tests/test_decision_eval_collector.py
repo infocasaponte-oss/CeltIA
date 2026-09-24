@@ -478,3 +478,39 @@ def test_resume_rejects_collecting_manifest_root_after_current_timestamp(tmp_pat
         assert False
     except ValueError as exc:
         assert "after collected_at" in str(exc)
+
+
+
+def test_partial_pilot_can_resume_into_full_collection(tmp_path, monkeypatch):
+    rows=[
+        {"text":"one","expected":"fast","ood":False},
+        {"text":"two","expected":"fast","ood":False},
+        {"text":"three","expected":"fast","ood":False},
+    ]
+    monkeypatch.setattr(collector,"load_datasets",lambda paths: rows)
+    monkeypatch.setattr(collector,"build_runtime",FakeRuntime)
+    monkeypatch.setattr(collector,"route",lambda text:type("R",(),{"mode":"fast"})())
+
+    pilot=asyncio.run(collector.collect(_args(tmp_path,limit=2,checkpoint_every=1)))
+    assert pilot["written"] == 2
+    pilot_manifest=pilot["manifest"]
+    assert pilot_manifest["selection"] == {
+        "dataset_rows":3,
+        "selected_rows":2,
+        "limit":2,
+    }
+
+    full_args=_args(tmp_path,resume=True,limit=0,checkpoint_every=1)
+    completed=asyncio.run(collector.collect(full_args))
+    assert completed["skipped"] == 2
+    assert completed["written"] == 1
+    assert completed["manifest"]["selection"] == {
+        "dataset_rows":3,
+        "selected_rows":3,
+        "limit":0,
+    }
+    saved=[
+        json.loads(line)
+        for line in (tmp_path / "results.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert [item["text"] for item in saved] == ["one","two","three"]
