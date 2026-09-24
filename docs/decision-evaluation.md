@@ -78,4 +78,4 @@ PYTHONPATH=. python scripts/evaluate_decision_routes.py \
   --cde-results results/cde_routes.jsonl
 ```
 
-Use `--resume` to continue an interrupted collection without re-running already valid rows, or `--limit N` for a deterministic small pilot. Existing resume files are validated before reuse so malformed or out-of-dataset rows are not silently carried forward.
+Use `--resume` to continue an interrupted collection without re-running already valid rows, or `--limit N` for a deterministic small pilot. Existing resume files are validated before reuse so malformed or out-of-dataset rows are not silently carried forward. Collection now checkpoints atomically: by default every 10 newly collected rows it writes and fsyncs a complete temporary JSONL and replaces the destination, avoiding a partially appended final file if the process is interrupted. `--checkpoint-every N` can tune the durability/cost trade-off from 1 to 100 rows.
