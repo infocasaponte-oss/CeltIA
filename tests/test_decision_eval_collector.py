@@ -193,3 +193,54 @@ def test_resume_rejects_changed_runtime_policy(tmp_path, monkeypatch):
         assert False
     except ValueError as exc:
         assert "policy provenance" in str(exc)
+
+
+def test_fresh_collection_refuses_to_overwrite_existing_results(tmp_path, monkeypatch):
+    path=tmp_path / "results.jsonl"
+    path.write_text('{"text":"old"}\n',encoding="utf-8")
+    monkeypatch.setattr(collector,"load_datasets",lambda paths:[{"text":"one","expected":"fast","ood":False}])
+    try:
+        asyncio.run(collector.collect(_args(tmp_path)))
+        assert False
+    except ValueError as exc:
+        assert "already exists" in str(exc)
+    assert path.read_text(encoding="utf-8") == '{"text":"old"}\n'
+
+
+def test_interrupted_fresh_collection_persists_manifest_for_resume(tmp_path, monkeypatch):
+    rows=[
+        {"text":"one","expected":"fast","ood":False},
+        {"text":"two","expected":"fast","ood":False},
+    ]
+    monkeypatch.setattr(collector,"load_datasets",lambda paths: rows)
+    monkeypatch.setattr(collector,"build_runtime",FakeRuntime)
+    monkeypatch.setattr(collector,"route",lambda text:type("R",(),{"mode":"fast"})())
+
+    calls={"count":0}
+    original=collector.collect_one
+
+    async def fail_after_first(runtime,row):
+        calls["count"]+=1
+        if calls["count"] > 1:
+            raise RuntimeError("simulated interruption")
+        return await original(runtime,row)
+
+    monkeypatch.setattr(collector,"collect_one",fail_after_first)
+    try:
+        asyncio.run(collector.collect(_args(tmp_path,checkpoint_every=1)))
+        assert False
+    except RuntimeError as exc:
+        assert "interruption" in str(exc)
+
+    path=tmp_path / "results.jsonl"
+    manifest_path=tmp_path / "results.jsonl.manifest.json"
+    assert path.exists()
+    assert manifest_path.exists()
+    assert json.loads(manifest_path.read_text(encoding="utf-8"))["format_version"] == 2
+
+    monkeypatch.setattr(collector,"collect_one",original)
+    resumed=asyncio.run(collector.collect(_args(tmp_path,resume=True,checkpoint_every=1)))
+    assert resumed["skipped"] == 1
+    assert resumed["written"] == 1
+    saved=[json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    assert [item["text"] for item in saved] == ["one","two"]
