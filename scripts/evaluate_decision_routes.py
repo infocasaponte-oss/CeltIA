@@ -155,6 +155,13 @@ def validate_results_manifest(results_path: Path, datasets: list[str], *, requir
         raise ValueError("CDE results manifest has invalid backend provenance")
     if not validate_policy_provenance(manifest.get("policy")):
         raise ValueError("CDE results manifest has invalid policy provenance")
+    expected_dataset_sha=manifest.get("dataset_sha256")
+    if (
+        not isinstance(expected_dataset_sha,str)
+        or not SHA256_RE.fullmatch(expected_dataset_sha)
+        or expected_dataset_sha != dataset_sha256(datasets)
+    ):
+        raise ValueError("CDE results manifest dataset provenance does not match selected datasets")
     if dataset_rows is None:
         dataset_rows=sum(
             1
@@ -167,13 +174,6 @@ def validate_results_manifest(results_path: Path, datasets: list[str], *, requir
         dataset_rows=dataset_rows,
         require_full_selection=require_full_selection,
     )
-    expected_dataset_sha=manifest.get("dataset_sha256")
-    if (
-        not isinstance(expected_dataset_sha,str)
-        or not SHA256_RE.fullmatch(expected_dataset_sha)
-        or expected_dataset_sha != dataset_sha256(datasets)
-    ):
-        raise ValueError("CDE results manifest dataset provenance does not match selected datasets")
     if manifest.get("status") != "complete":
         raise ValueError("CDE results manifest is not complete")
     expected_results_sha=manifest.get("results_sha256")
