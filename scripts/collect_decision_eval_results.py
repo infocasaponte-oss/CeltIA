@@ -6,6 +6,8 @@ import asyncio
 import json
 import os
 import tempfile
+import hashlib
+from datetime import datetime, timezone
 from pathlib import Path
 
 from core.config import settings
@@ -15,7 +17,7 @@ from core.router import route
 from scripts.evaluate_decision_routes import load_cde_results, load_jsonl
 
 ROUTES=("fast","think","code","agent","long")
-RESULT_FORMAT_VERSION=1
+RESULT_FORMAT_VERSION=2
 DEFAULT_CHECKPOINT_EVERY=10
 
 
@@ -60,6 +62,36 @@ async def collect_one(runtime: CeltIADecisionRuntime, row: dict) -> dict:
         "heuristic":heuristic,
         "expected":row.get("expected"),
         "expected_ood":row.get("ood"),
+    }
+
+
+def _dataset_sha256(paths: list[str]) -> str:
+    digest=hashlib.sha256()
+    for raw_path in paths:
+        path=Path(raw_path)
+        digest.update(str(path).encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def _runtime_manifest(runtime: CeltIADecisionRuntime, datasets: list[str]) -> dict:
+    llm=runtime.llm
+    primary=getattr(llm,"primary",None)
+    fallback=getattr(llm,"fallback",None)
+    return {
+        "format_version":RESULT_FORMAT_VERSION,
+        "collected_at":datetime.now(timezone.utc).isoformat(),
+        "dataset_sha256":_dataset_sha256(datasets),
+        "datasets":datasets,
+        "backend":{
+            "client_type":type(llm).__name__,
+            "model":getattr(llm,"model",None),
+            "primary_model":getattr(primary,"model",None),
+            "fallback_model":getattr(fallback,"model",None),
+        },
+        "policy":dict(runtime.engine_options),
     }
 
 
@@ -137,6 +169,7 @@ async def collect(args) -> dict:
             raise ValueError(f"existing result text not present in selected datasets: {first!r}")
 
     runtime=build_runtime()
+    manifest=_runtime_manifest(runtime,datasets)
     written=0
     skipped=0
     output.parent.mkdir(parents=True,exist_ok=True)
@@ -168,6 +201,7 @@ async def collect(args) -> dict:
         "written":written,
         "skipped":skipped,
         "checkpoint_every":args.checkpoint_every,
+        "manifest":manifest,
     }
 
 
