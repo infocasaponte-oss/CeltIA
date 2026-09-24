@@ -4,12 +4,14 @@ import argparse
 import json
 import math
 import hashlib
+import re
 from pathlib import Path
 
 from celtia.decision.evaluation import ShadowSample, evaluate_shadow, promotion_gate
 
 ROUTES={"fast","think","code","agent","long"}
 RESULT_FORMAT_VERSION=3
+SHA256_RE=re.compile(r"^[0-9a-f]{64}$")
 
 
 def file_sha256(path: Path) -> str:
@@ -41,12 +43,35 @@ def validate_results_manifest(results_path: Path, datasets: list[str]) -> dict:
         raise ValueError(f"missing or invalid CDE results manifest: {manifest_path}") from exc
     if not isinstance(manifest,dict) or manifest.get("format_version") != RESULT_FORMAT_VERSION:
         raise ValueError(f"incompatible CDE results manifest: {manifest_path}")
-    if manifest.get("dataset_sha256") != dataset_sha256(datasets):
+    manifest_datasets=manifest.get("datasets")
+    if (
+        not isinstance(manifest_datasets,list)
+        or any(not isinstance(item,str) or not item for item in manifest_datasets)
+        or manifest_datasets != datasets
+    ):
+        raise ValueError("CDE results manifest dataset list does not match selected datasets")
+    collected_at=manifest.get("collected_at")
+    if not isinstance(collected_at,str) or not collected_at.strip():
+        raise ValueError("CDE results manifest has invalid collected_at")
+    if not isinstance(manifest.get("backend"),dict):
+        raise ValueError("CDE results manifest has invalid backend provenance")
+    if not isinstance(manifest.get("policy"),dict):
+        raise ValueError("CDE results manifest has invalid policy provenance")
+    expected_dataset_sha=manifest.get("dataset_sha256")
+    if (
+        not isinstance(expected_dataset_sha,str)
+        or not SHA256_RE.fullmatch(expected_dataset_sha)
+        or expected_dataset_sha != dataset_sha256(datasets)
+    ):
         raise ValueError("CDE results manifest does not match selected datasets")
     if manifest.get("status") != "complete":
         raise ValueError("CDE results manifest is not complete")
     expected_results_sha=manifest.get("results_sha256")
-    if not isinstance(expected_results_sha,str) or expected_results_sha != file_sha256(results_path):
+    if (
+        not isinstance(expected_results_sha,str)
+        or not SHA256_RE.fullmatch(expected_results_sha)
+        or expected_results_sha != file_sha256(results_path)
+    ):
         raise ValueError("CDE results file does not match its manifest")
     expected_rows=manifest.get("result_rows")
     if isinstance(expected_rows,bool) or not isinstance(expected_rows,int) or expected_rows < 0:
