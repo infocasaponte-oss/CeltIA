@@ -398,3 +398,31 @@ def test_resume_rejects_tampered_collecting_checkpoint(tmp_path, monkeypatch):
         assert False
     except ValueError as exc:
         assert "collecting checkpoint results" in str(exc)
+
+
+
+def test_resume_rejects_collecting_manifest_naive_collection_timestamp(tmp_path, monkeypatch):
+    dataset=tmp_path / "dataset.jsonl"
+    dataset.write_text('{"text":"one","expected":"fast","ood":false}\n',encoding="utf-8")
+    path=tmp_path / "results.jsonl"
+    path.write_text(
+        '{"text":"one","cde":"fast","confidence":0.9,"abstained":false,"models_used":["fake-model"]}\n',
+        encoding="utf-8",
+    )
+    manifest=collector._runtime_manifest(FakeRuntime(),[str(dataset)])
+    manifest["collected_at"]="2026-01-01T00:00:00"
+    manifest["results_sha256"]=collector.file_sha256(path)
+    manifest["result_rows"]=1
+    (tmp_path / "results.jsonl.manifest.json").write_text(
+        json.dumps(manifest),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(collector,"build_runtime",FakeRuntime)
+
+    args=_args(tmp_path,resume=True)
+    args.dataset=[str(dataset)]
+    try:
+        asyncio.run(collector.collect(args))
+        assert False
+    except ValueError as exc:
+        assert "collected_at" in str(exc)
