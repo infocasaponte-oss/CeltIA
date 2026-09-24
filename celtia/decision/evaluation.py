@@ -47,6 +47,12 @@ def evaluate_shadow(samples: Iterable[ShadowSample]) -> dict:
             "selective_accuracy":route_correct/len(route_decided) if route_decided else None,
         }
 
+    routes_without_labels=[
+        name for name,item in per_route.items()
+        if item["labeled"] == 0
+    ]
+    all_routes_labeled=not routes_without_labels
+
     return {
         "samples": len(rows),
         "decided": len(decided),
@@ -59,14 +65,16 @@ def evaluate_shadow(samples: Iterable[ShadowSample]) -> dict:
         "labeled_coverage": len(labeled_decided)/len(labeled) if labeled else None,
         "labeled_abstentions": labeled_abstentions,
         "per_route": per_route,
+        "routes_with_labels":sum(item["labeled"] > 0 for item in per_route.values()),
+        "routes_without_labels":routes_without_labels,
         "min_route_labeled": min((item["labeled"] for item in per_route.values()), default=0),
-        "min_route_coverage": min(
-            (item["coverage"] for item in per_route.values() if item["coverage"] is not None),
-            default=None,
+        "min_route_coverage": (
+            min(item["coverage"] for item in per_route.values())
+            if all_routes_labeled else None
         ),
-        "min_route_accuracy": min(
-            (item["accuracy"] for item in per_route.values() if item["accuracy"] is not None),
-            default=None,
+        "min_route_accuracy": (
+            min(item["accuracy"] for item in per_route.values())
+            if all_routes_labeled else None
         ),
         "ood_labeled": len(ood_labeled),
         "ood_evaluated": len(ood_evaluated),
