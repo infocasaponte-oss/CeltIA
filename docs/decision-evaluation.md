@@ -106,3 +106,5 @@ Evaluation evidence schema v3 is the first schema that consistently covers per-r
 CDE configuration now fails at settings load, before API/runtime initialization, when probability thresholds, token/question limits, timeouts or aggregate output-budget constraints are invalid. The same bounds remain enforced inside the runtime as defense in depth.
 
 Candidate-aware output budgets are now bound to the exact serialized scorer request instead of being consumed from a positional iterator. That preserves the intended per-question budget even if scorer call ordering changes later, and the tests require the larger candidate set to receive the larger budget.
+
+The `/v1/decide` response preserves the runtime `usage.models` list alongside token counts, so callers can observe which backend model identities actually served structured decisions without relying on configured-provider assumptions.
