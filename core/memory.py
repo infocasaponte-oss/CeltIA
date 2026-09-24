@@ -45,6 +45,7 @@ class Memory:
         for column in ("rpm", "tpm", "monthly_tokens"):
             if column not in existing_ck:
                 self.db.execute(f"ALTER TABLE client_keys ADD COLUMN {column} INTEGER")
+        self.db.execute("CREATE TABLE IF NOT EXISTS processed_stripe(id TEXT PRIMARY KEY, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)")
         self._migrate_usage_events()
         self._migrate_api_keys()
         self._migrate_messages()
@@ -59,11 +60,7 @@ class Memory:
 
     def _migrate_decision_shadow(self):
         existing = {row[1] for row in self.db.execute("PRAGMA table_info(decision_shadow)").fetchall()}
-        additions = {
-            "abstention_reason": "TEXT",
-            "normalized_entropy": "REAL",
-            "margin": "REAL",
-        }
+        additions = {"abstention_reason": "TEXT", "normalized_entropy": "REAL", "margin": "REAL"}
         for column, decl in additions.items():
             if column not in existing:
                 self.db.execute(f"ALTER TABLE decision_shadow ADD COLUMN {column} {decl}")
@@ -140,6 +137,16 @@ class Memory:
             (rpm, tpm, monthly, key_id, owner_id))
         self.db.commit()
         return cur.rowcount > 0
+
+    def claim_stripe_event(self, event_id: str) -> bool:
+        """True the first time an id (checkout session / invoice) is seen; False on replays, so credits are granted once."""
+        cur = self.db.execute("INSERT OR IGNORE INTO processed_stripe(id) VALUES(?)", (event_id,))
+        self.db.commit()
+        return cur.rowcount > 0
+
+    def get_plan(self, api_key_id):
+        row = self.db.execute("SELECT plan FROM api_keys WHERE id=?", (api_key_id,)).fetchone()
+        return row[0] if row else None
 
     def month_tokens(self, api_key_id):
         row = self.db.execute(
@@ -352,17 +359,9 @@ class Memory:
         self.db.execute(
             "INSERT INTO decision_shadow(api_key_id,heuristic_route,cde_route,confidence,abstained,"
             "abstention_reason,normalized_entropy,margin,agreed) VALUES(?,?,?,?,?,?,?,?,?)",
-            (
-                api_key_id,
-                heuristic_route,
-                cde_route,
-                float(confidence),
-                int(bool(abstained)),
-                abstention_reason,
-                float(normalized_entropy) if normalized_entropy is not None else None,
-                float(margin) if margin is not None else None,
-                int(agreed),
-            ),
+            (api_key_id, heuristic_route, cde_route, float(confidence), int(bool(abstained)), abstention_reason,
+             float(normalized_entropy) if normalized_entropy is not None else None,
+             float(margin) if margin is not None else None, int(agreed)),
         )
         self.db.commit()
 
@@ -370,8 +369,7 @@ class Memory:
         since = f"-{max(1, int(days))} days"
         row = self.db.execute(
             "SELECT COUNT(*),COALESCE(SUM(agreed),0),COALESCE(SUM(abstained),0),AVG(confidence),"
-            "AVG(normalized_entropy),AVG(margin) "
-            "FROM decision_shadow WHERE created_at>=datetime('now',?)", (since,)
+            "AVG(normalized_entropy),AVG(margin) FROM decision_shadow WHERE created_at>=datetime('now',?)", (since,)
         ).fetchone()
         total, agreed, abstained, avg_confidence, avg_entropy, avg_margin = row
         disagreements = self.db.execute(
@@ -381,16 +379,13 @@ class Memory:
         ).fetchall()
         abstention_reasons = self.db.execute(
             "SELECT COALESCE(abstention_reason,'unknown'),COUNT(*) FROM decision_shadow "
-            "WHERE created_at>=datetime('now',?) AND abstained=1 "
-            "GROUP BY abstention_reason ORDER BY COUNT(*) DESC", (since,)
+            "WHERE created_at>=datetime('now',?) AND abstained=1 GROUP BY abstention_reason ORDER BY COUNT(*) DESC", (since,)
         ).fetchall()
         return {
             "days": max(1, int(days)), "samples": total, "agreements": agreed,
             "agreement_rate": (agreed / total) if total else None,
             "abstentions": abstained, "abstention_rate": (abstained / total) if total else None,
-            "avg_confidence": avg_confidence,
-            "avg_normalized_entropy": avg_entropy,
-            "avg_margin": avg_margin,
+            "avg_confidence": avg_confidence, "avg_normalized_entropy": avg_entropy, "avg_margin": avg_margin,
             "abstention_reasons": {reason: count for reason, count in abstention_reasons},
             "top_disagreements": [{"heuristic": a, "cde": b, "count": n} for a,b,n in disagreements],
         }

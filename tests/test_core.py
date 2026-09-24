@@ -153,17 +153,11 @@ def test_decision_shadow_telemetry_and_migration(tmp_path):
     )
     db.commit()
     db.close()
-
     mem = Memory(str(db_path))
     columns = {row[1] for row in mem.db.execute("PRAGMA table_info(decision_shadow)").fetchall()}
     assert {"abstention_reason", "normalized_entropy", "margin"} <= columns
-
-    mem.record_decision_shadow(
-        1, "fast", None, .5, True,
-        abstention_reason="suspected_ood",
-        normalized_entropy=1.0,
-        margin=0.0,
-    )
+    mem.record_decision_shadow(1, "fast", None, .5, True, abstention_reason="suspected_ood",
+                               normalized_entropy=1.0, margin=0.0)
     report = mem.decision_shadow_summary()
     assert report["samples"] == 1
     assert report["abstentions"] == 1

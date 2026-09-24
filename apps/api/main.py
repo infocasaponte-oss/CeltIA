@@ -11,6 +11,7 @@ from typing import Annotated, Literal
 import httpx
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from core import files as files_mod
+from core import webfetch
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -38,7 +39,7 @@ from core.tools import PUBLIC_SAFE_TOOLS, Tool, builtins
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="CeltIA", version="1.0.0")
+app = FastAPI(title="CeltIA", version="1.0.0", docs_url=None, redoc_url=None, openapi_url=None)
 app.state.metrics = {"requests": 0, "agent_runs": 0, "tool_calls": 0, "stream_requests": 0, "decision_requests": 0}
 app.add_middleware(
     CORSMiddleware,
@@ -83,7 +84,12 @@ gateway = Gateway(settings.gateway_max_concurrency, settings.gateway_queue_wait_
 login_limiter = AttemptLimiter(max_attempts=8, window_seconds=15 * 60)         # per email
 login_ip_limiter = AttemptLimiter(max_attempts=40, window_seconds=15 * 60)      # per IP (proxies share one IP)
 register_limiter = AttemptLimiter(max_attempts=10, window_seconds=60 * 60)
-AUTO_SEARCH_TOOLS = {"web_search"}
+MAX_CONTEXT_MESSAGES = 12
+URL_PATTERN = re.compile(r"https?://[^\s)\]>\"']+")
+LINK_WORDS = re.compile(r"\b(enlace|link|url|p[aá]gina|web|enlaz|ligaz[oó]n|liga)\b", re.I)
+MAX_TOOL_ROUNDS = 3
+BLANK_ANSWER_FALLBACK = "No he podido generar una respuesta esta vez. Vuelve a intentarlo o reformula la pregunta."
+AUTO_SEARCH_TOOLS = {"web_search", "fetch_url"}
 CODE_TOOLS = {"install_package"}
 ROLES = {"admin", "premium", "user"}
 
@@ -145,6 +151,7 @@ class ChatRequest(BaseModel):
     mode:str|None=None
     temperature:float|None=None
     max_tokens:int|None=None
+    timezone:str|None=None
 
 DecisionOptionInput = Annotated[str, Field(min_length=1, max_length=1000)]
 
@@ -162,7 +169,6 @@ class DecisionQuestionInput(BaseModel):
             if self.options or self.minimum is not None or self.maximum is not None:
                 raise ValueError("boolean questions do not accept options or score bounds")
             return self
-
         if self.type == "choice":
             if self.minimum is not None or self.maximum is not None:
                 raise ValueError("choice questions do not accept score bounds")
@@ -171,7 +177,6 @@ class DecisionQuestionInput(BaseModel):
             if len(set(self.options)) != len(self.options):
                 raise ValueError("choice options must be unique")
             return self
-
         if self.options:
             raise ValueError("score questions do not accept choice options")
         if self.minimum is None or self.maximum is None or self.minimum > self.maximum:
@@ -207,6 +212,16 @@ async def require_api_key(authorization: str | None = Header(default=None)):
         raise HTTPException(402, "Sin saldo de tokens. Recarga tu cuenta para continuar.")
     return record
 
+def client_ip(request: Request) -> str:
+    """Real client IP. Behind the Cloudflare tunnel every request arrives from 127.0.0.1, so the CF-Connecting-IP
+    header is honoured only when the direct peer is local (i.e. it came through our own tunnel)."""
+    peer = request.client.host if request.client else "unknown"
+    if peer in ("127.0.0.1", "::1"):
+        forwarded = request.headers.get("cf-connecting-ip", "").strip()
+        if forwarded:
+            return forwarded
+    return peer
+
 def _admin_token_ok(candidate: str | None) -> bool:
     return bool(settings.admin_token and candidate and secrets.compare_digest(candidate.encode(), settings.admin_token.encode()))
 
@@ -229,9 +244,28 @@ class CookieConsent(BaseModel):
 
 PLANS = {
     "free": {"label": "Free", "role": "user", "token_grant": None},
+    "basic": {"label": "Basic", "role": "premium", "token_grant": None},
     "pro": {"label": "Pro", "role": "premium", "token_grant": None},
+    "ultra": {"label": "Ultra", "role": "premium", "token_grant": None},
     "payg": {"label": "Pay-as-you-go", "role": "premium", "token_grant": None},
 }
+SUBSCRIPTION_PLANS = ("basic", "pro", "ultra")
+
+def plan_token_grant(plan: str) -> int:
+    return {"basic": settings.basic_plan_token_grant, "pro": settings.pro_plan_token_grant,
+            "ultra": settings.ultra_plan_token_grant}.get(plan, 0)
+
+def activate_paid_plan(key_id: int, plan: str, customer_id, subscription_id, claim_id: str) -> bool:
+    """Upgrade the account and grant the plan's tokens exactly once per checkout session (replay-safe)."""
+    memory.link_stripe_customer(key_id, customer_id, subscription_id)
+    memory.set_api_key_role(key_id, "premium")
+    memory.set_plan(key_id, plan)
+    if not memory.claim_stripe_event(claim_id):
+        return False
+    grant = plan_token_grant(plan)
+    if grant:
+        memory.add_token_credit(key_id, grant)
+    return True
 
 class RegisterRequest(BaseModel):
     name: str
@@ -251,8 +285,12 @@ async def billing_plans():
         "plans": [
             {"id": "free", "label": "Free", "description": f"{settings.free_plan_token_grant} tokens de prueba, sin tarjeta.",
              "requires_payment": False},
-            {"id": "pro", "label": "Pro", "description": f"Cuota fija mensual, incluye {settings.pro_plan_token_grant} tokens/mes.",
-             "requires_payment": billing.is_configured()},
+        ] + [
+            {"id": plan_id, "label": PLANS[plan_id]["label"],
+             "description": f"Cuota fija mensual, incluye {plan_token_grant(plan_id):,} tokens/mes.",
+             "requires_payment": billing.plan_configured(plan_id)}
+            for plan_id in SUBSCRIPTION_PLANS
+        ] + [
             {"id": "payg", "label": "Pay-as-you-go", "description": "Sin cuota fija, se factura mensualmente según los tokens que consumas.",
              "requires_payment": billing.metered_configured()},
         ]
@@ -260,7 +298,7 @@ async def billing_plans():
 
 @app.post("/auth/register")
 async def auth_register(req: RegisterRequest, request: Request):
-    ip_key = f"ip:{request.client.host if request.client else 'unknown'}"
+    ip_key = f"ip:{client_ip(request)}"
     register_limiter.check(ip_key)
     register_limiter.hit(ip_key)
     if len(req.password) < 8:
@@ -282,9 +320,9 @@ async def auth_register(req: RegisterRequest, request: Request):
 
     if req.plan == "free":
         memory.add_token_credit(key_id, settings.free_plan_token_grant)
-    elif req.plan == "pro" and billing.is_configured():
+    elif req.plan in SUBSCRIPTION_PLANS and billing.plan_configured(req.plan):
         try:
-            result["checkout_url"] = await billing.create_checkout_session(req.email, key_id=key_id, plan="pro")
+            result["checkout_url"] = await billing.create_checkout_session(req.email, key_id=key_id, plan=req.plan)
         except Exception:
             logger.exception("failed to create Pro checkout session on registration")
     elif req.plan == "payg" and billing.metered_configured():
@@ -296,7 +334,7 @@ async def auth_register(req: RegisterRequest, request: Request):
 
 @app.post("/auth/login")
 async def auth_login(req: LoginRequest, request: Request):
-    ip = request.client.host if request.client else "unknown"
+    ip = client_ip(request)
     email_key = f"email:{req.email.strip().lower()}"
     login_limiter.check(email_key)
     login_ip_limiter.check(f"ip:{ip}")
@@ -390,10 +428,7 @@ async def health(): return {"status":"ok","model":settings.model_serve_name}
 async def decide(req: DecisionApiRequest, key: dict = Depends(require_api_key)):
     """Structured decision endpoint. Results are advisory; this endpoint executes no tools."""
     if not req.questions or len(req.questions) > settings.decision_max_questions:
-        raise HTTPException(
-            400,
-            f"questions must contain between 1 and {settings.decision_max_questions} items",
-        )
+        raise HTTPException(400, f"questions must contain between 1 and {settings.decision_max_questions} items")
     payload = [q.model_dump() for q in req.questions]
     started_at = time.monotonic()
     try:
@@ -408,14 +443,9 @@ async def decide(req: DecisionApiRequest, key: dict = Depends(require_api_key)):
         prompt_tokens = int(usage.get("prompt_tokens", 0))
         completion_tokens = int(usage.get("completion_tokens", 0))
         total_tokens = int(usage.get("total_tokens", prompt_tokens + completion_tokens))
-        memory.record_usage(
-            key["id"],
-            prompt_tokens,
-            completion_tokens,
-            model=settings.model_serve_name,
-            latency_ms=int((time.monotonic() - started_at) * 1000),
-            client_key_id=key.get("client_key_id"),
-        )
+        memory.record_usage(key["id"], prompt_tokens, completion_tokens, model=settings.model_serve_name,
+                            latency_ms=int((time.monotonic() - started_at) * 1000),
+                            client_key_id=key.get("client_key_id"))
         gateway.record_tokens(key["id"], total_tokens, key.get("client_key_id"))
         if key.get("token_balance") is not None:
             memory.decrement_token_balance(key["id"], total_tokens)
@@ -425,10 +455,8 @@ async def decide(req: DecisionApiRequest, key: dict = Depends(require_api_key)):
     return {"object": "decision.list", "usage": usage, "data": [
         {"id": r.id, "probabilities": r.probabilities, "decision": r.decision,
          "confidence": r.confidence, "abstained": r.abstained,
-         "abstention_reason": r.abstention_reason,
-         "normalized_entropy": r.normalized_entropy,
-         "margin": r.margin,
-         "expected_score": r.expected_score}
+         "abstention_reason": r.abstention_reason, "normalized_entropy": r.normalized_entropy,
+         "margin": r.margin, "expected_score": r.expected_score}
         for r in results
     ]}
 
@@ -451,9 +479,43 @@ def _log_tool_activity(key_id, name, args, result):
     if name == "web_search":
         urls = [item.get("url") for item in result.get("results", []) if isinstance(item, dict) and item.get("url")]
         memory.record_activity(key_id, "web_search", json.dumps({"query": args.get("query"), "urls": urls}, ensure_ascii=False))
+    elif name == "fetch_url":
+        memory.record_activity(key_id, "fetch_url", json.dumps({"url": args.get("url"), "ok": result.get("ok")}, ensure_ascii=False))
     elif name == "install_package":
         memory.record_activity(key_id, "dependency_install", json.dumps(
             {"package": args.get("package"), "ok": result.get("ok")}, ensure_ascii=False))
+
+def _urls_in(text: str) -> list[str]:
+    return [u.rstrip(".,;:!?") for u in URL_PATTERN.findall(text or "")]
+
+async def _inject_linked_pages(msgs, user_text, allowed_tools, key, emit):
+    """If the user pastes a link, or refers to "the link" mentioned earlier, read that page server-side and give
+    its text to the model as context. Small local models don't reliably call fetch_url on their own."""
+    if allowed_tools is not None and "fetch_url" not in allowed_tools:
+        return msgs
+    urls = _urls_in(user_text)
+    if not urls and LINK_WORDS.search(user_text or ""):
+        for m in reversed(msgs[:-1]):
+            found = _urls_in(m.get("content", ""))
+            if found:
+                urls = [found[-1]]
+                break
+    urls = list(dict.fromkeys(urls))[:2]
+    if not urls:
+        return msgs
+    sections = []
+    for url in urls:
+        emit({"type": "tool_start", "name": "fetch_url", "args": {"url": url}})
+        page = await webfetch.fetch_url(url)
+        emit({"type": "tool_result", "name": "fetch_url", "ok": bool(page.get("ok"))})
+        _log_tool_activity(key.get("id"), "fetch_url", {"url": url}, page)
+        if page.get("ok"):
+            sections.append(f"[Contenido leído de {page['url']} — título: {page.get('title') or 'sin título'}]\n{page['text'][:4000]}")
+        else:
+            sections.append(f"[No se pudo leer {url}: {page.get('error')}]")
+    context = {"role": "system", "content": "Páginas web que el usuario indicó o mencionó (contenido real ya leído; úsalo como fuente, cita el enlace y "
+                                            "no digas que no puedes acceder a enlaces):\n\n" + "\n\n".join(sections)}
+    return msgs[:-1] + [context] + msgs[-1:]
 
 async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, stream_tokens=False):
     def emit(event):
@@ -474,24 +536,20 @@ async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, 
                 emit({"type": "token", "text": piece})
 
     started_at = time.monotonic()
+    persona.set_timezone(req.timezone)
     cap = gateway.limits_for(key.get("role", "user"))["max_tokens_per_request"]
     if req.max_tokens:
         req.max_tokens = min(req.max_tokens, cap)
-    text = "\n".join(m.content for m in req.messages if m.role == "user")[-20000:]
+    user_msgs = [m.content for m in req.messages if m.role == "user"]
+    text = (user_msgs[-1] if user_msgs else "")[-20000:]
     r = route(text)
     if settings.decision_shadow_routing:
         shadow = await evaluate_route_shadow(decision_runtime, text, r.mode)
         if shadow:
             logger.info("CDE shadow route: %s", shadow)
             memory.record_decision_shadow(
-                key.get("id"),
-                shadow["heuristic"],
-                shadow["cde"],
-                shadow["confidence"],
-                shadow["abstained"],
-                shadow.get("abstention_reason"),
-                shadow.get("normalized_entropy"),
-                shadow.get("margin"),
+                key.get("id"), shadow["heuristic"], shadow["cde"], shadow["confidence"], shadow["abstained"],
+                shadow.get("abstention_reason"), shadow.get("normalized_entropy"), shadow.get("margin"),
             )
             emit({"type": "decision_shadow", **shadow})
     auto_agent = r.mode == "agent"
@@ -500,13 +558,15 @@ async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, 
         r = r.__class__(req.mode, r.difficulty, req.mode in {"think", "code", "long"}, req.max_tokens or forced_tokens)
     role = key.get("role", "user")
     keep_history = role_has_history(role)
-    msgs = (memory.history(sid, api_key_id=key.get("id")) if keep_history else []) + [m.model_dump() for m in req.messages]
+    stored = memory.history(sid, api_key_id=key.get("id")) if keep_history and len(req.messages) == 1 else []
+    msgs = stored + [m.model_dump() for m in req.messages[-MAX_CONTEXT_MESSAGES:]]
     allowed_tools = role_tools(role)
     prompt_tokens = completion_tokens = 0
+    msgs = await _inject_linked_pages(msgs, text, allowed_tools, key, emit)
     emit({"type": "status", "text": f"Entendido. Ruta elegida: {r.mode}"})
     if r.mode == "agent":
         app.state.metrics["agent_runs"] += 1
-        result = await agent.run(msgs, allowed_tools=allowed_tools, role=role,
+        result = await agent.run(msgs, allowed_tools=allowed_tools, role=role, extra_instructions=" ".join(filter(None, [persona.language_hint(text), persona.relative_date_hint(text)])),
                                   on_tool_call=lambda n, a, res: _log_tool_activity(key.get("id"), n, a, res),
                                   on_event=on_event, on_token=on_token)
         answer = result["answer"]
@@ -525,10 +585,19 @@ async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, 
                 "or if answering accurately requires current or verifiable information, you MUST call web_search "
                 "before answering. Never claim you lack real-time or internet access — you have it via this tool."
             )
+        if "fetch_url" in effective_tools:
+            hint_lines.append(
+                "You also have fetch_url, which reads the text of a web page. If the user mentions a link/URL, or "
+                "asks about the contents of a page, call fetch_url on it (for weather, news or data, first web_search "
+                "then fetch_url on the most relevant result) before answering. Never say you cannot open links."
+            )
         if "install_package" in effective_tools:
             hint_lines.append(
                 "If you are writing code that needs a third-party library, call install_package to install it first."
             )
+        for extra_hint in (persona.language_hint(text), persona.relative_date_hint(text)):
+            if extra_hint:
+                hint_lines.append(extra_hint)
         hint_lines.append("Only use the tools listed for this request; do not invent or call tools that were not provided. Otherwise answer directly.")
         search_hint = {"role": "system", "content": persona.system_prompt(role, extra=" ".join(hint_lines))}
         emit({"type": "status", "text": "Consultando al modelo…"})
@@ -537,10 +606,14 @@ async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, 
             temperature=req.temperature, tools=registry.schemas(only=effective_tools), on_token=on_token,
         )
         search_msg = search_result["choices"][0]["message"]
-        tool_calls = search_msg.get("tool_calls") or []
         web_search_used = False
-        if tool_calls:
-            working = [search_hint] + msgs + [search_msg]
+        working = [search_hint] + msgs
+        result, msg = search_result, search_msg
+        for round_no in range(MAX_TOOL_ROUNDS):
+            tool_calls = msg.get("tool_calls") or []
+            if not tool_calls:
+                break
+            working.append(msg)
             for call in tool_calls[: settings.max_tool_calls]:
                 fn = call.get("function", {})
                 name = fn.get("name", "")
@@ -559,13 +632,25 @@ async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, 
                 _log_tool_activity(key.get("id"), name, args, tool_result)
                 if name == "web_search":
                     web_search_used = True
-                working.append({"role": "tool", "tool_call_id": call.get("id", "call-0"),
+                working.append({"role": "tool", "tool_call_id": call.get("id", f"call-{round_no}"),
                                  "content": tool_content(tool_result)})
             emit({"type": "status", "text": "Redactando la respuesta con los resultados…"})
-            result = await llm.chat(working, thinking=r.thinking, max_tokens=req.max_tokens or r.max_tokens, temperature=req.temperature, on_token=on_token)
-        else:
-            result = search_result
-        answer = result["choices"][0]["message"].get("content", "")
+            last_round = round_no == MAX_TOOL_ROUNDS - 1
+            result = await llm.chat(
+                working, thinking=r.thinking, max_tokens=req.max_tokens or r.max_tokens, temperature=req.temperature,
+                tools=None if last_round else registry.schemas(only=effective_tools), on_token=on_token,
+            )
+            msg = result["choices"][0]["message"]
+        answer = msg.get("content", "") or ""
+        if not persona.enforce_identity(answer).strip():
+            # Safety net: the model returned nothing usable (empty, or only reasoning). Ask once more, without tools.
+            emit({"type": "status", "text": "Reintentando la respuesta…"})
+            retry = await llm.chat(
+                working + [{"role": "system", "content": "Responde ahora de forma directa y completa a la última petición del usuario, con la información disponible. No llames a herramientas."}],
+                thinking=False, max_tokens=req.max_tokens or r.max_tokens, temperature=req.temperature, on_token=on_token,
+            )
+            result = retry
+            answer = retry["choices"][0]["message"].get("content", "") or ""
         meta = {"route": r.mode, "difficulty": r.difficulty, "thinking": r.thinking, "verified": False, "web_search_used": web_search_used}
         if result.get("meta", {}).get("offline_fallback"):
             meta["offline_fallback"] = True
@@ -574,6 +659,8 @@ async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, 
         prompt_tokens = usage.get("prompt_tokens", 0)
         completion_tokens = usage.get("completion_tokens", max(1, len(answer) // 4))
     answer = persona.enforce_identity(answer)
+    if not answer.strip():
+        answer = BLANK_ANSWER_FALLBACK
     if keep_history:
         memory.add(sid, "user", text, api_key_id=key.get("id"))
         memory.add(sid, "assistant", answer, api_key_id=key.get("id"))
@@ -651,6 +738,13 @@ async def create_api_key(req: ApiKeyCreateRequest, _=Depends(require_admin)):
 async def list_api_keys(_=Depends(require_admin)):
     return {"keys": memory.list_api_keys()}
 
+def _assert_not_last_admin(target: dict) -> None:
+    """Refuse to demote/deactivate the only active admin (it would lock everyone out of the admin panel)."""
+    if target["role"] == "admin" and target["active"]:
+        active_admins = [k for k in memory.list_api_keys() if k["role"] == "admin" and k["active"]]
+        if len(active_admins) <= 1:
+            raise HTTPException(400, "No puedes quitar el rol ni desactivar al único administrador activo")
+
 @app.patch("/admin/api-keys/{key_id}")
 async def update_api_key(key_id: int, req: ApiKeyUpdateRequest, _=Depends(require_admin)):
     target = memory.get_api_key(key_id)
@@ -658,10 +752,8 @@ async def update_api_key(key_id: int, req: ApiKeyUpdateRequest, _=Depends(requir
         raise HTTPException(404, "API key not found")
     demoting = req.role is not None and req.role != "admin"
     deactivating = req.active is False
-    if target["role"] == "admin" and target["active"] and (demoting or deactivating):
-        active_admins = [k for k in memory.list_api_keys() if k["role"] == "admin" and k["active"]]
-        if len(active_admins) <= 1:
-            raise HTTPException(400, "No puedes quitar el rol ni desactivar al único administrador activo")
+    if demoting or deactivating:
+        _assert_not_last_admin(target)
     if req.role is not None:
         if req.role not in ROLES:
             raise HTTPException(400, f"role must be one of {sorted(ROLES)}")
@@ -702,6 +794,50 @@ async def extract_file(file: UploadFile = File(...), key=Depends(require_api_key
         return files_mod.extract_text(file.filename or "archivo", data)
     except files_mod.UnsupportedFile as exc:
         raise HTTPException(415, str(exc))
+
+class ImageRequest(BaseModel):
+    prompt: str
+    n: int = 1
+
+@app.post("/v1/images/generations")
+async def generate_image(req: ImageRequest, key=Depends(require_api_key)):
+    """Image generation through xAI (Grok Imagine). Premium/admin only: every image costs real money."""
+    if not role_has_history(key.get("role", "user")):
+        raise HTTPException(403, "La generación de imágenes está disponible en los planes premium y admin")
+    api_key = settings.image_api_key or settings.xai_api_key
+    if not api_key:
+        raise HTTPException(503, "La generación de imágenes no está configurada")
+    prompt = req.prompt.strip()
+    if not prompt or len(prompt) > 2000:
+        raise HTTPException(400, "El prompt debe tener entre 1 y 2000 caracteres")
+    async with gateway.slot(key):
+        started = time.monotonic()
+        try:
+            async with httpx.AsyncClient(timeout=120) as client:
+                resp = await client.post(
+                    f"{settings.image_api_url.rstrip('/')}/images/generations",
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    json={"model": settings.image_model, "prompt": prompt, "n": 1, "response_format": "b64_json"},
+                )
+        except httpx.HTTPError:
+            logger.exception("image generation request failed")
+            raise HTTPException(502, "No se pudo contactar con el servicio de imágenes")
+        if resp.status_code >= 400:
+            logger.warning("image API error %s: %s", resp.status_code, resp.text[:300])
+            raise HTTPException(502, "El servicio de imágenes rechazó la petición (¿contenido no permitido?)")
+        data = resp.json().get("data") or []
+        if not data:
+            raise HTTPException(502, "El servicio de imágenes no devolvió ninguna imagen")
+    cost = settings.image_token_cost
+    if key.get("id") is not None:
+        memory.record_usage(key["id"], 0, cost, model=settings.image_model,
+                            latency_ms=int((time.monotonic() - started) * 1000), client_key_id=key.get("client_key_id"))
+        memory.record_activity(key["id"], "image_generation", json.dumps({"prompt": prompt[:200]}, ensure_ascii=False))
+        gateway.record_tokens(key["id"], cost, key.get("client_key_id"))
+        if key.get("token_balance") is not None:
+            memory.decrement_token_balance(key["id"], cost)
+    return {"created": int(time.time()), "model": settings.image_model,
+            "data": [{"b64_json": item.get("b64_json"), "url": item.get("url")} for item in data[:1]]}
 
 class ClientKeyCreateRequest(BaseModel):
     name: str
@@ -815,6 +951,10 @@ async def delete_my_data(key=Depends(require_api_key)):
 
 @app.delete("/admin/api-keys/{key_id}")
 async def revoke_api_key(key_id: int, _=Depends(require_admin)):
+    target = memory.get_api_key(key_id)
+    if not target:
+        raise HTTPException(404, "API key not found")
+    _assert_not_last_admin(target)
     if not memory.revoke_api_key(key_id):
         raise HTTPException(404, "API key not found")
     return {"revoked": key_id}
@@ -871,11 +1011,7 @@ async def billing_complete(session_id: str):
         # El pago confirma la cuenta que ya se creó en /auth/register: se sube a premium
         # y, si el plan lo incluye, se le acreditan tokens fijos, sin duplicar cuentas.
         key_id = referenced_id
-        memory.link_stripe_customer(key_id, customer_id, subscription_id)
-        memory.set_api_key_role(key_id, "premium")
-        memory.set_plan(key_id, referenced_plan)
-        if referenced_plan == "pro":
-            memory.add_token_credit(key_id, settings.pro_plan_token_grant)
+        activate_paid_plan(key_id, referenced_plan, customer_id, subscription_id, f"session:{session_id}")
         # payg: sin tope de saldo (token_balance queda NULL = ilimitado), se factura por uso real vía Stripe metered billing
         return RedirectResponse(url="/ui/#billing=success")
 
@@ -890,6 +1026,7 @@ async def billing_complete(session_id: str):
             email=email, role="premium",
             stripe_customer_id=customer_id, stripe_subscription_id=subscription_id,
         )
+        memory.claim_stripe_event(f"session:{session_id}")
         memory.add_token_credit(key_id, settings.pro_plan_token_grant)
     body = (
         f"<h1>CeltIA</h1><p>Subscription active.</p>"
@@ -914,11 +1051,24 @@ async def stripe_webhook(request: Request, stripe_signature: str | None = Header
         key_id = memory.find_api_key_by_customer(customer_id) if customer_id else None
         if key_id:
             memory.set_api_key_active(key_id, False)
+    elif event_type == "checkout.session.completed":
+        # Reliable activation even if the customer closes the browser before the success redirect.
+        ref = obj.get("client_reference_id") or ""
+        if ":" in ref and obj.get("payment_status") in {"paid", "no_payment_required"}:
+            ref_id, ref_plan = ref.split(":", 1)
+            if ref_id.isdigit() and memory.get_api_key(int(ref_id)):
+                activate_paid_plan(int(ref_id), ref_plan, obj.get("customer"), obj.get("subscription"),
+                                   f"session:{obj.get('id')}")
     elif event_type == "invoice.paid":
         customer_id = obj.get("customer")
         key_id = memory.find_api_key_by_customer(customer_id) if customer_id else None
         if key_id:
             memory.set_api_key_active(key_id, True)
+            # Monthly renewal: top up the plan's tokens once per invoice (the first invoice is covered at checkout).
+            if obj.get("billing_reason") == "subscription_cycle" and memory.claim_stripe_event(f"invoice:{obj.get('id')}"):
+                grant = plan_token_grant(memory.get_plan(key_id) or "")
+                if grant:
+                    memory.add_token_credit(key_id, grant)
     return {"received": True}
 
 
