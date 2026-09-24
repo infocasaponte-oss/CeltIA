@@ -78,7 +78,7 @@ def test_runtime_aggregates_usage_across_questions():
     ]
     results, usage = asyncio.run(runtime.decide_with_usage({}, questions))
     assert len(results) == 2
-    assert usage == {"prompt_tokens":22,"completion_tokens":14,"total_tokens":36}
+    assert usage == {"prompt_tokens":22,"completion_tokens":14,"total_tokens":36,"models":[]}
 
 
 class MalformedUsageLLM:
@@ -423,3 +423,31 @@ def test_runtime_rejects_request_when_candidate_floor_exceeds_total_output_budge
     except ValueError as exc:
         assert "candidate set" in str(exc)
     assert llm.calls == []
+
+
+class ModelMetaLLM:
+    def __init__(self):
+        self.calls=0
+
+    async def chat(self, messages, **kwargs):
+        self.calls += 1
+        model="primary-model" if self.calls == 1 else "fallback-model"
+        return {
+            "choices":[{"message":{"content":'{"scores":{"c0":0.1,"c1":2.0}}'}}],
+            "usage":{"prompt_tokens":1,"completion_tokens":1},
+            "meta":{"model":model},
+        }
+
+
+def test_runtime_records_distinct_models_used_across_question_calls():
+    runtime=CeltIADecisionRuntime(
+        ModelMetaLLM(),
+        abstain_below=0.0,
+        reject_suspected_ood=False,
+        max_questions=2,
+    )
+    _,usage=asyncio.run(runtime.decide_with_usage({},[
+        {"id":"q1","prompt":"route","type":"choice","options":["fast","think"]},
+        {"id":"q2","prompt":"route","type":"choice","options":["fast","think"]},
+    ]))
+    assert usage["models"] == ["primary-model","fallback-model"]
