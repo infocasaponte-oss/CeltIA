@@ -21,7 +21,7 @@ class ToolPolicy:
 
     def __init__(self, config: SandboxConfig | None = None):
         self.config = config or SandboxConfig()
-        self.allowed_tools = {"calculator", "python_exec", "read_file", "list_dir", "grep_text", "current_time", "web_search", "install_package", "system_audit"}
+        self.allowed_tools = {"calculator", "python_exec", "read_file", "list_dir", "grep_text", "current_time", "web_search", "fetch_url", "install_package", "system_audit"}
 
     def is_allowed(self, name: str) -> bool:
         return name in self.allowed_tools
@@ -80,6 +80,11 @@ class ToolPolicy:
             if count < 1 or count > 10:
                 raise ValueError("count out of range")
             return {"query": query, "count": count}
+        if name == "fetch_url":
+            url = str(args.get("url", "")).strip()
+            if not url or len(url) > 2000:
+                raise ValueError("invalid url")
+            return {"url": url}
         if name == "install_package":
             package = str(args.get("package", "")).strip()
             if not package:

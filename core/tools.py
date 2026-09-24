@@ -6,6 +6,7 @@ from typing import Any, Callable
 
 import httpx
 
+from core import webfetch
 from core.config import settings
 from core.policy import ToolPolicy
 
@@ -22,7 +23,7 @@ class Tool:
             "name":self.name,"description":self.description,"parameters":self.schema}}
 
 
-PUBLIC_SAFE_TOOLS = {"calculator", "current_time", "web_search"}
+PUBLIC_SAFE_TOOLS = {"calculator", "current_time", "web_search", "fetch_url"}
 
 
 _DEFAULT_POLICY = object()
@@ -138,7 +139,7 @@ async def web_search(query: str, count: int = 3):
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
     results = [
-        {"title": item.get("title"), "url": item.get("url"), "snippet": (item.get("description") or "")[:180]}
+        {"title": item.get("title"), "url": item.get("url"), "snippet": (item.get("description") or "")[:300]}
         for item in data.get("web", {}).get("results", [])[:count]
     ]
     return {"ok": True, "query": query, "results": results}
@@ -164,5 +165,6 @@ def builtins(policy=None):
     r.add(Tool("grep_text","Search text within /workspace files.",{"type":"object","properties":{"path":{"type":"string"},"pattern":{"type":"string"}},"required":["pattern"],"additionalProperties":False},grep_text))
     r.add(Tool("current_time","Return the current UTC time.",{"type":"object","properties":{},"required":[],"additionalProperties":False},current_time))
     r.add(Tool("web_search","Search the web for current information using Brave Search.",{"type":"object","properties":{"query":{"type":"string"},"count":{"type":"integer","minimum":1,"maximum":10}},"required":["query"],"additionalProperties":False},web_search))
+    r.add(Tool("fetch_url","Read the text content of a public web page (http/https). Use it to open a link the user mentions or a URL returned by web_search.",{"type":"object","properties":{"url":{"type":"string"}},"required":["url"],"additionalProperties":False},webfetch.fetch_url))
     r.add(Tool("install_package","Install a Python package needed to write or run code, via pip.",{"type":"object","properties":{"package":{"type":"string"}},"required":["package"],"additionalProperties":False},install_package))
     return r
