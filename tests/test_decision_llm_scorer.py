@@ -147,3 +147,33 @@ def test_llm_scorer_rejects_cyclic_context_before_model_call():
     except ValueError as exc:
         assert "JSON serializable" in str(exc)
     assert calls == []
+
+
+def test_llm_scorer_accepts_shared_json_container_references():
+    calls = []
+    async def chat(messages):
+        calls.append(messages)
+        return '{"scores":{"c0":0.0,"c1":1.0}}'
+    shared = {"value": [1, 2, 3]}
+    context = {"left": shared, "right": shared}
+    q = DecisionQuestion("safe", "safe?", DecisionType.BOOLEAN)
+    values = asyncio.run(AsyncLLMDecisionScorer(chat).score(context, q, q.candidates()))
+    assert values == [0.0, 1.0]
+    assert len(calls) == 1
+
+
+def test_llm_scorer_rejects_indirect_json_cycle_before_model_call():
+    calls = []
+    async def chat(messages):
+        calls.append(messages)
+        return '{"scores":{"c0":0.0,"c1":1.0}}'
+    outer = {}
+    inner = [outer]
+    outer["inner"] = inner
+    q = DecisionQuestion("safe", "safe?", DecisionType.BOOLEAN)
+    try:
+        asyncio.run(AsyncLLMDecisionScorer(chat).score(outer, q, q.candidates()))
+        assert False
+    except ValueError as exc:
+        assert "JSON serializable" in str(exc)
+    assert calls == []
