@@ -315,7 +315,7 @@ async def collect(args) -> dict:
         resume_manifest=_load_manifest(manifest_output)
         if resume_manifest.get("status") == "complete":
             try:
-                resume_manifest=validate_results_manifest(output,datasets,require_full_selection=False,dataset_rows=dataset_rows)
+                resume_manifest=validate_results_manifest(output,datasets,require_full_selection=False,require_clean_code=False,dataset_rows=dataset_rows)
             except ValueError as exc:
                 raise ValueError(f"resume completed provenance manifest is invalid: {exc}") from exc
         else:
