@@ -75,3 +75,25 @@ def test_sync_engine_can_disable_ood_rejection():
     ).decide(DecisionRequest({}, (q,)))[0]
     assert not result.abstained
     assert result.decision == "false"
+
+
+def test_score_decision_reports_expected_value():
+    q = DecisionQuestion("quality", "Quality", DecisionType.SCORE, minimum=1, maximum=3)
+    result = DecisionEngine(
+        FixedScorer([0.0, 0.0, 2.0]),
+        abstain_below=0.0,
+        reject_suspected_ood=False,
+    ).decide(DecisionRequest({}, (q,)))[0]
+    expected = sum(float(label) * probability for label, probability in result.probabilities.items())
+    assert math.isclose(result.expected_score, expected)
+    assert result.expected_score is not None
+
+
+def test_non_score_decision_has_no_expected_value():
+    q = DecisionQuestion("safe", "Safe?", DecisionType.BOOLEAN)
+    result = DecisionEngine(
+        FixedScorer([0.0, 2.0]),
+        abstain_below=0.0,
+        reject_suspected_ood=False,
+    ).decide(DecisionRequest({}, (q,)))[0]
+    assert result.expected_score is None
