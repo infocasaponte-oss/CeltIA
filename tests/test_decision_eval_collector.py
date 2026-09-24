@@ -650,11 +650,15 @@ def test_collection_rejects_undeclared_model_before_result_checkpoint(tmp_path, 
     except ValueError as exc:
         assert "not declared by provenance manifest" in str(exc)
 
-    assert not (tmp_path / "results.jsonl").exists()
+    path=tmp_path / "results.jsonl"
+    assert path.exists()
+    assert path.read_text(encoding="utf-8") == ""
     manifest_path=tmp_path / "results.jsonl.manifest.json"
     assert manifest_path.exists()
     manifest=json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["status"] == "collecting"
+    assert manifest["result_rows"] == 0
+    assert manifest["results_sha256"] == collector.file_sha256(path)
 
 
 
