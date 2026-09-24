@@ -33,6 +33,20 @@ def evaluate_shadow(samples: Iterable[ShadowSample]) -> dict:
     actual_positive=true_positive+false_negative
     actual_negative=true_negative+false_positive
 
+    per_route={}
+    for route_name in ("fast","think","code","agent","long"):
+        route_labeled=[s for s in labeled if s.expected == route_name]
+        route_decided=[s for s in route_labeled if not s.abstained and s.cde is not None]
+        route_correct=sum(s.cde == route_name for s in route_decided)
+        per_route[route_name]={
+            "labeled":len(route_labeled),
+            "decided":len(route_decided),
+            "coverage":len(route_decided)/len(route_labeled) if route_labeled else None,
+            "correct":route_correct,
+            "accuracy":route_correct/len(route_labeled) if route_labeled else None,
+            "selective_accuracy":route_correct/len(route_decided) if route_decided else None,
+        }
+
     return {
         "samples": len(rows),
         "decided": len(decided),
@@ -44,6 +58,16 @@ def evaluate_shadow(samples: Iterable[ShadowSample]) -> dict:
         "cde_selective_accuracy": cde_correct_when_decided/len(labeled_decided) if labeled_decided else None,
         "labeled_coverage": len(labeled_decided)/len(labeled) if labeled else None,
         "labeled_abstentions": labeled_abstentions,
+        "per_route": per_route,
+        "min_route_labeled": min((item["labeled"] for item in per_route.values()), default=0),
+        "min_route_coverage": min(
+            (item["coverage"] for item in per_route.values() if item["coverage"] is not None),
+            default=None,
+        ),
+        "min_route_accuracy": min(
+            (item["accuracy"] for item in per_route.values() if item["accuracy"] is not None),
+            default=None,
+        ),
         "ood_labeled": len(ood_labeled),
         "ood_evaluated": len(ood_evaluated),
         "ood_positive_labels": actual_positive,
@@ -63,6 +87,9 @@ def evaluate_shadow(samples: Iterable[ShadowSample]) -> dict:
 def promotion_gate(metrics: dict, *, min_samples: int = 200, min_coverage: float = 0.80,
                    min_labeled: int = 50, min_accuracy_delta: float = 0.02,
                    min_labeled_coverage: float = 0.80,
+                   min_route_labeled: int | None = None,
+                   min_route_coverage: float | None = None,
+                   min_route_accuracy: float | None = None,
                    min_ood_labeled: int | None = None,
                    min_ood_coverage: float | None = None,
                    min_ood_recall: float | None = None,
@@ -76,6 +103,26 @@ def promotion_gate(metrics: dict, *, min_samples: int = 200, min_coverage: float
         reasons.append("insufficient_labeled_coverage")
     h=metrics.get("heuristic_accuracy"); c=metrics.get("cde_accuracy")
     if h is None or c is None or c-h < min_accuracy_delta: reasons.append("accuracy_delta_below_gate")
+
+    per_route=metrics.get("per_route") or {}
+    if min_route_labeled is not None:
+        if not per_route or any((per_route.get(name) or {}).get("labeled", 0) < min_route_labeled
+                                for name in ("fast","think","code","agent","long")):
+            reasons.append("insufficient_per_route_labeled_samples")
+    if min_route_coverage is not None:
+        if not per_route or any(
+            (per_route.get(name) or {}).get("coverage") is None
+            or (per_route.get(name) or {}).get("coverage") < min_route_coverage
+            for name in ("fast","think","code","agent","long")
+        ):
+            reasons.append("per_route_coverage_below_gate")
+    if min_route_accuracy is not None:
+        if not per_route or any(
+            (per_route.get(name) or {}).get("accuracy") is None
+            or (per_route.get(name) or {}).get("accuracy") < min_route_accuracy
+            for name in ("fast","think","code","agent","long")
+        ):
+            reasons.append("per_route_accuracy_below_gate")
 
     if min_ood_labeled is not None and metrics.get("ood_labeled", 0) < min_ood_labeled:
         reasons.append("insufficient_ood_labeled_samples")
