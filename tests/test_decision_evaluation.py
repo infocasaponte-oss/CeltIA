@@ -1,4 +1,5 @@
 from celtia.decision.evaluation import ShadowSample, evaluate_shadow, promotion_gate
+from scripts.evaluate_decision_routes import load_cde_results
 
 def test_shadow_metrics_and_gate():
     samples=[
@@ -174,3 +175,48 @@ def test_promotion_gate_requires_both_ood_classes_when_thresholded():
     )
     assert not gate["eligible"]
     assert "insufficient_ood_positive_samples" in gate["reasons"]
+
+
+
+def test_load_cde_results_validates_promotion_inputs(tmp_path):
+    good = tmp_path / "good.jsonl"
+    good.write_text(
+        '{"text":"a","cde":"fast","confidence":0.9,"abstained":false,"suspected_ood":false}\n'
+        '{"text":"b","cde":null,"confidence":0.2,"abstained":true,"suspected_ood":true}\n',
+        encoding="utf-8",
+    )
+    rows = load_cde_results(good)
+    assert rows["a"]["confidence"] == .9
+    assert rows["b"]["abstained"] is True
+
+    bad_rows = (
+        '{"text":"a","cde":"fast","confidence":"NaN","abstained":false}',
+        '{"text":"a","cde":"fast","confidence":1.1,"abstained":false}',
+        '{"text":"a","cde":"fast","confidence":0.9,"abstained":"false"}',
+        '{"text":"a","cde":null,"confidence":0.9,"abstained":false}',
+        '{"text":"a","cde":"fast","confidence":0.9,"abstained":true}',
+        '{"text":"a","cde":"unknown","confidence":0.9,"abstained":false}',
+        '{"text":"a","cde":"fast","confidence":0.9,"abstained":false,"suspected_ood":1}',
+    )
+    for index, line in enumerate(bad_rows):
+        path = tmp_path / f"bad-{index}.jsonl"
+        path.write_text(line + "\n", encoding="utf-8")
+        try:
+            load_cde_results(path)
+            assert False, line
+        except ValueError:
+            pass
+
+
+def test_load_cde_results_rejects_duplicate_text(tmp_path):
+    path = tmp_path / "duplicate.jsonl"
+    path.write_text(
+        '{"text":"same","cde":"fast","confidence":0.9,"abstained":false}\n'
+        '{"text":"same","cde":"think","confidence":0.8,"abstained":false}\n',
+        encoding="utf-8",
+    )
+    try:
+        load_cde_results(path)
+        assert False
+    except ValueError as exc:
+        assert "duplicate CDE result text" in str(exc)
