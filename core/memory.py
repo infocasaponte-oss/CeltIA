@@ -28,6 +28,11 @@ class Memory:
             "CREATE TABLE IF NOT EXISTS activity_log(id INTEGER PRIMARY KEY,api_key_id INTEGER,kind TEXT,detail TEXT,created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"
         )
         self.db.execute(
+            "CREATE TABLE IF NOT EXISTS decision_shadow(id INTEGER PRIMARY KEY,api_key_id INTEGER,"
+            "heuristic_route TEXT,cde_route TEXT,confidence REAL,abstained INTEGER,"
+            "agreed INTEGER,created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"
+        )
+        self.db.execute(
             "CREATE TABLE IF NOT EXISTS oauth_states(state TEXT PRIMARY KEY,provider TEXT,gdpr_accepted INTEGER,"
             "cookie_consent TEXT,created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"
         )
@@ -327,6 +332,34 @@ class Memory:
              client_key_id),
         )
         self.db.commit()
+
+    def record_decision_shadow(self, api_key_id, heuristic_route, cde_route, confidence, abstained):
+        agreed = bool(cde_route and cde_route == heuristic_route and not abstained)
+        self.db.execute(
+            "INSERT INTO decision_shadow(api_key_id,heuristic_route,cde_route,confidence,abstained,agreed) VALUES(?,?,?,?,?,?)",
+            (api_key_id, heuristic_route, cde_route, float(confidence), int(bool(abstained)), int(agreed)),
+        )
+        self.db.commit()
+
+    def decision_shadow_summary(self, days=30):
+        since = f"-{max(1, int(days))} days"
+        row = self.db.execute(
+            "SELECT COUNT(*),COALESCE(SUM(agreed),0),COALESCE(SUM(abstained),0),AVG(confidence) "
+            "FROM decision_shadow WHERE created_at>=datetime('now',?)", (since,)
+        ).fetchone()
+        total, agreed, abstained, avg_confidence = row
+        disagreements = self.db.execute(
+            "SELECT heuristic_route,cde_route,COUNT(*) FROM decision_shadow "
+            "WHERE created_at>=datetime('now',?) AND abstained=0 AND heuristic_route<>cde_route "
+            "GROUP BY heuristic_route,cde_route ORDER BY COUNT(*) DESC LIMIT 20", (since,)
+        ).fetchall()
+        return {
+            "days": max(1, int(days)), "samples": total, "agreements": agreed,
+            "agreement_rate": (agreed / total) if total else None,
+            "abstentions": abstained, "abstention_rate": (abstained / total) if total else None,
+            "avg_confidence": avg_confidence,
+            "top_disagreements": [{"heuristic": a, "cde": b, "count": n} for a,b,n in disagreements],
+        }
 
     def record_activity(self, api_key_id, kind, detail):
         self.db.execute(
