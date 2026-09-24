@@ -31,6 +31,7 @@ class FakeDecisionRuntime:
                 abstention_reason=None,
                 normalized_entropy=0.2,
                 margin=0.8,
+                expected_score=None,
             )
         ], {"prompt_tokens": 4, "completion_tokens": 2, "total_tokens": 6}
 
@@ -54,6 +55,7 @@ def test_decide_uses_gateway_slot_and_records_metric(monkeypatch):
     assert result["data"][0]["abstention_reason"] is None
     assert result["data"][0]["normalized_entropy"] == 0.2
     assert result["data"][0]["margin"] == 0.8
+    assert result["data"][0]["expected_score"] is None
 
 
 class FakeMemory:
