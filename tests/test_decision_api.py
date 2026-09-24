@@ -151,36 +151,16 @@ def test_decide_honors_configured_question_limit(monkeypatch):
     assert gateway.keys == []
 
 
-def test_decision_api_rejects_cross_type_fields_at_runtime(monkeypatch):
-    gateway = FakeGateway()
-    memory = FakeMemory()
-    monkeypatch.setattr(api_main, "gateway", gateway)
-    monkeypatch.setattr(api_main, "memory", memory)
-
-    class RejectingRuntime:
-        async def decide_with_usage(self, context, questions):
-            from core.decision_runtime import CeltIADecisionRuntime
-            return await CeltIADecisionRuntime(FakeDecisionRuntime()).decide_with_usage(context, questions)
-
-    # Use the real request construction path with a harmless fake backend only after validation.
-    class NoCallLLM:
-        async def chat(self, messages, **kwargs):
-            assert False, "backend must not be called for an invalid question"
-
-    monkeypatch.setattr(api_main, "decision_runtime", __import__(
-        "core.decision_runtime", fromlist=["CeltIADecisionRuntime"]
-    ).CeltIADecisionRuntime(NoCallLLM()))
-
-    req = api_main.DecisionApiRequest(
-        context={},
-        questions=[api_main.DecisionQuestionInput(
-            id="b", prompt="bool?", type="boolean", options=["x", "y"]
-        )],
-    )
-    key = {"id": None, "role": "user"}
-    try:
-        asyncio.run(api_main.decide(req, key))
-        assert False
-    except api_main.HTTPException as exc:
-        assert exc.status_code == 400
-        assert "boolean questions do not accept" in str(exc.detail)
+def test_decision_api_schema_rejects_cross_type_fields():
+    invalid_questions = [
+        {"id":"b","prompt":"bool?","type":"boolean","options":["x","y"]},
+        {"id":"b","prompt":"bool?","type":"boolean","minimum":0,"maximum":1},
+        {"id":"c","prompt":"choice?","type":"choice","options":["x","y"],"minimum":0},
+        {"id":"s","prompt":"score?","type":"score","options":["x","y"],"minimum":1,"maximum":5},
+    ]
+    for question in invalid_questions:
+        try:
+            api_main.DecisionApiRequest.model_validate({"context": {}, "questions": [question]})
+            assert False
+        except ValueError:
+            pass
