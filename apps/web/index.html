@@ -687,6 +687,12 @@
             <button class="send-btn" id="changeKeyBtn" style="min-width:auto;padding:0 18px">Cambiar clave</button>
           </div>
 
+          <div class="panel" id="securityPanel">
+            <h4>Seguridade da conta</h4>
+            <p class="billing-note">Cambia o contrasinal co que inicias sesión.</p>
+            <button class="send-btn" id="changeMyPasswordBtn" style="min-width:auto;padding:0 18px">Cambiar o meu contrasinal</button>
+          </div>
+
           <div class="panel" id="apiPanel">
             <h4>API Keys para clientes externos</h4>
             <p class="billing-note">Cada clave móstrase unha soa vez; só se garda o seu hash. Úsaa como <code>Authorization: Bearer sk_live_…</code>.</p>
@@ -1041,6 +1047,8 @@
         return res.json();
       }
 
+
+      document.getElementById('changeMyPasswordBtn').addEventListener('click', () => openPasswordDialog({}, { self: true }));
 
       // ---------- API Keys + consumo ----------
       function fmtDate(v) { return v ? String(v).slice(0, 16).replace('T', ' ') : '—'; }
@@ -1629,19 +1637,21 @@
 
 
       // Diálogo para que un admin cambie o contrasinal dun usuario (campo oculto, confirmación e xerador).
-      function openPasswordDialog(user) {
+      function openPasswordDialog(user, { self = false } = {}) {
         const overlay = document.createElement('div');
         overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px';
         const box = document.createElement('form');
         box.style.cssText = 'width:100%;max-width:400px;background:var(--panel-strong,#161922);border:1px solid var(--border,#262b38);border-radius:14px;padding:22px;color:inherit;display:grid;gap:10px';
         const title = document.createElement('h3');
         title.style.margin = '0';
-        title.textContent = 'Cambiar contrasinal';
+        title.textContent = self ? 'Cambiar o meu contrasinal' : 'Cambiar contrasinal';
         const who = document.createElement('div');
         who.style.cssText = 'font-size:0.85rem;color:var(--muted)';
-        who.textContent = `${user.name || '—'}${user.email ? ' · ' + user.email : ''}`;
+        who.textContent = self ? 'Introduce o contrasinal actual e o novo.' : `${user.name || '—'}${user.email ? ' · ' + user.email : ''}`;
 
         const inputCss = 'padding:9px;border-radius:8px;border:1px solid var(--border,#262b38);background:transparent;color:inherit;width:100%;box-sizing:border-box';
+        const current = document.createElement('input');
+        current.type = 'password'; current.placeholder = 'Contrasinal actual'; current.autocomplete = 'current-password'; current.style.cssText = inputCss;
         const pw = document.createElement('input');
         pw.type = 'password'; pw.placeholder = 'Novo contrasinal (mín. 8 caracteres)'; pw.autocomplete = 'new-password'; pw.style.cssText = inputCss;
         const pw2 = document.createElement('input');
@@ -1664,10 +1674,10 @@
         const save = mkBtn('Gardar');
         save.type = 'submit';
         actions.append(cancel, save);
-        box.append(title, who, pw, pw2, row, msg, actions);
+        box.append(title, who, ...(self ? [current] : []), pw, pw2, row, msg, actions);
         overlay.appendChild(box);
         document.body.appendChild(overlay);
-        pw.focus();
+        (self ? current : pw).focus();
 
         const close = () => overlay.remove();
         cancel.addEventListener('click', close);
@@ -1696,17 +1706,31 @@
         box.addEventListener('submit', async (e) => {
           e.preventDefault();
           msg.style.color = 'var(--danger,#e5484d)';
+          if (self && !current.value) { msg.textContent = 'Introduce o contrasinal actual.'; return; }
           if (pw.value.length < 8) { msg.textContent = 'O contrasinal debe ter polo menos 8 caracteres.'; return; }
           if (pw.value !== pw2.value) { msg.textContent = 'Os contrasinais non coinciden.'; return; }
           save.disabled = true;
           try {
-            await adminFetch(`/admin/users/${user.id}/password`, { method: 'POST', body: JSON.stringify({ new_password: pw.value }) });
+            if (self) {
+              // 401 aquí significa "contrasinal actual incorrecto", non sesión caducada: non se usa meFetch.
+              const res = await fetch(`${apiBase}/v1/me/password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getApiKey()}` },
+                body: JSON.stringify({ current_password: current.value, new_password: pw.value }),
+              });
+              if (!res.ok) {
+                const detail = (await res.json().catch(() => ({}))).detail;
+                throw new Error(res.status === 401 ? 'O contrasinal actual non é correcto.' : (detail || `erro ${res.status}`));
+              }
+            } else {
+              await adminFetch(`/admin/users/${user.id}/password`, { method: 'POST', body: JSON.stringify({ new_password: pw.value }) });
+            }
             msg.style.color = 'var(--accent,#3ddc84)';
             msg.textContent = 'Contrasinal actualizado.';
-            pw.value = pw2.value = '';
+            pw.value = pw2.value = current.value = '';
             setTimeout(close, 900);
           } catch (err) {
-            msg.textContent = 'Non se puido cambiar: ' + err.message;
+            msg.textContent = (self ? '' : 'Non se puido cambiar: ') + err.message;
             save.disabled = false;
           }
         });
@@ -1773,8 +1797,11 @@
           });
           tbody.querySelectorAll('[data-revoke]').forEach((btn) => {
             btn.addEventListener('click', async () => {
-              await adminFetch(`/admin/api-keys/${btn.dataset.revoke}`, { method: 'DELETE' });
+              if (!confirm('Revogar desactiva a conta completa (o usuario non poderá iniciar sesión nin usar a API). Continuar?')) return;
+              try { await adminFetch(`/admin/api-keys/${btn.dataset.revoke}`, { method: 'DELETE' }); }
+              catch (err) { alert('Non se puido revogar: ' + err.message); }
               loadKeys();
+              if (typeof loadUsers === 'function') loadUsers();
             });
           });
           tbody.querySelectorAll('[data-credit]').forEach((btn) => {
