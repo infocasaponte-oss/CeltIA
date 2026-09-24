@@ -188,11 +188,11 @@ async def collect(args) -> dict:
         if not manifest_output.exists():
             raise ValueError("resume requires the evaluation provenance manifest")
         resume_manifest=_load_manifest(manifest_output)
-        existing=load_cde_results(output,require_models_used=True)
         if resume_manifest.get("status") == "complete":
             expected_sha=resume_manifest.get("results_sha256")
             if not isinstance(expected_sha,str) or expected_sha != file_sha256(output):
                 raise ValueError("resume result file does not match completed provenance manifest")
+        existing=load_cde_results(output,require_models_used=True)
         unknown=set(existing)-{row["text"] for row in rows}
         if unknown:
             first=sorted(unknown)[0]
