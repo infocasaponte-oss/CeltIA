@@ -17,3 +17,10 @@ Passing the gate means eligible for a controlled experiment, not automatic activ
 
 
 Evaluation also reports selective accuracy: accuracy only on labeled samples where CDE actually returns a decision. This is reported alongside total labeled accuracy and labeled coverage so abstention cannot hide errors or inflate the promotion result.
+
+
+## Option-order evaluation harness
+
+`celtia.decision.order_eval` can evaluate a scorer across a bounded, deterministic set of candidate permutations. It always includes the canonical order and reverse order, then adds rotations up to `max_orders` (default 8), avoiding factorial growth for large candidate sets.
+
+The report keeps distributions label-aligned and records maximum probability deviation plus whether the winning label changes across orders. This is an evaluation path only; production decisions are not multiplied by permutation testing.
