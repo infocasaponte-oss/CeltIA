@@ -20,6 +20,12 @@ class FakeRuntime:
     def __init__(self):
         self.llm=type("FakeLLM", (), {"model":"fake-model"})()
         self.engine_options={"abstain_below":.55,"temperature":1.0,"reject_suspected_ood":True,"ood_entropy_threshold":.90,"ood_margin_threshold":.10}
+        self.max_questions=32
+        self.max_output_tokens=1024
+        self.max_total_output_tokens=8192
+        self.max_total_prompt_chars=250000
+        self.call_timeout_seconds=30.0
+        self.request_timeout_seconds=120.0
 
     async def decide(self, context, questions):
         return [FakeResult()]
@@ -739,3 +745,29 @@ def test_fresh_collection_refuses_orphaned_manifest(tmp_path, monkeypatch):
         assert False
     except ValueError as exc:
         assert "output or manifest already exists" in str(exc)
+
+
+
+def test_resume_rejects_changed_runtime_execution_limits(tmp_path, monkeypatch):
+    dataset=tmp_path / "dataset.jsonl"
+    dataset.write_text('{"text":"one","expected":"fast","ood":false}\n',encoding="utf-8")
+    monkeypatch.setattr(collector,"build_runtime",FakeRuntime)
+    monkeypatch.setattr(collector,"route",lambda text:type("R",(),{"mode":"fast"})())
+
+    args=_args(tmp_path)
+    args.dataset=[str(dataset)]
+    asyncio.run(collector.collect(args))
+
+    class ChangedRuntime(FakeRuntime):
+        def __init__(self):
+            super().__init__()
+            self.max_output_tokens=512
+
+    monkeypatch.setattr(collector,"build_runtime",ChangedRuntime)
+    resume_args=_args(tmp_path,resume=True)
+    resume_args.dataset=[str(dataset)]
+    try:
+        asyncio.run(collector.collect(resume_args))
+        assert False
+    except ValueError as exc:
+        assert "runtime provenance does not match current runtime" in str(exc)
