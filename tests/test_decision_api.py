@@ -254,3 +254,23 @@ def test_decision_api_schema_rejects_duplicate_question_ids():
         assert False
     except ValueError as exc:
         assert "question ids must be unique" in str(exc)
+
+
+def test_decision_api_schema_rejects_blank_and_coerced_fields():
+    invalid_payloads = [
+        {"context": {}, "questions": [{"id":"   ","prompt":"x","type":"boolean"}]},
+        {"context": {}, "questions": [{"id":"q","prompt":"   ","type":"boolean"}]},
+        {"context": {}, "questions": [{"id":123,"prompt":"x","type":"boolean"}]},
+        {"context": {}, "questions": [{"id":"q","prompt":123,"type":"boolean"}]},
+        {"context": {}, "questions": [{"id":"q","prompt":"x","type":"choice","options":["ok","   "]}]},
+        {"context": {}, "questions": [{"id":"q","prompt":"x","type":"choice","options":["ok",123]}]},
+        {"context": {}, "questions": [{"id":"q","prompt":"x","type":"score","minimum":True,"maximum":5}]},
+        {"context": {}, "questions": [{"id":"q","prompt":"x","type":"score","minimum":1,"maximum":False}]},
+        {"context": {}, "questions": [{"id":"q","prompt":"x","type":"score","minimum":1.0,"maximum":5}]},
+    ]
+    for payload in invalid_payloads:
+        try:
+            api_main.DecisionApiRequest.model_validate(payload)
+            assert False, payload
+        except ValueError:
+            pass
