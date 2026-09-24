@@ -60,6 +60,9 @@ def test_collect_checkpoints_and_resumes_without_duplicate_calls(tmp_path, monke
     manifest_path=tmp_path / "results.jsonl.manifest.json"
     manifest=json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["format_version"] == 2
+    assert manifest["status"] == "complete"
+    assert manifest["result_rows"] == 2
+    assert manifest["results_sha256"] == collector.file_sha256(path)
     assert first["manifest_output"] == str(manifest_path)
 
     second=asyncio.run(collector.collect(_args(tmp_path, resume=True, limit=2)))
@@ -240,7 +243,9 @@ def test_interrupted_fresh_collection_persists_manifest_for_resume(tmp_path, mon
     manifest_path=tmp_path / "results.jsonl.manifest.json"
     assert path.exists()
     assert manifest_path.exists()
-    assert json.loads(manifest_path.read_text(encoding="utf-8"))["format_version"] == 2
+    interrupted_manifest=json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert interrupted_manifest["format_version"] == 2
+    assert interrupted_manifest["status"] == "collecting"
 
     monkeypatch.setattr(collector,"collect_one",original)
     resumed=asyncio.run(collector.collect(_args(tmp_path,resume=True,checkpoint_every=1)))
@@ -248,3 +253,26 @@ def test_interrupted_fresh_collection_persists_manifest_for_resume(tmp_path, mon
     assert resumed["written"] == 1
     saved=[json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
     assert [item["text"] for item in saved] == ["one","two"]
+
+
+def test_resume_rejects_tampered_completed_results(tmp_path, monkeypatch):
+    dataset=tmp_path / "dataset.jsonl"
+    dataset.write_text('{"text":"one","expected":"fast","ood":false}\n',encoding="utf-8")
+    args=_args(tmp_path)
+    args.dataset=[str(dataset)]
+    monkeypatch.setattr(collector,"build_runtime",FakeRuntime)
+    monkeypatch.setattr(collector,"route",lambda text:type("R",(),{"mode":"fast"})())
+    asyncio.run(collector.collect(args))
+
+    path=tmp_path / "results.jsonl"
+    path.write_text(
+        '{"text":"one","cde":"fast","confidence":0.1,"abstained":false,"suspected_ood":false}\n',
+        encoding="utf-8",
+    )
+    resume_args=_args(tmp_path,resume=True)
+    resume_args.dataset=[str(dataset)]
+    try:
+        asyncio.run(collector.collect(resume_args))
+        assert False
+    except ValueError as exc:
+        assert "completed provenance manifest" in str(exc)
