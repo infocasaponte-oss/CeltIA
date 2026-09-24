@@ -59,7 +59,7 @@ def test_collect_checkpoints_and_resumes_without_duplicate_calls(tmp_path, monke
     assert not list(tmp_path.glob("results.jsonl.*.tmp"))
     manifest_path=tmp_path / "results.jsonl.manifest.json"
     manifest=json.loads(manifest_path.read_text(encoding="utf-8"))
-    assert manifest["format_version"] == 2
+    assert manifest["format_version"] == collector.RESULT_FORMAT_VERSION
     assert manifest["status"] == "complete"
     assert manifest["result_rows"] == 2
     assert manifest["results_sha256"] == collector.file_sha256(path)
@@ -108,7 +108,7 @@ def test_runtime_manifest_records_dataset_digest_backend_and_policy(tmp_path):
     dataset.write_text('{"text":"one","expected":"fast","ood":false}\n',encoding="utf-8")
     runtime=FakeRuntime()
     manifest=collector._runtime_manifest(runtime,[str(dataset)])
-    assert manifest["format_version"] == 2
+    assert manifest["format_version"] == collector.RESULT_FORMAT_VERSION
     assert manifest["datasets"] == [str(dataset)]
     assert len(manifest["dataset_sha256"]) == 64
     assert manifest["backend"]["client_type"] == "FakeLLM"
@@ -244,7 +244,7 @@ def test_interrupted_fresh_collection_persists_manifest_for_resume(tmp_path, mon
     assert path.exists()
     assert manifest_path.exists()
     interrupted_manifest=json.loads(manifest_path.read_text(encoding="utf-8"))
-    assert interrupted_manifest["format_version"] == 2
+    assert interrupted_manifest["format_version"] == collector.RESULT_FORMAT_VERSION
     assert interrupted_manifest["status"] == "collecting"
 
     monkeypatch.setattr(collector,"collect_one",original)
