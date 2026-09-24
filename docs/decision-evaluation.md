@@ -117,3 +117,6 @@ Promotion evidence now verifies the manifest's `result_rows` against the actual 
 Dataset provenance hashing now streams file contents in fixed-size chunks while preserving the exact schema-v3 digest algorithm (path, NUL separator, file bytes, NUL separator, in dataset order). This avoids loading a large evaluation corpus into memory without invalidating existing v3 digests.
 
 Repeated resume operations preserve the timestamp of the original collection in `resumed_from_collected_at` instead of replacing it with the immediately preceding resume timestamp. The current `collected_at` still identifies the latest completed materialization, while the root collection provenance remains stable across an arbitrary resume chain.
+
+
+Schema-v3 promotion and resume paths now require each result row to carry a valid `models_used` list. The list may be empty when a backend exposes no model identity, but every present entry must be a unique non-empty string. This prevents a v3 artifact from claiming row-level model provenance while silently omitting or corrupting that field.
