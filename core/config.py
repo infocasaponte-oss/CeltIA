@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     basic_plan_token_grant: int = 500_000
     ultra_plan_token_grant: int = 6_000_000
     stripe_meter_event_name: str = "celtia_tokens"
-    public_base_url: str = "http://localhost:8080"
+    public_base_url: str = "http://localhost:8081"
     # Generación de imágenes (xAI / Grok Imagine)
     image_api_url: str = "https://api.x.ai/v1"
     image_api_key: str = ""
