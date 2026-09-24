@@ -26,6 +26,8 @@ A request contains shared context plus questions. Each question exposes a finite
 - low confidence can abstain;
 - sync and async engines share the same optional OOD rejection semantics (entropy/margin thresholds);
 - policy thresholds are bounded to [0,1] and scorer logits must be finite numeric values (booleans are rejected);
+- runtime configuration is validated at construction (finite thresholds/temperature, boolean OOD flag, cost and timeout bounds) so misconfiguration fails before serving decisions;
+- direct runtime callers get normalized validation errors for malformed question containers or missing required question fields;
 - deterministic tests need no GPU/model downloads.
 
 ## Next milestones
