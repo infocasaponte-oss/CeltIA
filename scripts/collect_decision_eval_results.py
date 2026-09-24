@@ -40,7 +40,7 @@ def build_runtime() -> CeltIADecisionRuntime:
 async def collect_one(runtime: CeltIADecisionRuntime, row: dict) -> dict:
     text=row["text"]
     heuristic=route(text).mode
-    result=(await runtime.decide(
+    results,usage=await runtime.decide_with_usage(
         {"user_message": text[-12000:], "heuristic_route": heuristic},
         [{
             "id":"route",
@@ -48,7 +48,8 @@ async def collect_one(runtime: CeltIADecisionRuntime, row: dict) -> dict:
             "type":"choice",
             "options":list(ROUTES),
         }],
-    ))[0]
+    )
+    result=results[0]
     return {
         "text":text,
         "cde":result.decision,
@@ -61,6 +62,7 @@ async def collect_one(runtime: CeltIADecisionRuntime, row: dict) -> dict:
         "heuristic":heuristic,
         "expected":row.get("expected"),
         "expected_ood":row.get("ood"),
+        "models_used":list(usage.get("models") or []),
     }
 
 
