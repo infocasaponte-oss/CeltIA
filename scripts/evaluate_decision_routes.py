@@ -46,6 +46,12 @@ def validate_results_manifest(results_path: Path, datasets: list[str]) -> dict:
     expected_results_sha=manifest.get("results_sha256")
     if not isinstance(expected_results_sha,str) or expected_results_sha != file_sha256(results_path):
         raise ValueError("CDE results file does not match its manifest")
+    expected_rows=manifest.get("result_rows")
+    if isinstance(expected_rows,bool) or not isinstance(expected_rows,int) or expected_rows < 0:
+        raise ValueError("CDE results manifest has invalid result_rows")
+    actual_rows=sum(1 for line in results_path.read_text(encoding="utf-8").splitlines() if line.strip())
+    if expected_rows != actual_rows:
+        raise ValueError("CDE results row count does not match its manifest")
     return manifest
 
 def load_jsonl(path: Path):
