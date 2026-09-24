@@ -13,7 +13,7 @@ class AsyncLLMDecisionScorer:
     def __init__(self, chat: Callable[[list[dict]], Awaitable[str]]): self.chat = chat
 
     @staticmethod
-    def _messages(context: object, question: DecisionQuestion, candidates: Sequence[str]) -> list[dict]:
+    def messages_for(context: object, question: DecisionQuestion, candidates: Sequence[str]) -> list[dict]:
         candidate_items = [
             {"id": f"c{index}", "value": candidate}
             for index, candidate in enumerate(candidates)
@@ -42,7 +42,7 @@ class AsyncLLMDecisionScorer:
         ]
 
     async def score(self, context: object, question: DecisionQuestion, candidates: Sequence[str]) -> list[float]:
-        text = await self.chat(self._messages(context, question, candidates))
+        text = await self.chat(self.messages_for(context, question, candidates))
         try:
             data=json.loads(text)
         except (json.JSONDecodeError, TypeError) as exc:
