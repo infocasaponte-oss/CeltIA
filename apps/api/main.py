@@ -359,15 +359,34 @@ async def decide(req: DecisionApiRequest, key: dict = Depends(require_api_key)):
     if not req.questions or len(req.questions) > 32:
         raise HTTPException(400, "questions must contain between 1 and 32 items")
     payload = [q.model_dump() for q in req.questions]
+    started_at = time.monotonic()
     try:
         async with gateway.slot(key):
-            results = await decision_runtime.decide(req.context, payload)
+            results, usage = await decision_runtime.decide_with_usage(req.context, payload)
     except (ValueError, TypeError) as exc:
         raise HTTPException(400, str(exc))
     except RuntimeError as exc:
         raise HTTPException(503, str(exc))
     app.state.metrics["decision_requests"] += 1
-    return {"object": "decision.list", "data": [
+    if key.get("id") is not None:
+        prompt_tokens = int(usage.get("prompt_tokens", 0))
+        completion_tokens = int(usage.get("completion_tokens", 0))
+        total_tokens = int(usage.get("total_tokens", prompt_tokens + completion_tokens))
+        memory.record_usage(
+            key["id"],
+            prompt_tokens,
+            completion_tokens,
+            model=settings.model_serve_name,
+            latency_ms=int((time.monotonic() - started_at) * 1000),
+            client_key_id=key.get("client_key_id"),
+        )
+        gateway.record_tokens(key["id"], total_tokens, key.get("client_key_id"))
+        if key.get("token_balance") is not None:
+            memory.decrement_token_balance(key["id"], total_tokens)
+        customer_id = key.get("stripe_customer_id")
+        if customer_id:
+            asyncio.create_task(billing.report_usage(customer_id, total_tokens))
+    return {"object": "decision.list", "usage": usage, "data": [
         {"id": r.id, "probabilities": r.probabilities, "decision": r.decision,
          "confidence": r.confidence, "abstained": r.abstained}
         for r in results
