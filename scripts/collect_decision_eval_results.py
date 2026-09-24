@@ -29,6 +29,7 @@ from scripts.evaluate_decision_routes import (
     validate_policy_provenance,
     validate_result_models,
     validate_results_manifest,
+    validate_runtime_provenance,
     validate_selection_provenance,
 )
 
@@ -146,6 +147,8 @@ def _validate_collecting_manifest(manifest: dict, datasets: list[str], results_p
         raise ValueError("resume manifest has invalid backend provenance")
     if not validate_policy_provenance(manifest.get("policy")):
         raise ValueError("resume manifest has invalid policy provenance")
+    if not validate_runtime_provenance(manifest.get("runtime")):
+        raise ValueError("resume manifest has invalid runtime provenance")
     if (
         "code_revision" not in manifest
         or "code_dirty" not in manifest
@@ -216,6 +219,14 @@ def _runtime_manifest(runtime: CeltIADecisionRuntime, datasets: list[str], *, da
             "fallback_model":getattr(fallback,"model",None),
         },
         "policy":dict(runtime.engine_options),
+        "runtime":{
+            "max_questions":runtime.max_questions,
+            "max_output_tokens":runtime.max_output_tokens,
+            "max_total_output_tokens":runtime.max_total_output_tokens,
+            "max_total_prompt_chars":runtime.max_total_prompt_chars,
+            "call_timeout_seconds":runtime.call_timeout_seconds,
+            "request_timeout_seconds":runtime.request_timeout_seconds,
+        },
     }
 
 
@@ -347,7 +358,7 @@ async def collect(args) -> dict:
     if resume_manifest is not None:
         if resume_manifest.get("dataset_sha256") != manifest["dataset_sha256"]:
             raise ValueError("resume dataset provenance does not match current datasets")
-        for field in ("backend","policy","code_revision","code_dirty"):
+        for field in ("backend","policy","runtime","code_revision","code_dirty"):
             if resume_manifest.get(field) != manifest[field]:
                 raise ValueError(f"resume {field} provenance does not match current runtime")
         manifest["resumed_from_collected_at"]=(
