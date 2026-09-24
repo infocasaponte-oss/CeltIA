@@ -13,7 +13,7 @@ from core.config import settings
 from core.decision_runtime import CeltIADecisionRuntime
 from core.inference import build_llm
 from core.router import route
-from scripts.evaluate_decision_routes import dataset_sha256, load_cde_results, load_jsonl
+from scripts.evaluate_decision_routes import dataset_sha256, file_sha256, load_cde_results, load_jsonl
 
 ROUTES=("fast","think","code","agent","long")
 RESULT_FORMAT_VERSION=2
@@ -82,6 +82,7 @@ def _runtime_manifest(runtime: CeltIADecisionRuntime, datasets: list[str]) -> di
     fallback=getattr(llm,"fallback",None)
     return {
         "format_version":RESULT_FORMAT_VERSION,
+        "status":"collecting",
         "collected_at":datetime.now(timezone.utc).isoformat(),
         "dataset_sha256":dataset_sha256(datasets),
         "datasets":datasets,
@@ -189,6 +190,10 @@ async def collect(args) -> dict:
         if not manifest_output.exists():
             raise ValueError("resume requires the evaluation provenance manifest")
         resume_manifest=_load_manifest(manifest_output)
+        if resume_manifest.get("status") == "complete":
+            expected_sha=resume_manifest.get("results_sha256")
+            if not isinstance(expected_sha,str) or expected_sha != file_sha256(output):
+                raise ValueError("resume result file does not match completed provenance manifest")
         unknown=set(existing)-{row["text"] for row in rows}
         if unknown:
             first=sorted(unknown)[0]
@@ -229,6 +234,9 @@ async def collect(args) -> dict:
 
     # Always materialize a complete valid checkpoint, including zero-write resume runs.
     _write_atomic_jsonl(output,collected)
+    manifest["status"]="complete"
+    manifest["results_sha256"]=file_sha256(output)
+    manifest["result_rows"]=len(collected)
     _write_atomic_json(manifest_output,manifest)
 
     return {
