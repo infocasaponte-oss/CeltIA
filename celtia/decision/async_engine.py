@@ -2,7 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol, Sequence
 from .schema import DecisionQuestion, DecisionRequest, DecisionResult
-from .policy import decision_policy, probability_distribution
+from .policy import decision_policy, probability_distribution, validate_policy_settings
 
 class AsyncCandidateScorer(Protocol):
     async def score(self, context: object, question: DecisionQuestion, candidates: Sequence[str]) -> Sequence[float]: ...
@@ -17,18 +17,24 @@ class AsyncDecisionEngine:
     ood_margin_threshold: float = 0.10
 
     async def decide(self, request: DecisionRequest) -> list[DecisionResult]:
-        if self.temperature <= 0: raise ValueError("temperature must be positive")
+        settings = validate_policy_settings(
+            abstain_below=self.abstain_below,
+            temperature=self.temperature,
+            reject_suspected_ood=self.reject_suspected_ood,
+            ood_entropy_threshold=self.ood_entropy_threshold,
+            ood_margin_threshold=self.ood_margin_threshold,
+        )
         results=[]
         for q in request.questions:
             candidates=q.candidates()
             logits=list(await self.scorer.score(request.context,q,candidates))
-            distribution=probability_distribution(candidates, logits, temperature=self.temperature)
+            distribution=probability_distribution(candidates, logits, temperature=settings["temperature"])
             outcome=decision_policy(
                 distribution,
-                abstain_below=self.abstain_below,
-                reject_suspected_ood=self.reject_suspected_ood,
-                ood_entropy_threshold=self.ood_entropy_threshold,
-                ood_margin_threshold=self.ood_margin_threshold,
+                abstain_below=settings["abstain_below"],
+                reject_suspected_ood=settings["reject_suspected_ood"],
+                ood_entropy_threshold=settings["ood_entropy_threshold"],
+                ood_margin_threshold=settings["ood_margin_threshold"],
             )
             expected_score = (
                 sum(float(candidate) * probability for candidate, probability in distribution.items())
