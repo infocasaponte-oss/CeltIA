@@ -48,7 +48,7 @@ def test_collect_checkpoints_and_resumes_without_duplicate_calls(tmp_path, monke
     path=tmp_path / "results.jsonl"
     saved=[json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
     assert [item["text"] for item in saved] == ["one","two"]
-    assert not (tmp_path / "results.jsonl.tmp").exists()
+    assert not list(tmp_path.glob("results.jsonl.*.tmp"))
 
     second=asyncio.run(collector.collect(_args(tmp_path, resume=True, limit=2)))
     assert second["written"] == 0
@@ -67,4 +67,22 @@ def test_atomic_writer_replaces_complete_file(tmp_path):
     collector._write_atomic_jsonl(path,rows)
     parsed=[json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
     assert parsed == rows
-    assert not (tmp_path / "results.jsonl.tmp").exists()
+    assert not list(tmp_path.glob("results.jsonl.*.tmp"))
+
+
+def test_atomic_writer_preserves_destination_and_cleans_temp_on_replace_failure(tmp_path, monkeypatch):
+    path=tmp_path / "results.jsonl"
+    path.write_text('{"text":"old"}\n',encoding="utf-8")
+
+    def fail_replace(source, destination):
+        raise OSError("simulated replace failure")
+
+    monkeypatch.setattr(collector.os, "replace", fail_replace)
+    try:
+        collector._write_atomic_jsonl(path,[{"text":"new"}])
+        assert False
+    except OSError as exc:
+        assert "simulated replace failure" in str(exc)
+
+    assert json.loads(path.read_text(encoding="utf-8")) == {"text":"old"}
+    assert not list(tmp_path.glob("results.jsonl.*.tmp"))
