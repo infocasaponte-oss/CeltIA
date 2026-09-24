@@ -62,3 +62,39 @@ def test_selective_accuracy_does_not_replace_total_accuracy():
     )
     assert not gate["eligible"]
     assert "accuracy_delta_below_gate" in gate["reasons"]
+
+
+def test_shadow_evaluation_reports_ood_confusion_metrics():
+    samples = [
+        ShadowSample("fast", None, .2, True, None, suspected_ood=True, expected_ood=True),
+        ShadowSample("fast", "fast", .9, False, "fast", suspected_ood=False, expected_ood=False),
+        ShadowSample("think", None, .3, True, None, suspected_ood=False, expected_ood=True),
+        ShadowSample("think", None, .4, True, None, suspected_ood=True, expected_ood=False),
+        ShadowSample("agent", None, .0, True, None, suspected_ood=None, expected_ood=True),
+    ]
+    metrics = evaluate_shadow(samples)
+    assert metrics["ood_labeled"] == 5
+    assert metrics["ood_evaluated"] == 4
+    assert metrics["ood_coverage"] == .8
+    assert metrics["ood_true_positive"] == 1
+    assert metrics["ood_false_positive"] == 1
+    assert metrics["ood_true_negative"] == 1
+    assert metrics["ood_false_negative"] == 1
+    assert metrics["ood_precision"] == .5
+    assert metrics["ood_recall"] == .5
+    assert metrics["ood_specificity"] == .5
+    assert metrics["ood_false_positive_rate"] == .5
+    assert metrics["ood_accuracy"] == .5
+
+
+def test_shadow_evaluation_keeps_route_and_ood_labels_independent():
+    sample = ShadowSample(
+        "fast", "fast", .9, False, "fast",
+        suspected_ood=False,
+        expected_ood=False,
+    )
+    metrics = evaluate_shadow([sample])
+    assert metrics["labeled"] == 1
+    assert metrics["cde_accuracy"] == 1.0
+    assert metrics["ood_labeled"] == 1
+    assert metrics["ood_accuracy"] == 1.0
