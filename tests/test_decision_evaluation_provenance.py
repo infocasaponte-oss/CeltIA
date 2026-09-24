@@ -11,6 +11,12 @@ def _backend_provenance():
         "model":"fake-model",
         "primary_model":None,
         "fallback_model":None,
+        "endpoint":"http://localhost:8000/v1",
+        "primary_endpoint":None,
+        "fallback_endpoint":None,
+        "local":True,
+        "primary_local":None,
+        "fallback_local":None,
     }
 
 
