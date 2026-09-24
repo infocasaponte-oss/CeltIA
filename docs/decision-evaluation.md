@@ -110,3 +110,10 @@ Candidate-aware output budgets are now bound to the exact serialized scorer requ
 The `/v1/decide` response preserves the runtime `usage.models` list alongside token counts, so callers can observe which backend model identities actually served structured decisions without relying on configured-provider assumptions.
 
 Promotion evidence now verifies the manifest's `result_rows` against the actual number of non-empty JSONL rows in addition to the SHA-256 binding. Invalid row-count types or count mismatches fail closed, making manifest consistency explicit rather than treating the count as descriptive metadata only.
+
+
+## Rollout evidence hardening
+
+Dataset provenance hashing now streams file contents in fixed-size chunks while preserving the exact schema-v3 digest algorithm (path, NUL separator, file bytes, NUL separator, in dataset order). This avoids loading a large evaluation corpus into memory without invalidating existing v3 digests.
+
+Repeated resume operations preserve the timestamp of the original collection in `resumed_from_collected_at` instead of replacing it with the immediately preceding resume timestamp. The current `collected_at` still identifies the latest completed materialization, while the root collection provenance remains stable across an arbitrary resume chain.
