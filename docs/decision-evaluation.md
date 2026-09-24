@@ -10,6 +10,10 @@ Default gate:
 - at least 200 total samples;
 - at least 80% CDE decision coverage;
 - at least 50 labeled samples;
+- at least 80% coverage on labeled samples;
 - CDE labeled accuracy at least 2 percentage points above the heuristic.
 
 Passing the gate means eligible for a controlled experiment, not automatic activation. Tool authorization and security policy remain independent of routing.
+
+
+Evaluation also reports selective accuracy: accuracy only on labeled samples where CDE actually returns a decision. This is reported alongside total labeled accuracy and labeled coverage so abstention cannot hide errors or inflate the promotion result.
