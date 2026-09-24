@@ -12,6 +12,14 @@ ROUTES={"fast","think","code","agent","long"}
 RESULT_FORMAT_VERSION=2
 
 
+def file_sha256(path: Path) -> str:
+    digest=hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def dataset_sha256(paths: list[str]) -> str:
     digest=hashlib.sha256()
     for raw_path in paths:
@@ -33,6 +41,11 @@ def validate_results_manifest(results_path: Path, datasets: list[str]) -> dict:
         raise ValueError(f"incompatible CDE results manifest: {manifest_path}")
     if manifest.get("dataset_sha256") != dataset_sha256(datasets):
         raise ValueError("CDE results manifest does not match selected datasets")
+    if manifest.get("status") != "complete":
+        raise ValueError("CDE results manifest is not complete")
+    expected_results_sha=manifest.get("results_sha256")
+    if not isinstance(expected_results_sha,str) or expected_results_sha != file_sha256(results_path):
+        raise ValueError("CDE results file does not match its manifest")
     return manifest
 
 def load_jsonl(path: Path):
