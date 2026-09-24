@@ -67,6 +67,8 @@ Promotion-result ingestion is strict. Each result row must have a unique non-emp
 `scripts/collect_decision_eval_results.py` runs the same route-decision shape used by shadow routing against the configured CeltIA LLM stack and writes strict JSONL suitable for the offline evaluator. By default it combines the 120 in-domain routing cases and 80 OOD cases. It records the CDE route, confidence, abstention, explicit `suspected_ood`, uncertainty diagnostics, heuristic route and benchmark labels.
 
 Because the collector uses `build_llm()`, it follows the active CeltIA provider configuration: when the hosted primary is enabled and credentialed, running the collector can send benchmark prompts to that provider and consume billable model usage. CI only smoke-tests `--help`; it never executes live model calls.
+A manual GitHub Actions workflow, `.github/workflows/cde-live-evidence.yml`, is available for deliberate live collection. It only runs through `workflow_dispatch`, requires the operator to type `RUN_LIVE_CDE`, and fails before model calls when none of `LLM_PRIMARY_API_KEY`, `XAI_API_KEY` or `IMAGE_API_KEY` is configured. Successful runs archive the result JSONL, v4 manifest, evaluator output and gate exit code as the `cde-live-evidence` artifact.
+
 
 Example:
 
