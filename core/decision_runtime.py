@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
+
+from collections.abc import Mapping
 
 from celtia.decision.async_engine import AsyncDecisionEngine
 from celtia.decision.llm_scorer import AsyncLLMDecisionScorer
@@ -31,6 +34,31 @@ class CeltIADecisionRuntime:
         call_timeout_seconds: float = 30.0,
         request_timeout_seconds: float = 120.0,
     ):
+        def finite_number(name, value):
+            if isinstance(value, bool):
+                raise ValueError(f"{name} must be a finite number")
+            try:
+                number = float(value)
+            except (TypeError, ValueError, OverflowError) as exc:
+                raise ValueError(f"{name} must be a finite number") from exc
+            if not math.isfinite(number):
+                raise ValueError(f"{name} must be a finite number")
+            return number
+
+        abstain_below = finite_number("abstain_below", abstain_below)
+        temperature = finite_number("temperature", temperature)
+        ood_entropy_threshold = finite_number("ood_entropy_threshold", ood_entropy_threshold)
+        ood_margin_threshold = finite_number("ood_margin_threshold", ood_margin_threshold)
+        if not 0 <= abstain_below <= 1:
+            raise ValueError("abstain_below must be between 0 and 1")
+        if temperature <= 0:
+            raise ValueError("temperature must be positive")
+        if not 0 <= ood_entropy_threshold <= 1:
+            raise ValueError("ood_entropy_threshold must be between 0 and 1")
+        if not 0 <= ood_margin_threshold <= 1:
+            raise ValueError("ood_margin_threshold must be between 0 and 1")
+        if not isinstance(reject_suspected_ood, bool):
+            raise ValueError("reject_suspected_ood must be boolean")
         if not 1 <= max_questions <= self.HARD_MAX_QUESTIONS:
             raise ValueError("max_questions must be between 1 and 32")
         if not 64 <= max_output_tokens <= 2048:
@@ -67,9 +95,18 @@ class CeltIADecisionRuntime:
             raise ValueError("context must be JSON-serializable") from exc
         if len(serialized_context) > self.MAX_CONTEXT_CHARS:
             raise ValueError("decision context exceeds 50000 serialized characters")
-        if not questions or len(questions) > self.max_questions:
+        try:
+            question_items = tuple(questions)
+        except TypeError as exc:
+            raise ValueError("questions must be an iterable of mappings") from exc
+        if not question_items or len(question_items) > self.max_questions:
             raise ValueError(f"questions must contain between 1 and {self.max_questions} items")
-        ids = [q.get("id") for q in questions]
+        if not all(isinstance(q, Mapping) for q in question_items):
+            raise ValueError("questions must contain mappings")
+        required_fields = {"id", "prompt", "type"}
+        if any(not required_fields.issubset(q) for q in question_items):
+            raise ValueError("each question requires id, prompt, and type")
+        ids = [q["id"] for q in question_items]
         if len(ids) != len(set(ids)):
             raise ValueError("question ids must be unique")
         return DecisionRequest(
@@ -83,7 +120,7 @@ class CeltIADecisionRuntime:
                     minimum=q.get("minimum"),
                     maximum=q.get("maximum"),
                 )
-                for q in questions
+                for q in question_items
             ),
         )
 
