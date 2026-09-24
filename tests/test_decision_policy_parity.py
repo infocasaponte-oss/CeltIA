@@ -34,3 +34,15 @@ def test_sync_and_async_engines_have_identical_policy_semantics():
     sync = DecisionEngine(SyncScorer([0.0, 2.0, 0.5]), **kwargs).decide(req)[0]
     async_result = asyncio.run(AsyncDecisionEngine(AsyncScorer([0.0, 2.0, 0.5]), **kwargs).decide(req))[0]
     assert sync == async_result
+
+
+def test_sync_and_async_score_expected_value_match():
+    q = DecisionQuestion("score", "rate", DecisionType.SCORE, minimum=1, maximum=3)
+    req = DecisionRequest({}, (q,))
+    kwargs = {"abstain_below": 0.0, "reject_suspected_ood": False}
+    sync = DecisionEngine(SyncScorer([0.0, 1.0, 2.0]), **kwargs).decide(req)[0]
+    async_result = asyncio.run(
+        AsyncDecisionEngine(AsyncScorer([0.0, 1.0, 2.0]), **kwargs).decide(req)
+    )[0]
+    assert sync == async_result
+    assert sync.expected_score is not None
