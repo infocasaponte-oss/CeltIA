@@ -21,6 +21,7 @@ from scripts.evaluate_decision_routes import (
     load_cde_results,
     load_jsonl,
     validate_results_manifest,
+    valid_aware_timestamp,
 )
 
 ROUTES=("fast","think","code","agent","long")
@@ -94,7 +95,7 @@ def _validate_collecting_manifest(manifest: dict, datasets: list[str], results_p
     ):
         raise ValueError("resume manifest dataset list does not match selected datasets")
     collected_at=manifest.get("collected_at")
-    if not isinstance(collected_at,str) or not collected_at.strip():
+    if not valid_aware_timestamp(collected_at):
         raise ValueError("resume manifest has invalid collected_at")
     if not isinstance(manifest.get("backend"),dict):
         raise ValueError("resume manifest has invalid backend provenance")
