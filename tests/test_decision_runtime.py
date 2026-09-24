@@ -324,3 +324,43 @@ def test_runtime_rejects_invalid_request_timeout():
             assert False
         except ValueError:
             pass
+
+
+def test_runtime_rejects_invalid_policy_configuration_at_construction():
+    invalid = (
+        {"abstain_below": -0.01},
+        {"abstain_below": 1.01},
+        {"abstain_below": float("nan")},
+        {"temperature": 0},
+        {"temperature": -1},
+        {"temperature": float("inf")},
+        {"ood_entropy_threshold": -0.01},
+        {"ood_entropy_threshold": 1.01},
+        {"ood_margin_threshold": -0.01},
+        {"ood_margin_threshold": 1.01},
+        {"ood_margin_threshold": float("nan")},
+        {"reject_suspected_ood": 1},
+    )
+    for kwargs in invalid:
+        try:
+            CeltIADecisionRuntime(FakeLLM(), **kwargs)
+            assert False, kwargs
+        except ValueError:
+            pass
+
+
+def test_runtime_rejects_malformed_question_containers_cleanly():
+    runtime = CeltIADecisionRuntime(FakeLLM())
+    invalid_questions = (
+        123,
+        ["not-a-mapping"],
+        [{"id":"q","prompt":"x"}],
+        [{"id":"q","type":"boolean"}],
+        [{"prompt":"x","type":"boolean"}],
+    )
+    for questions in invalid_questions:
+        try:
+            asyncio.run(runtime.decide({}, questions))
+            assert False, questions
+        except ValueError:
+            pass
