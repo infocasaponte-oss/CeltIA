@@ -21,6 +21,8 @@ from scripts.evaluate_decision_routes import (
     load_cde_results,
     load_jsonl,
     parse_aware_timestamp,
+    validate_backend_provenance,
+    validate_policy_provenance,
     validate_results_manifest,
 )
 
@@ -105,9 +107,9 @@ def _validate_collecting_manifest(manifest: dict, datasets: list[str], results_p
             raise ValueError("resume manifest has invalid resumed_from_collected_at")
         if resumed_from_value > collected_at_value:
             raise ValueError("resume manifest root timestamp is after collected_at")
-    if not isinstance(manifest.get("backend"),dict):
+    if not validate_backend_provenance(manifest.get("backend")):
         raise ValueError("resume manifest has invalid backend provenance")
-    if not isinstance(manifest.get("policy"),dict):
+    if not validate_policy_provenance(manifest.get("policy")):
         raise ValueError("resume manifest has invalid policy provenance")
     expected_dataset_sha=manifest.get("dataset_sha256")
     if (
