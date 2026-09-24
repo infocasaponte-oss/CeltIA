@@ -2,6 +2,7 @@ from __future__ import annotations
 import json
 import math
 from collections.abc import Awaitable, Callable, Sequence
+from .json_safety import validate_json_depth
 from .schema import DecisionQuestion
 
 
@@ -38,6 +39,7 @@ class AsyncLLMDecisionScorer:
             "candidates": candidate_items,
         }
         try:
+            validate_json_depth(context)
             serialized = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
         except (TypeError, ValueError, RecursionError) as exc:
             raise ValueError("decision input must be JSON serializable") from exc
