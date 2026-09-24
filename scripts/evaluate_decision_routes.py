@@ -125,7 +125,7 @@ def dataset_sha256(paths: list[str]) -> str:
     return digest.hexdigest()
 
 
-def validate_results_manifest(results_path: Path, datasets: list[str], *, require_full_selection: bool = True) -> dict:
+def validate_results_manifest(results_path: Path, datasets: list[str], *, require_full_selection: bool = True, dataset_rows: int | None = None) -> dict:
     manifest_path=Path(str(results_path) + ".manifest.json")
     try:
         manifest=json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -155,12 +155,13 @@ def validate_results_manifest(results_path: Path, datasets: list[str], *, requir
         raise ValueError("CDE results manifest has invalid backend provenance")
     if not validate_policy_provenance(manifest.get("policy")):
         raise ValueError("CDE results manifest has invalid policy provenance")
-    dataset_rows=sum(
-        1
-        for raw_path in datasets
-        for line in Path(raw_path).read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    )
+    if dataset_rows is None:
+        dataset_rows=sum(
+            1
+            for raw_path in datasets
+            for line in Path(raw_path).read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        )
     selected_rows=validate_selection_provenance(
         manifest.get("selection"),
         dataset_rows=dataset_rows,
@@ -299,7 +300,7 @@ def main():
             rows.append(row)
     if args.cde_results:
         results_path=Path(args.cde_results)
-        validate_results_manifest(results_path,datasets)
+        validate_results_manifest(results_path,datasets,dataset_rows=len(rows))
         by_text=load_cde_results(results_path,require_models_used=True)
     else:
         by_text={}
