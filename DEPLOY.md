@@ -4,11 +4,11 @@
 > `celtia-llms` sigue en `celtia-llms.pages.dev` (y `www.celtiaia.com` sigue apuntando a él). Los pasos de abajo
 > quedan como referencia y para revertir.
 
-La API + interfaz corren en local (`start_ui.ps1`, puerto 8080) y se publican por el túnel `celtiav2`.
+La API + interfaz corren en local (`start_ui.ps1`, puerto 8081) y se publican por el túnel `celtiav2`.
 
 ## Cambios en Cloudflare (dashboard)
 1. **Zero Trust → Networks → Tunnels → `celtiav2` → Public Hostname → Add**: hostname `celtiaia.com`,
-   servicio `HTTP` → `127.0.0.1:8080`. (Deja las rutas existentes de `app`, `bff` y `native1`.)
+   servicio `HTTP` → `127.0.0.1:8081`. (Deja las rutas existentes de `app`, `bff` y `native1`.)
 2. **Workers & Pages → `celtia-llms` → Custom domains**: quitar `celtiaia.com` (el proyecto no se borra;
    sigue en `celtia-llms.pages.dev`).
 3. **DNS → `celtiaia.com`** (CNAME): cambiar el destino de `celtia-llms.pages.dev` a
