@@ -246,3 +246,37 @@ def test_runtime_rejects_invalid_total_prompt_budget():
             assert False
         except ValueError:
             pass
+
+
+class SlowLLM:
+    async def chat(self, messages, **kwargs):
+        await asyncio.sleep(0.05)
+        return {
+            "choices":[{"message":{"content":'{"scores":{"c0":0.0,"c1":1.0}}'}}],
+            "usage":{"prompt_tokens":1,"completion_tokens":1},
+        }
+
+
+def test_runtime_times_out_slow_scoring_call():
+    runtime = CeltIADecisionRuntime(
+        SlowLLM(),
+        abstain_below=0.0,
+        reject_suspected_ood=False,
+        call_timeout_seconds=0.01,
+    )
+    try:
+        asyncio.run(runtime.decide({}, [{
+            "id":"route","prompt":"route","type":"choice","options":["fast","think"]
+        }]))
+        assert False
+    except RuntimeError as exc:
+        assert "timed out" in str(exc)
+
+
+def test_runtime_rejects_invalid_call_timeout():
+    for value in (0, -1, 301):
+        try:
+            CeltIADecisionRuntime(FakeLLM(), call_timeout_seconds=value)
+            assert False
+        except ValueError:
+            pass
