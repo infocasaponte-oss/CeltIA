@@ -60,14 +60,29 @@ def declared_backend_models(value: object) -> set[str]:
 def validate_backend_provenance(value: object) -> bool:
     if not isinstance(value,dict):
         return False
-    required={"client_type","model","primary_model","fallback_model"}
+    required={
+        "client_type",
+        "model",
+        "primary_model",
+        "fallback_model",
+        "endpoint",
+        "primary_endpoint",
+        "fallback_endpoint",
+        "local",
+        "primary_local",
+        "fallback_local",
+    }
     if not required.issubset(value):
         return False
     if not isinstance(value.get("client_type"),str) or not value["client_type"].strip():
         return False
-    for field in ("model","primary_model","fallback_model"):
-        model=value.get(field)
-        if model is not None and (not isinstance(model,str) or not model.strip()):
+    for field in ("model","primary_model","fallback_model","endpoint","primary_endpoint","fallback_endpoint"):
+        item=value.get(field)
+        if item is not None and (not isinstance(item,str) or not item.strip()):
+            return False
+    for field in ("local","primary_local","fallback_local"):
+        item=value.get(field)
+        if item is not None and not isinstance(item,bool):
             return False
     return bool(declared_backend_models(value))
 
