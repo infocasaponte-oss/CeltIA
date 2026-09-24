@@ -346,7 +346,7 @@ def test_resume_rejects_collecting_manifest_missing_structural_provenance(tmp_pa
     )
     monkeypatch.setattr(collector,"build_runtime",FakeRuntime)
 
-    for field in ("collected_at","backend","policy","code_revision","code_dirty"):
+    for field in ("collected_at","backend","policy","runtime","code_revision","code_dirty"):
         manifest=collector._runtime_manifest(FakeRuntime(),[str(dataset)])
         manifest.pop(field)
         (tmp_path / "results.jsonl.manifest.json").write_text(
