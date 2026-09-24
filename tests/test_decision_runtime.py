@@ -202,3 +202,47 @@ def test_runtime_rejects_invalid_total_output_budget():
             assert False
         except ValueError:
             pass
+
+
+def test_runtime_rejects_aggregate_prompt_budget_before_model_calls():
+    llm = CaptureBudgetLLM()
+    runtime = CeltIADecisionRuntime(
+        llm,
+        abstain_below=0.0,
+        reject_suspected_ood=False,
+        max_questions=2,
+        max_total_prompt_chars=10000,
+    )
+    questions = [
+        {"id":"q1","prompt":"route","type":"choice","options":["fast","think"]},
+        {"id":"q2","prompt":"route","type":"choice","options":["fast","think"]},
+    ]
+    try:
+        asyncio.run(runtime.decide({"text":"x" * 6000}, questions))
+        assert False
+    except ValueError as exc:
+        assert "prompt budget exceeded" in str(exc)
+    assert llm.calls == []
+
+
+def test_runtime_accepts_request_within_aggregate_prompt_budget():
+    llm = CaptureBudgetLLM()
+    runtime = CeltIADecisionRuntime(
+        llm,
+        abstain_below=0.0,
+        reject_suspected_ood=False,
+        max_total_prompt_chars=10000,
+    )
+    asyncio.run(runtime.decide({"text":"short"}, [{
+        "id":"route","prompt":"route","type":"choice","options":["fast","think"]
+    }]))
+    assert len(llm.calls) == 1
+
+
+def test_runtime_rejects_invalid_total_prompt_budget():
+    for value in (9999, 2000001):
+        try:
+            CeltIADecisionRuntime(FakeLLM(), max_total_prompt_chars=value)
+            assert False
+        except ValueError:
+            pass
