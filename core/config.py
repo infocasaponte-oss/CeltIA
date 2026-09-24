@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     decision_max_output_tokens: int = 1024
     decision_max_total_output_tokens: int = 8192
     decision_max_total_prompt_chars: int = 250000
+    decision_call_timeout_seconds: float = 30.0
 
     # Creador Studio: proyectos aislados + sandbox Docker por proyecto
     creator_projects_dir: str = "/data/projects"
