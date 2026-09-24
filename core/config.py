@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     decision_reject_ood: bool = True
     decision_ood_entropy_threshold: float = 0.90
     decision_ood_margin_threshold: float = 0.10
+    decision_max_questions: int = 32
+    decision_max_output_tokens: int = 1024
 
     # Creador Studio: proyectos aislados + sandbox Docker por proyecto
     creator_projects_dir: str = "/data/projects"
