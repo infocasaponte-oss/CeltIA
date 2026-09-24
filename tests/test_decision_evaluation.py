@@ -302,3 +302,29 @@ def test_route_summary_does_not_hide_unlabeled_routes():
     assert metrics["min_route_labeled"] == 0
     assert metrics["min_route_coverage"] is None
     assert metrics["min_route_accuracy"] is None
+
+
+def test_promotion_gate_rejects_invalid_threshold_configuration():
+    metrics = evaluate_shadow([])
+    invalid = (
+        {"min_samples": -1},
+        {"min_samples": True},
+        {"min_coverage": -0.01},
+        {"min_coverage": 1.01},
+        {"min_labeled_coverage": float("nan")},
+        {"min_accuracy_delta": -1.01},
+        {"min_accuracy_delta": 1.01},
+        {"min_route_labeled": -1},
+        {"min_route_coverage": float("inf")},
+        {"min_route_accuracy": 1.01},
+        {"min_ood_labeled": -1},
+        {"min_ood_coverage": -0.01},
+        {"min_ood_recall": 1.01},
+        {"max_ood_false_positive_rate": -0.01},
+    )
+    for kwargs in invalid:
+        try:
+            promotion_gate(metrics, **kwargs)
+            assert False, kwargs
+        except ValueError:
+            pass
