@@ -52,7 +52,8 @@ jobs:
             tests/test_decision_evaluation.py \
             tests/test_decision_robustness.py \
             tests/test_decision_calibration.py \
-            tests/test_decision_benchmark.py
+            tests/test_decision_benchmark.py \
+            tests/test_decision_provenance.py
 
   app:
     name: App Python ${{ matrix.python-version }}
