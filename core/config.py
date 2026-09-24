@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     decision_ood_margin_threshold: float = 0.10
     decision_max_questions: int = 32
     decision_max_output_tokens: int = 1024
+    decision_max_total_output_tokens: int = 8192
 
     # Creador Studio: proyectos aislados + sandbox Docker por proyecto
     creator_projects_dir: str = "/data/projects"
