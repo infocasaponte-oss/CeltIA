@@ -73,7 +73,7 @@ def load_jsonl(path: Path):
         rows.append(row)
     return rows
 
-def load_cde_results(path: Path) -> dict[str, dict]:
+def load_cde_results(path: Path, *, require_models_used: bool = False) -> dict[str, dict]:
     by_text={}
     for n,line in enumerate(path.read_text(encoding="utf-8").splitlines(),1):
         if not line.strip():
@@ -84,6 +84,15 @@ def load_cde_results(path: Path) -> dict[str, dict]:
         confidence=item.get("confidence")
         abstained=item.get("abstained")
         suspected_ood=item.get("suspected_ood")
+        models_used=item.get("models_used")
+
+        if models_used is not None or require_models_used:
+            if (
+                not isinstance(models_used,list)
+                or any(not isinstance(model,str) or not model.strip() for model in models_used)
+                or len(models_used) != len(set(models_used))
+            ):
+                raise ValueError(f"invalid CDE result models_used {path}:{n}")
 
         if not isinstance(text,str) or not text.strip():
             raise ValueError(f"invalid CDE result row {path}:{n}")
@@ -155,7 +164,7 @@ def main():
     if args.cde_results:
         results_path=Path(args.cde_results)
         validate_results_manifest(results_path,datasets)
-        by_text=load_cde_results(results_path)
+        by_text=load_cde_results(results_path,require_models_used=True)
     else:
         by_text={}
     unknown_results=set(by_text)-seen_text
