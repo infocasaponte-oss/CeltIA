@@ -27,7 +27,7 @@ from core.creator import git_tools as creator_git
 from core.creator.projects import project_manager
 from core.creator.sandbox import sandbox_configured, sandbox_for
 from core.creator.tools import CREATOR_TOOL_NAMES, build_creator_registry
-from core.inference import VLLMClient
+from core.inference import build_llm
 from core.memory import Memory
 from core.planner import Planner
 from core.policy import ToolPolicy
@@ -59,7 +59,8 @@ if web_dir.exists():
 
 memory = Memory(settings.sqlite_path)
 registry = builtins(policy=ToolPolicy())
-llm = VLLMClient(settings.vllm_base_url, settings.model_serve_name)
+llm = build_llm()
+PUBLIC_MODEL_NAME = "CeltIA V4"
 agent = Agent(llm, registry, policy=ToolPolicy(), planner=Planner())
 gateway = Gateway(settings.gateway_max_concurrency, settings.gateway_queue_wait_seconds,
                   month_usage=lambda key_id: memory.month_tokens(key_id),
@@ -103,6 +104,8 @@ async def system_audit():
     return {
         "ok": vllm_status == "ok" and db_status == "ok",
         "vllm_backend": vllm_status,
+        "llm_primary": ({"model": llm.primary.model, "available": llm.primary_available()}
+                        if hasattr(llm, "primary") else "disabled (local only)"),
         "database": db_status,
         "metrics": dict(app.state.metrics),
         "api_keys": {
@@ -369,7 +372,7 @@ async def gateway_rejection_handler(request: Request, exc: GatewayRejection):
                         headers={"Retry-After": str(exc.retry_after)})
 
 @app.get("/health")
-async def health(): return {"status":"ok","model":settings.model_serve_name}
+async def health(): return {"status":"ok","model":PUBLIC_MODEL_NAME}
 
 @app.get("/metrics")
 async def metrics():
@@ -564,7 +567,7 @@ async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, 
         memory.prune_conversations(key["id"], keep=10)
     app.state.metrics["requests"] += 1
     if key.get("id") is not None:
-        memory.record_usage(key["id"], prompt_tokens, completion_tokens, model=settings.model_serve_name,
+        memory.record_usage(key["id"], prompt_tokens, completion_tokens, model=llm.model,
                             latency_ms=int((time.monotonic() - started_at) * 1000),
                             client_key_id=key.get("client_key_id"))
         gateway.record_tokens(key["id"], prompt_tokens + completion_tokens, key.get("client_key_id"))
@@ -573,7 +576,7 @@ async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, 
         customer_id = key.get("stripe_customer_id")
         if customer_id:
             asyncio.create_task(billing.report_usage(customer_id, prompt_tokens + completion_tokens))
-    return {"id": "celtia-" + uuid.uuid4().hex, "object": "chat.completion", "model": settings.model_serve_name, "choices": [{"index": 0, "message": {"role": "assistant", "content": answer}, "finish_reason": "stop"}],
+    return {"id": "celtia-" + uuid.uuid4().hex, "object": "chat.completion", "model": PUBLIC_MODEL_NAME, "choices": [{"index": 0, "message": {"role": "assistant", "content": answer}, "finish_reason": "stop"}],
             "usage": {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens, "total_tokens": prompt_tokens + completion_tokens},
             "metadata": meta, "session_id": sid}
 
