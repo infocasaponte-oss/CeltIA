@@ -182,8 +182,8 @@ class DecisionQuestionInput(BaseModel):
             return self
         if self.options:
             raise ValueError("score questions do not accept choice options")
-        if self.minimum is None or self.maximum is None or self.minimum > self.maximum:
-            raise ValueError("score questions require a valid minimum/maximum")
+        if self.minimum is None or self.maximum is None or self.minimum >= self.maximum:
+            raise ValueError("score questions require at least two ordered values")
         if self.maximum - self.minimum + 1 > 101:
             raise ValueError("score questions support at most 101 candidate values")
         return self
