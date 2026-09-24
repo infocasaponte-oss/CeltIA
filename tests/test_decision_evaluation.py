@@ -290,3 +290,15 @@ def test_promotion_gate_requires_minimum_labels_for_every_route():
     )
     assert not gate["eligible"]
     assert "insufficient_per_route_labeled_samples" in gate["reasons"]
+
+
+def test_route_summary_does_not_hide_unlabeled_routes():
+    metrics = evaluate_shadow([
+        ShadowSample("fast", "fast", .9, False, "fast"),
+        ShadowSample("think", "think", .9, False, "think"),
+    ])
+    assert metrics["routes_with_labels"] == 2
+    assert metrics["routes_without_labels"] == ["code", "agent", "long"]
+    assert metrics["min_route_labeled"] == 0
+    assert metrics["min_route_coverage"] is None
+    assert metrics["min_route_accuracy"] is None
