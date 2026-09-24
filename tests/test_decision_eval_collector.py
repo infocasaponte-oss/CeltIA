@@ -573,3 +573,24 @@ def test_resume_rejects_collecting_manifest_invalid_code_revision(tmp_path, monk
         assert False
     except ValueError as exc:
         assert "code revision provenance" in str(exc)
+
+
+
+def test_resume_allows_null_code_revision_when_current_environment_is_unresolved(tmp_path, monkeypatch):
+    dataset=tmp_path / "dataset.jsonl"
+    dataset.write_text('{"text":"one","expected":"fast","ood":false}\n',encoding="utf-8")
+    monkeypatch.setattr(collector,"build_runtime",FakeRuntime)
+    monkeypatch.setattr(collector,"route",lambda text:type("R",(),{"mode":"fast"})())
+    monkeypatch.setattr(collector,"_code_revision",lambda:None)
+
+    args=_args(tmp_path)
+    args.dataset=[str(dataset)]
+    first=asyncio.run(collector.collect(args))
+    assert first["manifest"]["code_revision"] is None
+
+    resume_args=_args(tmp_path,resume=True)
+    resume_args.dataset=[str(dataset)]
+    second=asyncio.run(collector.collect(resume_args))
+    assert second["written"] == 0
+    assert second["skipped"] == 1
+    assert second["manifest"]["code_revision"] is None
