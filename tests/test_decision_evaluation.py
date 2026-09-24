@@ -98,3 +98,79 @@ def test_shadow_evaluation_keeps_route_and_ood_labels_independent():
     assert metrics["cde_accuracy"] == 1.0
     assert metrics["ood_labeled"] == 1
     assert metrics["ood_accuracy"] == 1.0
+
+
+def test_promotion_gate_can_require_ood_evidence():
+    metrics = evaluate_shadow([
+        ShadowSample("fast", "fast", .9, False, "fast", suspected_ood=False, expected_ood=False),
+        ShadowSample("think", "think", .9, False, "think", suspected_ood=False, expected_ood=False),
+        ShadowSample("fast", None, .2, True, None, suspected_ood=True, expected_ood=True),
+        ShadowSample("think", None, .2, True, None, suspected_ood=True, expected_ood=True),
+    ])
+    gate = promotion_gate(
+        metrics,
+        min_samples=1,
+        min_coverage=.5,
+        min_labeled=1,
+        min_accuracy_delta=0,
+        min_labeled_coverage=.5,
+        min_ood_labeled=4,
+        min_ood_coverage=1.0,
+        min_ood_recall=.8,
+        max_ood_false_positive_rate=.2,
+    )
+    assert gate["eligible"]
+
+
+def test_promotion_gate_blocks_unsafe_ood_behavior():
+    metrics = evaluate_shadow([
+        ShadowSample("fast", "fast", .9, False, "fast", suspected_ood=True, expected_ood=False),
+        ShadowSample("think", "think", .9, False, "think", suspected_ood=False, expected_ood=False),
+        ShadowSample("fast", None, .2, True, None, suspected_ood=False, expected_ood=True),
+        ShadowSample("think", None, .2, True, None, suspected_ood=True, expected_ood=True),
+    ])
+    gate = promotion_gate(
+        metrics,
+        min_samples=1,
+        min_coverage=.5,
+        min_labeled=1,
+        min_accuracy_delta=0,
+        min_labeled_coverage=.5,
+        min_ood_labeled=4,
+        min_ood_coverage=1.0,
+        min_ood_recall=.8,
+        max_ood_false_positive_rate=.2,
+    )
+    assert not gate["eligible"]
+    assert "ood_recall_below_gate" in gate["reasons"]
+    assert "ood_false_positive_rate_above_gate" in gate["reasons"]
+
+
+def test_promotion_gate_requires_both_ood_classes_when_thresholded():
+    missing_positive = {
+        "samples": 10,
+        "coverage": 1.0,
+        "labeled": 10,
+        "labeled_coverage": 1.0,
+        "heuristic_accuracy": .5,
+        "cde_accuracy": .8,
+        "ood_labeled": 10,
+        "ood_coverage": 1.0,
+        "ood_positive_labels": 0,
+        "ood_negative_labels": 10,
+        "ood_false_positive_rate": 0.0,
+    }
+    gate = promotion_gate(
+        missing_positive,
+        min_samples=1,
+        min_coverage=.5,
+        min_labeled=1,
+        min_accuracy_delta=0,
+        min_labeled_coverage=.5,
+        min_ood_labeled=1,
+        min_ood_coverage=.5,
+        min_ood_recall=.5,
+        max_ood_false_positive_rate=.5,
+    )
+    assert not gate["eligible"]
+    assert "insufficient_ood_positive_samples" in gate["reasons"]
