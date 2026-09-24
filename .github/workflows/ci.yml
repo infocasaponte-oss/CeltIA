@@ -8,6 +8,9 @@ name: CI
 permissions:
   contents: read
 
+env:
+  PYTHONUNBUFFERED: "1"
+
 jobs:
   cde:
     name: CDE Python ${{ matrix.python-version }}
@@ -18,7 +21,17 @@ jobs:
         python-version: ["3.11", "3.12"]
     timeout-minutes: 10
     steps:
+      - name: Runner smoke test
+        run: |
+          echo "runner-ok"
+          pwd
+          ls -la
       - uses: actions/checkout@v4
+      - name: Repository smoke test
+        run: |
+          test -f celtia/decision/async_engine.py
+          test -f tests/test_async_decision_engine.py
+          echo "checkout-ok"
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
