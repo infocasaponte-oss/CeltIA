@@ -131,3 +131,19 @@ def test_llm_scorer_rejects_pathologically_deep_context_before_model_call():
     except ValueError as exc:
         assert "JSON serializable" in str(exc)
     assert calls == []
+
+
+def test_llm_scorer_rejects_cyclic_context_before_model_call():
+    calls = []
+    async def chat(messages):
+        calls.append(messages)
+        return '{"scores":{"c0":0.0,"c1":1.0}}'
+    context = []
+    context.append(context)
+    q = DecisionQuestion("safe", "safe?", DecisionType.BOOLEAN)
+    try:
+        asyncio.run(AsyncLLMDecisionScorer(chat).score(context, q, q.candidates()))
+        assert False
+    except ValueError as exc:
+        assert "JSON serializable" in str(exc)
+    assert calls == []
