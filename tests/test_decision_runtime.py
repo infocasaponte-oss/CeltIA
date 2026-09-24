@@ -4,7 +4,7 @@ from core.decision_runtime import CeltIADecisionRuntime
 class FakeLLM:
     async def chat(self, messages, **kwargs):
         return {
-            "choices":[{"message":{"content":'{"scores":{"fast":0.1,"think":2.0}}'}}],
+            "choices":[{"message":{"content":'{"scores":{"c0":0.1,"c1":2.0}}'}}],
             "usage":{"prompt_tokens":11,"completion_tokens":7,"total_tokens":18},
         }
 
@@ -84,7 +84,7 @@ def test_runtime_aggregates_usage_across_questions():
 class MalformedUsageLLM:
     async def chat(self, messages, **kwargs):
         return {
-            "choices":[{"message":{"content":'{"scores":{"fast":0.1,"think":2.0}}'}}],
+            "choices":[{"message":{"content":'{"scores":{"c0":0.1,"c1":2.0}}'}}],
             "usage":{"prompt_tokens":-5,"completion_tokens":"bad","total_tokens":999999},
         }
 
