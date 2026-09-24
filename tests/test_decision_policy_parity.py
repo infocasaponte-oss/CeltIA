@@ -46,3 +46,33 @@ def test_sync_and_async_score_expected_value_match():
     )[0]
     assert sync == async_result
     assert sync.expected_score is not None
+
+
+def test_policy_rejects_boolean_logits():
+    q = DecisionQuestion("safe", "safe?", DecisionType.BOOLEAN)
+    req = DecisionRequest({}, (q,))
+    try:
+        DecisionEngine(SyncScorer([False, True]), reject_suspected_ood=False).decide(req)
+        assert False
+    except ValueError as exc:
+        assert "invalid logits" in str(exc)
+
+
+def test_policy_rejects_out_of_range_ood_thresholds():
+    q = DecisionQuestion("safe", "safe?", DecisionType.BOOLEAN)
+    req = DecisionRequest({}, (q,))
+    for kwargs in (
+        {"ood_entropy_threshold": -0.1},
+        {"ood_entropy_threshold": 1.1},
+        {"ood_margin_threshold": -0.1},
+        {"ood_margin_threshold": 1.1},
+    ):
+        try:
+            DecisionEngine(
+                SyncScorer([0.0, 1.0]),
+                reject_suspected_ood=True,
+                **kwargs,
+            ).decide(req)
+            assert False
+        except ValueError:
+            pass
