@@ -13,7 +13,15 @@ from core.config import settings
 from core.decision_runtime import CeltIADecisionRuntime
 from core.inference import build_llm
 from core.router import route
-from scripts.evaluate_decision_routes import RESULT_FORMAT_VERSION, dataset_sha256, file_sha256, load_cde_results, load_jsonl
+from scripts.evaluate_decision_routes import (
+    RESULT_FORMAT_VERSION,
+    SHA256_RE,
+    dataset_sha256,
+    file_sha256,
+    load_cde_results,
+    load_jsonl,
+    validate_results_manifest,
+)
 
 ROUTES=("fast","think","code","agent","long")
 DEFAULT_CHECKPOINT_EVERY=10
@@ -73,6 +81,32 @@ def _load_manifest(path: Path) -> dict:
     if not isinstance(value,dict) or value.get("format_version") != RESULT_FORMAT_VERSION:
         raise ValueError(f"incompatible evaluation manifest: {path}")
     return value
+
+
+def _validate_collecting_manifest(manifest: dict, datasets: list[str]) -> None:
+    if manifest.get("status") != "collecting":
+        raise ValueError("resume manifest has invalid collection status")
+    manifest_datasets=manifest.get("datasets")
+    if (
+        not isinstance(manifest_datasets,list)
+        or any(not isinstance(item,str) or not item for item in manifest_datasets)
+        or manifest_datasets != datasets
+    ):
+        raise ValueError("resume manifest dataset list does not match selected datasets")
+    collected_at=manifest.get("collected_at")
+    if not isinstance(collected_at,str) or not collected_at.strip():
+        raise ValueError("resume manifest has invalid collected_at")
+    if not isinstance(manifest.get("backend"),dict):
+        raise ValueError("resume manifest has invalid backend provenance")
+    if not isinstance(manifest.get("policy"),dict):
+        raise ValueError("resume manifest has invalid policy provenance")
+    expected_dataset_sha=manifest.get("dataset_sha256")
+    if (
+        not isinstance(expected_dataset_sha,str)
+        or not SHA256_RE.fullmatch(expected_dataset_sha)
+        or expected_dataset_sha != dataset_sha256(datasets)
+    ):
+        raise ValueError("resume dataset provenance does not match current datasets")
 
 
 def _runtime_manifest(runtime: CeltIADecisionRuntime, datasets: list[str]) -> dict:
@@ -189,9 +223,12 @@ async def collect(args) -> dict:
             raise ValueError("resume requires the evaluation provenance manifest")
         resume_manifest=_load_manifest(manifest_output)
         if resume_manifest.get("status") == "complete":
-            expected_sha=resume_manifest.get("results_sha256")
-            if not isinstance(expected_sha,str) or expected_sha != file_sha256(output):
-                raise ValueError("resume result file does not match completed provenance manifest")
+            try:
+                resume_manifest=validate_results_manifest(output,datasets)
+            except ValueError as exc:
+                raise ValueError("resume result file does not match completed provenance manifest") from exc
+        else:
+            _validate_collecting_manifest(resume_manifest,datasets)
         existing=load_cde_results(output,require_models_used=True)
         unknown=set(existing)-{row["text"] for row in rows}
         if unknown:
