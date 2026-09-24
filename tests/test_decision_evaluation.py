@@ -41,3 +41,24 @@ def test_gate_blocks_excessive_labeled_abstention():
     )
     assert not gate["eligible"]
     assert "insufficient_labeled_coverage" in gate["reasons"]
+
+
+def test_selective_accuracy_does_not_replace_total_accuracy():
+    samples = [
+        ShadowSample("fast", "fast", .9, False, "fast"),
+        ShadowSample("fast", None, .1, True, "think"),
+    ]
+    metrics = evaluate_shadow(samples)
+    assert metrics["cde_selective_accuracy"] == 1.0
+    assert metrics["cde_accuracy"] == .5
+    assert metrics["labeled_coverage"] == .5
+    gate = promotion_gate(
+        metrics,
+        min_samples=1,
+        min_coverage=.5,
+        min_labeled=1,
+        min_accuracy_delta=.1,
+        min_labeled_coverage=.5,
+    )
+    assert not gate["eligible"]
+    assert "accuracy_delta_below_gate" in gate["reasons"]
