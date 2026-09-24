@@ -5,6 +5,8 @@ import argparse
 import asyncio
 import json
 import os
+import re
+import subprocess
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -76,6 +78,21 @@ async def collect_one(runtime: CeltIADecisionRuntime, row: dict) -> dict:
         "expected_ood":row.get("ood"),
         "models_used":list(usage.get("models") or []),
     }
+
+
+def _code_revision() -> str | None:
+    try:
+        completed=subprocess.run(
+            ["git","rev-parse","HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError,subprocess.SubprocessError):
+        return None
+    value=completed.stdout.strip()
+    return value if SHA256_RE.fullmatch(value) or re.fullmatch(r"^[0-9a-f]{40}$",value) else None
 
 
 def _load_manifest(path: Path) -> dict:
@@ -159,6 +176,7 @@ def _runtime_manifest(runtime: CeltIADecisionRuntime, datasets: list[str], *, da
         "status":"collecting",
         "collected_at":datetime.now(timezone.utc).isoformat(),
         "dataset_sha256":dataset_sha256(datasets),
+        "code_revision":_code_revision(),
         "datasets":datasets,
         "selection":{
             "dataset_rows":dataset_rows,
@@ -296,7 +314,7 @@ async def collect(args) -> dict:
     if resume_manifest is not None:
         if resume_manifest.get("dataset_sha256") != manifest["dataset_sha256"]:
             raise ValueError("resume dataset provenance does not match current datasets")
-        for field in ("backend","policy"):
+        for field in ("backend","policy","code_revision"):
             if resume_manifest.get(field) != manifest[field]:
                 raise ValueError(f"resume {field} provenance does not match current runtime")
         manifest["resumed_from_collected_at"]=(
