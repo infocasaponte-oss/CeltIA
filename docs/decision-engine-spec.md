@@ -17,6 +17,7 @@ A request contains shared context plus questions. Each question exposes a finite
 - model usage from decision scoring is aggregated per request and fed into CeltIA usage/quota/billing accounting;
 - invalid definitions/output fail closed;
 - low confidence can abstain;
+- sync and async engines share the same optional OOD rejection semantics (entropy/margin thresholds);
 - deterministic tests need no GPU/model downloads.
 
 ## Next milestones
