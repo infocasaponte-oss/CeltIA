@@ -297,7 +297,11 @@ async def collect(args) -> dict:
                 raise ValueError(f"resume completed provenance manifest is invalid: {exc}") from exc
         else:
             _validate_collecting_manifest(resume_manifest,datasets,output,dataset_rows=dataset_rows)
-        existing=load_cde_results(\n            output,\n            require_models_used=True,\n            allowed_models=declared_backend_models(resume_manifest["backend"]),\n        )
+        existing=load_cde_results(
+            output,
+            require_models_used=True,
+            allowed_models=declared_backend_models(resume_manifest["backend"]),
+        )
         previous_selection=resume_manifest["selection"]
         previous_selected_rows=previous_selection["selected_rows"]
         previous_selected_texts={row["text"] for row in all_rows[:previous_selected_rows]}
