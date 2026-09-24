@@ -3,7 +3,10 @@ from core.decision_runtime import CeltIADecisionRuntime
 
 class FakeLLM:
     async def chat(self, messages, **kwargs):
-        return {"choices":[{"message":{"content":'{"scores":{"fast":0.1,"think":2.0}}'}}]}
+        return {
+            "choices":[{"message":{"content":'{"scores":{"fast":0.1,"think":2.0}}'}}],
+            "usage":{"prompt_tokens":11,"completion_tokens":7,"total_tokens":18},
+        }
 
 def test_runtime_bridge():
     runtime=CeltIADecisionRuntime(FakeLLM(),abstain_below=0.5)
@@ -65,3 +68,14 @@ def test_runtime_rejects_empty_or_excessive_questions():
             assert False
         except ValueError as exc:
             assert "between 1 and 32" in str(exc)
+
+
+def test_runtime_aggregates_usage_across_questions():
+    runtime = CeltIADecisionRuntime(FakeLLM(), abstain_below=0.0, reject_suspected_ood=False)
+    questions = [
+        {"id":"q1","prompt":"route","type":"choice","options":["fast","think"]},
+        {"id":"q2","prompt":"route","type":"choice","options":["fast","think"]},
+    ]
+    results, usage = asyncio.run(runtime.decide_with_usage({}, questions))
+    assert len(results) == 2
+    assert usage == {"prompt_tokens":22,"completion_tokens":14,"total_tokens":36}
