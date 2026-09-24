@@ -113,9 +113,9 @@ def test_runtime_manifest_records_dataset_digest_backend_and_policy(tmp_path):
 def test_dataset_digest_changes_when_evaluation_data_changes(tmp_path):
     dataset=tmp_path / "dataset.jsonl"
     dataset.write_text("first\n",encoding="utf-8")
-    first=collector._dataset_sha256([str(dataset)])
+    first=collector.dataset_sha256([str(dataset)])
     dataset.write_text("second\n",encoding="utf-8")
-    second=collector._dataset_sha256([str(dataset)])
+    second=collector.dataset_sha256([str(dataset)])
     assert first != second
 
 
