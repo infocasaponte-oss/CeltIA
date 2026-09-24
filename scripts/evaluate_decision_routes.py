@@ -63,7 +63,7 @@ def validate_results_manifest(results_path: Path, datasets: list[str]) -> dict:
         or not SHA256_RE.fullmatch(expected_dataset_sha)
         or expected_dataset_sha != dataset_sha256(datasets)
     ):
-        raise ValueError("CDE results manifest does not match selected datasets")
+        raise ValueError("CDE results manifest dataset provenance does not match selected datasets")
     if manifest.get("status") != "complete":
         raise ValueError("CDE results manifest is not complete")
     expected_results_sha=manifest.get("results_sha256")
