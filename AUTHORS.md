@@ -5,6 +5,7 @@
 - **Autor e titular:** Luis Manuel Cousido Hermida (<infocasaponte@gmail.com>)
 - **Proxecto:** CeltIA, sistema de asistente de IA local con axente, gateway de API, API keys para clientes,
   streaming en vivo, adxuntos e panel de administración.
+- **Licenza:** propietaria, ver [LICENSE](LICENSE).
 - **Rexistro de cambios:** ver [CHANGELOG.md](CHANGELOG.md) e o historial de git, onde todos os commits
   están asinados a nome do autor.
 

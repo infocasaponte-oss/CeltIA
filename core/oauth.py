@@ -57,7 +57,8 @@ async def google_fetch_identity(code: str, redirect_uri: str) -> dict:
         info_res = await client.get(GOOGLE_USERINFO_URL, headers={"Authorization": f"Bearer {access_token}"})
         info_res.raise_for_status()
         info = info_res.json()
-        return {"subject": info["sub"], "email": info.get("email"), "name": info.get("name") or info.get("email")}
+        email = info.get("email") if info.get("email_verified") else None  # never link accounts by an unverified email
+        return {"subject": info["sub"], "email": email, "name": info.get("name") or info.get("email")}
 
 
 async def github_fetch_identity(code: str, redirect_uri: str) -> dict:
@@ -83,7 +84,7 @@ async def github_fetch_identity(code: str, redirect_uri: str) -> dict:
             emails_res = await client.get(GITHUB_EMAILS_URL, headers=headers)
             if emails_res.status_code == 200:
                 for entry in emails_res.json():
-                    if entry.get("primary"):
+                    if entry.get("primary") and entry.get("verified"):
                         email = entry.get("email")
                         break
         return {"subject": str(user["id"]), "email": email, "name": user.get("name") or user.get("login")}

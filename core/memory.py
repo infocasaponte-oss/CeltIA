@@ -369,10 +369,11 @@ class Memory:
         )
         self.db.commit()
 
-    def history(self, sid, limit=16):
+    def history(self, sid, limit=16, api_key_id=None):
+        """Only returns messages owned by `api_key_id`, so a client-chosen session_id can't read another user's chat."""
         rows = self.db.execute(
-            "SELECT role,content FROM messages WHERE session_id=? ORDER BY id DESC LIMIT ?",
-            (sid, limit),
+            "SELECT role,content FROM messages WHERE session_id=? AND api_key_id IS ? ORDER BY id DESC LIMIT ?",
+            (sid, api_key_id, limit),
         ).fetchall()
         return [{"role": r, "content": c} for r, c in reversed(rows)]
 

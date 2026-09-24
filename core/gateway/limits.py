@@ -14,6 +14,41 @@ DEFAULT_LIMITS = {
 }
 
 
+class AttemptLimiter:
+    """Sliding-window counter for failed logins / registrations (brute-force protection)."""
+
+    def __init__(self, max_attempts: int, window_seconds: int):
+        self.max_attempts = max_attempts
+        self.window = window_seconds
+        self._events: dict[str, deque] = defaultdict(deque)
+
+    def _prune(self, key: str):
+        now = time.monotonic()
+        events = self._events[key]
+        while events and now - events[0] > self.window:
+            events.popleft()
+        if not events:
+            self._events.pop(key, None)
+        return now
+
+    def check(self, *keys: str):
+        for key in keys:
+            now = self._prune(key)
+            events = self._events.get(key)
+            if events and len(events) >= self.max_attempts:
+                raise GatewayRejection("Demasiados intentos. Espera unos minutos antes de volver a probar",
+                                       max(1, int(self.window - (now - events[0])) + 1))
+
+    def hit(self, *keys: str):
+        now = time.monotonic()
+        for key in keys:
+            self._events[key].append(now)
+
+    def clear(self, *keys: str):
+        for key in keys:
+            self._events.pop(key, None)
+
+
 class GatewayRejection(Exception):
     def __init__(self, reason: str, retry_after: int):
         super().__init__(reason)

@@ -1,0 +1,41 @@
+LICENCIA PROPIETARIA / PROPRIETARY LICENSE
+
+Copyright (c) 2026 Luis Manuel Cousido Hermida. Todos los derechos reservados.
+Copyright (c) 2026 Luis Manuel Cousido Hermida. All rights reserved.
+
+CeltIA V4 (el "Software") es software propietario y confidencial. Este repositorio no es
+software libre ni de código abierto. Su visibilidad en una plataforma de alojamiento no
+concede ninguna licencia.
+
+1. TITULARIDAD. El Software, su código fuente, documentación, diseño, configuración,
+   "CeltIA" como nombre del proyecto y todo el material relacionado son propiedad exclusiva
+   de Luis Manuel Cousido Hermida (el "Titular"). No se transfiere ningún derecho de propiedad.
+
+2. SIN LICENCIA IMPLÍCITA. Salvo autorización previa, expresa y por escrito del Titular, queda
+   prohibido: (a) copiar, reproducir o almacenar el Software; (b) modificarlo o crear obras
+   derivadas; (c) distribuirlo, publicarlo, sublicenciarlo, venderlo, alquilarlo o cederlo;
+   (d) ofrecerlo como servicio a terceros; (e) usarlo para entrenar o evaluar otros modelos o
+   sistemas; (f) descompilar, extraer o eliminar avisos de copyright o de autoría.
+
+3. AUTORIZACIONES. Cualquier uso, evaluación o despliegue requiere un acuerdo escrito con el
+   Titular, que podrá limitarlo en alcance, tiempo y finalidad, y revocarlo.
+
+4. COMPONENTES DE TERCEROS. El Software puede depender de bibliotecas y modelos de terceros
+   (p. ej. FastAPI, Uvicorn, httpx, Pydantic, pypdf, python-docx, openpyxl, Ollama y los modelos
+   que se ejecuten con él). Cada uno se rige por su propia licencia, que no queda modificada
+   por este documento y que debe respetarse por separado.
+
+5. SIN GARANTÍA. El Software se ofrece "TAL CUAL", sin garantía de ningún tipo, expresa o
+   implícita, incluidas comerciabilidad, idoneidad para un fin concreto y no infracción. El
+   Titular no será responsable de daños derivados de su uso.
+
+6. INCUMPLIMIENTO. El uso no autorizado infringe los derechos de propiedad intelectual del
+   Titular y puede dar lugar a las acciones legales que correspondan.
+
+Contacto para licencias: infocasaponte@gmail.com
+
+---
+EN: This is proprietary software. No license is granted to copy, modify, distribute, host,
+sublicense or use it, or to use it to train other models, without the prior written permission
+of Luis Manuel Cousido Hermida. Third-party components remain under their own licenses.
+The Software is provided "AS IS" without warranty of any kind.
