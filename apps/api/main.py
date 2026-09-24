@@ -449,7 +449,16 @@ async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, 
         shadow = await evaluate_route_shadow(decision_runtime, text, r.mode)
         if shadow:
             logger.info("CDE shadow route: %s", shadow)
-            memory.record_decision_shadow(key.get("id"), shadow["heuristic"], shadow["cde"], shadow["confidence"], shadow["abstained"])
+            memory.record_decision_shadow(
+                key.get("id"),
+                shadow["heuristic"],
+                shadow["cde"],
+                shadow["confidence"],
+                shadow["abstained"],
+                shadow.get("abstention_reason"),
+                shadow.get("normalized_entropy"),
+                shadow.get("margin"),
+            )
             emit({"type": "decision_shadow", **shadow})
     auto_agent = r.mode == "agent"
     if not auto_agent and req.mode in {"fast", "think", "code", "long"}:
