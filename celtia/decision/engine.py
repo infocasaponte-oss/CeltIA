@@ -4,6 +4,7 @@ import math
 from dataclasses import dataclass
 from typing import Protocol, Sequence
 from .schema import DecisionQuestion, DecisionRequest, DecisionResult
+from .robustness import ood_signal
 
 class CandidateScorer(Protocol):
     def score(self, context: object, question: DecisionQuestion, candidates: Sequence[str]) -> Sequence[float]: ...
@@ -13,6 +14,9 @@ class DecisionEngine:
     scorer: CandidateScorer
     abstain_below: float = 0.55
     temperature: float = 1.0
+    reject_suspected_ood: bool = True
+    ood_entropy_threshold: float = 0.90
+    ood_margin_threshold: float = 0.10
 
     def decide(self, request: DecisionRequest) -> list[DecisionResult]:
         if self.temperature <= 0: raise ValueError("temperature must be positive")
@@ -26,7 +30,14 @@ class DecisionEngine:
         pairs = dict(zip(candidates, probs, strict=True))
         best = max(range(len(probs)), key=probs.__getitem__)
         confidence = probs[best]
-        abstained = confidence < self.abstain_below
+        risk = ood_signal(
+            pairs,
+            entropy_threshold=self.ood_entropy_threshold,
+            margin_threshold=self.ood_margin_threshold,
+        )
+        abstained = confidence < self.abstain_below or (
+            self.reject_suspected_ood and risk["suspected_ood"]
+        )
         return DecisionResult(q.id, pairs, None if abstained else candidates[best], confidence, abstained)
 
     @staticmethod
