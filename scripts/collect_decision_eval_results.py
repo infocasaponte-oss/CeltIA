@@ -25,7 +25,7 @@ from scripts.evaluate_decision_routes import (
     load_jsonl,
     parse_aware_timestamp,
     validate_backend_provenance,
-    validate_code_revision,
+    validate_code_provenance,
     validate_policy_provenance,
     validate_results_manifest,
     validate_selection_provenance,
@@ -145,15 +145,15 @@ def _validate_collecting_manifest(manifest: dict, datasets: list[str], results_p
         raise ValueError("resume manifest has invalid backend provenance")
     if not validate_policy_provenance(manifest.get("policy")):
         raise ValueError("resume manifest has invalid policy provenance")
-    if "code_revision" not in manifest or not validate_code_revision(manifest.get("code_revision")):
-        raise ValueError("resume manifest has invalid code revision provenance")
-    code_revision=manifest.get("code_revision")
-    code_dirty=manifest.get("code_dirty")
-    if code_revision is None:
-        if code_dirty is not None:
-            raise ValueError("resume manifest has invalid code dirty provenance")
-    elif not isinstance(code_dirty,bool):
-        raise ValueError("resume manifest has invalid code dirty provenance")
+    if (
+        "code_revision" not in manifest
+        or "code_dirty" not in manifest
+        or not validate_code_provenance(
+            manifest.get("code_revision"),
+            manifest.get("code_dirty"),
+        )
+    ):
+        raise ValueError("resume manifest has invalid code provenance")
     selected_rows=validate_selection_provenance(
         manifest.get("selection"),
         dataset_rows=dataset_rows,
