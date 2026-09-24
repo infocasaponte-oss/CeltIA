@@ -27,3 +27,12 @@ The report keeps distributions label-aligned and records maximum probability dev
 
 
 Shadow telemetry stores only routing metadata and uncertainty diagnostics. It does not persist the user prompt. Existing databases are migrated in place by adding nullable `abstention_reason`, `normalized_entropy`, and `margin` columns.
+
+
+## Labeled OOD evaluation
+
+Decision results expose `suspected_ood` separately from `abstention_reason`. This matters when low confidence and OOD are both true: the abstention reason keeps its deterministic precedence, while evaluation can still count the independent OOD signal.
+
+`evaluate_shadow` now reports OOD label coverage plus true/false positives and negatives, precision, recall, specificity, false-positive rate and accuracy whenever samples provide `expected_ood` and `suspected_ood`. Route labels and OOD labels are independent, so an in-domain route sample can contribute to both routing accuracy and OOD specificity.
+
+`benchmarks/decision_routes_ood.jsonl` is a small adversarial seed set containing malformed, injection-like and route-label-manipulation inputs. It is validated in CI but is not large enough for a promotion claim. The offline evaluator accepts `"expected": null, "ood": true` rows and optional `suspected_ood` values in CDE result JSONL.
