@@ -76,3 +76,42 @@ def test_policy_rejects_out_of_range_ood_thresholds():
             assert False
         except ValueError:
             pass
+
+
+def test_sync_and_async_engines_reject_invalid_policy_types_consistently():
+    q = DecisionQuestion("safe", "safe?", DecisionType.BOOLEAN)
+    req = DecisionRequest({}, (q,))
+    invalid = (
+        {"temperature": True},
+        {"temperature": "not-a-number"},
+        {"abstain_below": False},
+        {"abstain_below": float("nan")},
+        {"reject_suspected_ood": 1},
+        {"ood_entropy_threshold": float("inf")},
+        {"ood_margin_threshold": "bad"},
+    )
+    for kwargs in invalid:
+        try:
+            DecisionEngine(SyncScorer([0.0, 1.0]), **kwargs).decide(req)
+            assert False, kwargs
+        except ValueError:
+            pass
+        try:
+            asyncio.run(AsyncDecisionEngine(AsyncScorer([0.0, 1.0]), **kwargs).decide(req))
+            assert False, kwargs
+        except ValueError:
+            pass
+
+
+def test_engine_policy_validation_runs_even_for_empty_request():
+    req = DecisionRequest({}, ())
+    try:
+        DecisionEngine(SyncScorer([]), temperature=True).decide(req)
+        assert False
+    except ValueError:
+        pass
+    try:
+        asyncio.run(AsyncDecisionEngine(AsyncScorer([]), temperature=True).decide(req))
+        assert False
+    except ValueError:
+        pass
