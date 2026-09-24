@@ -301,3 +301,55 @@ def test_repeated_resume_preserves_original_collection_timestamp(tmp_path, monke
     asyncio.run(collector.collect(resume_args))
     second_resume=json.loads(manifest_path.read_text(encoding="utf-8"))
     assert second_resume["resumed_from_collected_at"] == original_collected_at
+
+
+
+def test_resume_rejects_collecting_manifest_dataset_list_mismatch(tmp_path, monkeypatch):
+    dataset=tmp_path / "dataset.jsonl"
+    dataset.write_text('{"text":"one","expected":"fast","ood":false}\n',encoding="utf-8")
+    path=tmp_path / "results.jsonl"
+    path.write_text(
+        '{"text":"one","cde":"fast","confidence":0.9,"abstained":false,"models_used":["fake-model"]}\n',
+        encoding="utf-8",
+    )
+    manifest=collector._runtime_manifest(FakeRuntime(),[str(dataset)])
+    manifest["datasets"]=["different.jsonl"]
+    (tmp_path / "results.jsonl.manifest.json").write_text(
+        json.dumps(manifest),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(collector,"build_runtime",FakeRuntime)
+
+    args=_args(tmp_path,resume=True)
+    args.dataset=[str(dataset)]
+    try:
+        asyncio.run(collector.collect(args))
+        assert False
+    except ValueError as exc:
+        assert "dataset list" in str(exc)
+
+
+def test_resume_rejects_collecting_manifest_missing_structural_provenance(tmp_path, monkeypatch):
+    dataset=tmp_path / "dataset.jsonl"
+    dataset.write_text('{"text":"one","expected":"fast","ood":false}\n',encoding="utf-8")
+    path=tmp_path / "results.jsonl"
+    path.write_text(
+        '{"text":"one","cde":"fast","confidence":0.9,"abstained":false,"models_used":["fake-model"]}\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(collector,"build_runtime",FakeRuntime)
+
+    for field in ("collected_at","backend","policy"):
+        manifest=collector._runtime_manifest(FakeRuntime(),[str(dataset)])
+        manifest.pop(field)
+        (tmp_path / "results.jsonl.manifest.json").write_text(
+            json.dumps(manifest),
+            encoding="utf-8",
+        )
+        args=_args(tmp_path,resume=True)
+        args.dataset=[str(dataset)]
+        try:
+            asyncio.run(collector.collect(args))
+            assert False,field
+        except ValueError:
+            pass
