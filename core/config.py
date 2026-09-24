@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     vllm_base_url: str = "http://localhost:8000/v1"
     sqlite_path: str = "./mini_council.db"
     max_agent_steps: int = 8
-    gateway_max_concurrency: int = 1
+    gateway_max_concurrency: int = 4  # local GPU requests queue inside Ollama; the cloud primary handles parallel calls
     gateway_queue_wait_seconds: float = 30.0
     max_tool_calls: int = 12
     python_tool_timeout_seconds: int = 8
@@ -30,6 +30,16 @@ class Settings(BaseSettings):
     xai_api_key: str = ""
     image_model: str = "grok-imagine-image"
     image_token_cost: int = 1500  # tokens descontados del saldo por imagen generada
+
+    # Modelo principal del chat (Grok / xAI, API compatible con OpenAI). El modelo local (Ollama) queda de reserva.
+    llm_primary_enabled: bool = True
+    llm_primary_base_url: str = "https://api.x.ai/v1"
+    llm_primary_api_key: str = ""  # si está vacío se reutiliza XAI_API_KEY / IMAGE_API_KEY
+    llm_primary_model: str = "grok-4.20-0309-non-reasoning"
+    llm_primary_reasoning_model: str = "grok-4.20-0309-reasoning"  # solo para respuestas sin herramientas en modo "pensar"
+    llm_primary_context: int = 128000
+    llm_primary_timeout_seconds: int = 60
+    llm_primary_cooldown_seconds: int = 60  # tras un fallo de disponibilidad se usa el modelo local durante este tiempo
 
     data_retention_days: int = 365
     google_client_id: str = ""
@@ -61,6 +71,10 @@ class Settings(BaseSettings):
     creator_container_cpu_quota: int = 100000
     creator_command_timeout_seconds: int = 120
     creator_max_auto_repair_attempts: int = 2
+    @property
+    def primary_llm_key(self) -> str:
+        return self.llm_primary_api_key or self.xai_api_key or self.image_api_key
+
     model_config = SettingsConfigDict(env_file=(".env", ".env.local"), extra="ignore")
 
 settings = Settings()

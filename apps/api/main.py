@@ -28,7 +28,7 @@ from core.creator import git_tools as creator_git
 from core.creator.projects import project_manager
 from core.creator.sandbox import sandbox_configured, sandbox_for
 from core.creator.tools import CREATOR_TOOL_NAMES, build_creator_registry
-from core.inference import VLLMClient
+from core.inference import build_llm
 from core.decision_runtime import CeltIADecisionRuntime
 from core.decision_shadow import evaluate_route_shadow
 from core.memory import Memory
@@ -62,7 +62,8 @@ if web_dir.exists():
 
 memory = Memory(settings.sqlite_path)
 registry = builtins(policy=ToolPolicy())
-llm = VLLMClient(settings.vllm_base_url, settings.model_serve_name)
+llm = build_llm()
+PUBLIC_MODEL_NAME = "CeltIA V4"
 decision_runtime = CeltIADecisionRuntime(
     llm,
     abstain_below=settings.decision_abstain_below,
@@ -120,6 +121,8 @@ async def system_audit():
     return {
         "ok": vllm_status == "ok" and db_status == "ok",
         "vllm_backend": vllm_status,
+        "llm_primary": ({"model": llm.primary.model, "available": llm.primary_available()}
+                        if hasattr(llm, "primary") else "disabled (local only)"),
         "database": db_status,
         "metrics": dict(app.state.metrics),
         "api_keys": {
@@ -422,7 +425,7 @@ async def gateway_rejection_handler(request: Request, exc: GatewayRejection):
                         headers={"Retry-After": str(exc.retry_after)})
 
 @app.get("/health")
-async def health(): return {"status":"ok","model":settings.model_serve_name}
+async def health(): return {"status":"ok","model":PUBLIC_MODEL_NAME}
 
 @app.post("/v1/decide")
 async def decide(req: DecisionApiRequest, key: dict = Depends(require_api_key)):
@@ -443,9 +446,14 @@ async def decide(req: DecisionApiRequest, key: dict = Depends(require_api_key)):
         prompt_tokens = int(usage.get("prompt_tokens", 0))
         completion_tokens = int(usage.get("completion_tokens", 0))
         total_tokens = int(usage.get("total_tokens", prompt_tokens + completion_tokens))
-        memory.record_usage(key["id"], prompt_tokens, completion_tokens, model=settings.model_serve_name,
-                            latency_ms=int((time.monotonic() - started_at) * 1000),
-                            client_key_id=key.get("client_key_id"))
+        memory.record_usage(
+            key["id"],
+            prompt_tokens,
+            completion_tokens,
+            model=PUBLIC_MODEL_NAME,
+            latency_ms=int((time.monotonic() - started_at) * 1000),
+            client_key_id=key.get("client_key_id"),
+        )
         gateway.record_tokens(key["id"], total_tokens, key.get("client_key_id"))
         if key.get("token_balance") is not None:
             memory.decrement_token_balance(key["id"], total_tokens)
@@ -549,9 +557,15 @@ async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, 
         if shadow:
             logger.info("CDE shadow route: %s", shadow)
             memory.record_decision_shadow(
-                key.get("id"), shadow["heuristic"], shadow["cde"], shadow["confidence"], shadow["abstained"],
-                shadow.get("abstention_reason"), shadow.get("suspected_ood"),
-                shadow.get("normalized_entropy"), shadow.get("margin"),
+                key.get("id"),
+                shadow["heuristic"],
+                shadow["cde"],
+                shadow["confidence"],
+                shadow["abstained"],
+                shadow.get("abstention_reason"),
+                shadow.get("suspected_ood"),
+                shadow.get("normalized_entropy"),
+                shadow.get("margin"),
             )
             emit({"type": "decision_shadow", **shadow})
     auto_agent = r.mode == "agent"
@@ -669,7 +683,7 @@ async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, 
         memory.prune_conversations(key["id"], keep=10)
     app.state.metrics["requests"] += 1
     if key.get("id") is not None:
-        memory.record_usage(key["id"], prompt_tokens, completion_tokens, model=settings.model_serve_name,
+        memory.record_usage(key["id"], prompt_tokens, completion_tokens, model=llm.model,
                             latency_ms=int((time.monotonic() - started_at) * 1000),
                             client_key_id=key.get("client_key_id"))
         gateway.record_tokens(key["id"], prompt_tokens + completion_tokens, key.get("client_key_id"))
@@ -678,7 +692,7 @@ async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, 
         customer_id = key.get("stripe_customer_id")
         if customer_id:
             asyncio.create_task(billing.report_usage(customer_id, prompt_tokens + completion_tokens))
-    return {"id": "celtia-" + uuid.uuid4().hex, "object": "chat.completion", "model": settings.model_serve_name, "choices": [{"index": 0, "message": {"role": "assistant", "content": answer}, "finish_reason": "stop"}],
+    return {"id": "celtia-" + uuid.uuid4().hex, "object": "chat.completion", "model": PUBLIC_MODEL_NAME, "choices": [{"index": 0, "message": {"role": "assistant", "content": answer}, "finish_reason": "stop"}],
             "usage": {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens, "total_tokens": prompt_tokens + completion_tokens},
             "metadata": meta, "session_id": sid}
 

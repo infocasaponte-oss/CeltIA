@@ -143,6 +143,76 @@ def test_offline_fallback_response():
     asyncio.run(run_case())
 
 
+def test_failover_uses_local_when_primary_fails_and_cools_down():
+    import asyncio
+    import httpx
+    from core.inference import FailoverClient, VLLMClient
+
+    calls = {"primary": 0, "fallback": 0}
+
+    class Primary(VLLMClient):
+        async def raw_chat(self, messages, **kw):
+            calls["primary"] += 1
+            request = httpx.Request("POST", "https://x")
+            raise httpx.HTTPStatusError("boom", request=request, response=httpx.Response(503, request=request))
+
+    class Fallback(VLLMClient):
+        async def chat(self, messages, **kw):
+            calls["fallback"] += 1
+            return {"choices": [{"message": {"role": "assistant", "content": "local"}}]}
+
+    client = FailoverClient(Primary("https://x", "grok"), Fallback("http://l", "local"), cooldown_seconds=60)
+
+    async def run():
+        first = await client.chat([{"role": "user", "content": "hola"}], thinking=False, max_tokens=50)
+        second = await client.chat([{"role": "user", "content": "hola"}], thinking=False, max_tokens=50)
+        return first, second
+
+    first, second = asyncio.run(run())
+    assert first["choices"][0]["message"]["content"] == "local" == second["choices"][0]["message"]["content"]
+    assert calls == {"primary": 1, "fallback": 2}  # the second request skipped the failing primary (cooldown)
+    assert not client.primary_available()
+
+
+def test_failover_discards_partial_stream_when_primary_dies_midway():
+    import asyncio
+    from core.inference import FailoverClient, VLLMClient
+
+    events = []
+
+    class Primary(VLLMClient):
+        async def raw_chat(self, messages, on_token=None, **kw):
+            on_token("parcial")
+            raise RuntimeError("connection reset")
+
+    class Fallback(VLLMClient):
+        async def chat(self, messages, on_token=None, **kw):
+            on_token("local ok")
+            return {"choices": [{"message": {"role": "assistant", "content": "local ok"}}]}
+
+    client = FailoverClient(Primary("https://x", "grok"), Fallback("http://l", "local"))
+    asyncio.run(client.chat([{"role": "user", "content": "x"}], thinking=False, max_tokens=50, on_token=events.append))
+    assert events == ["parcial", None, "local ok"]  # None tells the UI to drop the partial text
+
+
+def test_primary_uses_reasoning_model_only_without_tools():
+    from core.inference import VLLMClient
+    import asyncio
+
+    seen = []
+
+    class Recorder(VLLMClient):
+        async def _chat_streaming(self, payload, timeout, on_token):
+            seen.append(payload["model"]); return {"choices": [{"message": {"content": "x"}}]}
+
+    c = Recorder("https://x", "fast", api_key="k", reasoning_model="deep", local=False)
+    noop = lambda d: None
+    asyncio.run(c.raw_chat([{"role": "user", "content": "a"}], thinking=True, max_tokens=50, on_token=noop))
+    asyncio.run(c.raw_chat([{"role": "user", "content": "a"}], thinking=True, max_tokens=50, tools=[{"type": "function"}], on_token=noop))
+    asyncio.run(c.raw_chat([{"role": "user", "content": "a"}], thinking=False, max_tokens=50, on_token=noop))
+    assert seen == ["deep", "fast", "fast"]
+
+
 def test_decision_shadow_telemetry_and_migration(tmp_path):
     db_path = tmp_path / "shadow.db"
     db = sqlite3.connect(db_path)
@@ -156,8 +226,13 @@ def test_decision_shadow_telemetry_and_migration(tmp_path):
     mem = Memory(str(db_path))
     columns = {row[1] for row in mem.db.execute("PRAGMA table_info(decision_shadow)").fetchall()}
     assert {"abstention_reason", "suspected_ood", "normalized_entropy", "margin"} <= columns
-    mem.record_decision_shadow(1, "fast", None, .5, True, abstention_reason="suspected_ood",
-                               suspected_ood=True, normalized_entropy=1.0, margin=0.0)
+    mem.record_decision_shadow(
+        1, "fast", None, .5, True,
+        abstention_reason="suspected_ood",
+        suspected_ood=True,
+        normalized_entropy=1.0,
+        margin=0.0,
+    )
     report = mem.decision_shadow_summary()
     assert report["samples"] == 1
     assert report["abstentions"] == 1

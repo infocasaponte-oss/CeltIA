@@ -33,7 +33,7 @@ if (-not (Test-Path $stamp) -or (Get-Content $stamp -Raw).Trim() -ne $hash) {
 $env:PYTHONPATH = $projectRoot
 
 # 3. Lanzar la API en otra ventana
-$apiCmd = "Set-Location '$projectRoot'; . '$activate'; `$env:PYTHONPATH='$projectRoot'; `$env:VLLM_BASE_URL='http://localhost:11434/v1'; `$env:MODEL_SERVE_NAME='celtia-qwen3'; `$env:MODEL_CONTEXT='8192'; `$env:PUBLIC_BASE_URL='https://celtiaia.com'; python -m uvicorn apps.api.main:app --host 127.0.0.1 --port 8081 --reload"
+$apiCmd = "Set-Location '$projectRoot'; . '$activate'; `$env:PYTHONPATH='$projectRoot'; `$env:VLLM_BASE_URL='http://localhost:11434/v1'; `$env:MODEL_SERVE_NAME='celtia-qwen3'; `$env:MODEL_CONTEXT='8192'; `$env:GATEWAY_MAX_CONCURRENCY='4'; `$env:PUBLIC_BASE_URL='https://celtiaia.com'; python -m uvicorn apps.api.main:app --host 127.0.0.1 --port 8081 --reload"
 Start-Process powershell -ArgumentList "-NoExit", "-Command", $apiCmd
 Write-Host "API en http://localhost:8081"
 
