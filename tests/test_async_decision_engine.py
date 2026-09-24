@@ -18,3 +18,6 @@ def test_async_engine_abstains_on_ambiguous_distribution():
     result=asyncio.run(AsyncDecisionEngine(AmbiguousScorer(),abstain_below=0.0).decide(DecisionRequest({},(q,))))[0]
     assert result.abstained
     assert result.decision is None
+    assert result.abstention_reason == "suspected_ood"
+    assert result.normalized_entropy == 1.0
+    assert result.margin == 0.0
