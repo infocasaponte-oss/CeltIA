@@ -69,6 +69,8 @@ decision_runtime = CeltIADecisionRuntime(
     reject_suspected_ood=settings.decision_reject_ood,
     ood_entropy_threshold=settings.decision_ood_entropy_threshold,
     ood_margin_threshold=settings.decision_ood_margin_threshold,
+    max_questions=settings.decision_max_questions,
+    max_output_tokens=settings.decision_max_output_tokens,
 )
 agent = Agent(llm, registry, policy=ToolPolicy(), planner=Planner())
 gateway = Gateway(settings.gateway_max_concurrency, settings.gateway_queue_wait_seconds,
@@ -359,8 +361,11 @@ async def health(): return {"status":"ok","model":settings.model_serve_name}
 @app.post("/v1/decide")
 async def decide(req: DecisionApiRequest, key: dict = Depends(require_api_key)):
     """Structured decision endpoint. Results are advisory; this endpoint executes no tools."""
-    if not req.questions or len(req.questions) > 32:
-        raise HTTPException(400, "questions must contain between 1 and 32 items")
+    if not req.questions or len(req.questions) > settings.decision_max_questions:
+        raise HTTPException(
+            400,
+            f"questions must contain between 1 and {settings.decision_max_questions} items",
+        )
     payload = [q.model_dump() for q in req.questions]
     started_at = time.monotonic()
     try:
