@@ -213,3 +213,26 @@ def test_decide_maps_backend_timeout_to_503(monkeypatch):
         assert exc.status_code == 503
         assert "timed out" in str(exc.detail)
     assert gateway.keys == [key]
+
+
+class RequestTimeoutDecisionRuntime:
+    async def decide_with_usage(self, context, questions):
+        raise RuntimeError("decision request timed out")
+
+
+def test_decide_maps_request_timeout_to_503(monkeypatch):
+    gateway = FakeGateway()
+    monkeypatch.setattr(api_main, "gateway", gateway)
+    monkeypatch.setattr(api_main, "decision_runtime", RequestTimeoutDecisionRuntime())
+    req = api_main.DecisionApiRequest(
+        context={},
+        questions=[api_main.DecisionQuestionInput(id="q", prompt="safe?", type="boolean")],
+    )
+    key = {"id": None, "role": "user"}
+    try:
+        asyncio.run(api_main.decide(req, key))
+        assert False
+    except api_main.HTTPException as exc:
+        assert exc.status_code == 503
+        assert "request timed out" in str(exc.detail)
+    assert gateway.keys == [key]
