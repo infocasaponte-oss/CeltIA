@@ -15,6 +15,7 @@ from pathlib import Path
 from core.config import settings
 
 _SLUG_PATTERN = re.compile(r"[^a-z0-9-]+")
+_PROJECT_ID_PATTERN = re.compile(r"[0-9a-f]{12}")
 
 
 def _slugify(name: str) -> str:
@@ -28,6 +29,8 @@ class ProjectManager:
         self.root.mkdir(parents=True, exist_ok=True)
 
     def _project_dir(self, project_id: str) -> Path:
+        if not _PROJECT_ID_PATTERN.fullmatch(project_id or ""):
+            raise PermissionError("invalid project id")
         return self.root / project_id
 
     def workspace_path(self, project_id: str) -> Path:

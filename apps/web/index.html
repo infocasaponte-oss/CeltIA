@@ -931,6 +931,10 @@
         };
       }
 
+      function escHtml(v) {
+        return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+      }
+
       // Session expired / key revoked: forget it and send the user back to the login gate.
       function sessionExpired() {
         localStorage.removeItem('celtia_api_key');
@@ -1289,8 +1293,8 @@
             const div = document.createElement('div');
             div.className = 'conv-item';
             div.style.position = 'relative';
-            div.innerHTML = `<div class="conv-meta">${c.last_at} · ${c.message_count} mensaxes</div>` +
-              `<div class="conv-preview">${(c.last_message || '').slice(0, 140)}</div>` +
+            div.innerHTML = `<div class="conv-meta">${escHtml(c.last_at)} · ${escHtml(c.message_count)} mensaxes</div>` +
+              `<div class="conv-preview">${escHtml((c.last_message || '').slice(0, 140))}</div>` +
               `<button class="conv-delete-btn" title="Eliminar conversa" style="position:absolute;top:8px;right:8px;border:none;background:transparent;color:var(--danger);cursor:pointer;font-size:1rem;">🗑</button>`;
             div.addEventListener('click', (e) => {
               if (e.target.closest('.conv-delete-btn')) return;
@@ -1312,7 +1316,7 @@
           if (err.message.includes('403')) {
             list.innerHTML = '<p class="empty-state">O teu plan actual non inclúe historial de conversas. Pasa a premium para gardar e recuperar conversas.</p>';
           } else {
-            list.innerHTML = `<p class="empty-state">Erro cargando o historial: ${err.message}</p>`;
+            list.innerHTML = `<p class="empty-state">Erro cargando o historial: ${escHtml(err.message)}</p>`;
           }
         }
       }
@@ -1337,7 +1341,7 @@
             document.querySelector('.nav-item[data-view="chat"]').click();
           };
         } catch (err) {
-          historyMessages.innerHTML = `<p class="empty-state">Erro cargando a conversa: ${err.message}</p>`;
+          historyMessages.innerHTML = `<p class="empty-state">Erro cargando a conversa: ${escHtml(err.message)}</p>`;
         }
       }
 
@@ -1354,7 +1358,7 @@
         try {
           me = await meFetch('/v1/me');
         } catch (err) {
-          content.innerHTML = `<p class="empty-state">Erro cargando a conta: ${err.message}</p>`;
+          content.innerHTML = `<p class="empty-state">Erro cargando a conta: ${escHtml(err.message)}</p>`;
           return;
         }
 
@@ -1529,7 +1533,7 @@
             });
           });
         } catch (err) {
-          tbody.innerHTML = `<tr><td colspan="7">Erro cargando claves: ${err.message}</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="7">Erro cargando claves: ${escHtml(err.message)}</td></tr>`;
         }
       }
 
@@ -1547,13 +1551,13 @@
             }
             const balance = detail.token_balance_max ? `${detail.token_balance}/${detail.token_balance_max}` : '—';
             const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${k.name}</td><td>${detail.email || '—'}</td>` +
+            tr.innerHTML = `<td>${escHtml(k.name)}</td><td>${escHtml(detail.email) || '—'}</td>` +
               `<td>${detail.usage.total_tokens}</td><td>${detail.usage.requests}</td><td>${balance}</td>` +
               `<td>${detail.subscription_status || (detail.stripe_customer_id ? 'descoñecido' : 'sen subscrición')}</td>`;
             tbody.appendChild(tr);
           }
         } catch (err) {
-          tbody.innerHTML = `<tr><td colspan="6">Erro cargando facturación: ${err.message}</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="6">Erro cargando facturación: ${escHtml(err.message)}</td></tr>`;
         }
       }
 
@@ -1686,7 +1690,7 @@
         const select = document.getElementById('creatorProjectSelect');
         try {
           const data = await creatorApiFetch('/projects');
-          select.innerHTML = data.projects.map((p) => `<option value="${p.id}">${p.name}</option>`).join('');
+          select.innerHTML = data.projects.map((p) => `<option value="${escHtml(p.id)}">${escHtml(p.name)}</option>`).join('');
           if (data.projects.length) {
             creatorProjectId = select.value;
             document.getElementById('creatorEmptyState').style.display = 'none';
@@ -1746,7 +1750,7 @@
             }
           });
         } catch (err) {
-          tree.innerHTML = `<div class="empty-state">${err.message}</div>`;
+          tree.innerHTML = `<div class="empty-state">${escHtml(err.message)}</div>`;
         }
       }
 

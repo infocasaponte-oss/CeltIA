@@ -13,3 +13,14 @@ Autor: Luis Manuel Cousido Hermida
 - **Panel de consumo** (peticións, tokens, latencia, cota mensual) e **rexistro de usuarios** para administradores
   (rol, estado, contrasinal).
 - **Seguridade:** escape de nomes no panel admin, protección do último administrador, 403/401 diferenciados.
+
+## 2026-09 — Revisión de seguridade e licenza
+- **Licenza propietaria** (`LICENSE`) e `SECURITY.md` cos riscos coñecidos.
+- **Corrixido:** un usuario podía parar o sandbox de proxectos alleos (IDOR en `DELETE /creator/projects/{id}`).
+- **Corrixido:** un cliente podía ler o historial doutra sesión elixindo o seu `session_id`.
+- **Corrixido:** XSS almacenado no historial, na táboa de facturación e no selector de proxectos (escape de HTML).
+- **Corrixido:** enlace de contas OAuth por email non verificado (Google/GitHub).
+- **Engadido:** bloqueo por forza bruta no login (8 fallos/email, 40/IP en 15 min) e no rexistro.
+- **Engadido:** contrasinal mínimo de 8 caracteres, comparación en tempo constante do token admin,
+  validación do id de proxecto e cabeceiras de seguridade.
+- **Restrinxido:** `install_package` (pip no host) só para administradores.

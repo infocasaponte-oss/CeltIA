@@ -19,7 +19,8 @@ from core import billing, diagnostics, oauth, persona
 from core.agent import Agent, tool_content
 from core.apikeys import generate_client_key, generate_key, hash_key, hash_password, verify_password
 from core.config import settings
-from core.gateway import Gateway, GatewayRejection
+import secrets
+from core.gateway import AttemptLimiter, Gateway, GatewayRejection
 from core.creator import filesystem as creator_fs
 from core.creator import git_tools as creator_git
 from core.creator.projects import project_manager
@@ -43,6 +44,14 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
 )
 
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    return response
+
 web_dir = Path(__file__).resolve().parent.parent / "web"
 if web_dir.exists():
     app.mount("/ui", StaticFiles(directory=str(web_dir), html=True), name="web")
@@ -54,6 +63,9 @@ agent = Agent(llm, registry, policy=ToolPolicy(), planner=Planner())
 gateway = Gateway(settings.gateway_max_concurrency, settings.gateway_queue_wait_seconds,
                   month_usage=lambda key_id: memory.month_tokens(key_id),
                   month_usage_client=lambda cid: memory.month_tokens_client(cid))
+login_limiter = AttemptLimiter(max_attempts=8, window_seconds=15 * 60)         # per email
+login_ip_limiter = AttemptLimiter(max_attempts=40, window_seconds=15 * 60)      # per IP (proxies share one IP)
+register_limiter = AttemptLimiter(max_attempts=10, window_seconds=60 * 60)
 AUTO_SEARCH_TOOLS = {"web_search"}
 CODE_TOOLS = {"install_package"}
 ROLES = {"admin", "premium", "user"}
@@ -61,9 +73,7 @@ ROLES = {"admin", "premium", "user"}
 def role_tools(role: str):
     if role == "admin":
         return None
-    if role == "premium":
-        return PUBLIC_SAFE_TOOLS | CODE_TOOLS
-    return PUBLIC_SAFE_TOOLS
+    return PUBLIC_SAFE_TOOLS  # install_package runs pip on the host: admin only
 
 def role_has_history(role: str) -> bool:
     return role in {"admin", "premium"}
@@ -142,6 +152,9 @@ async def require_api_key(authorization: str | None = Header(default=None)):
         raise HTTPException(402, "Sin saldo de tokens. Recarga tu cuenta para continuar.")
     return record
 
+def _admin_token_ok(candidate: str | None) -> bool:
+    return bool(settings.admin_token and candidate and secrets.compare_digest(candidate.encode(), settings.admin_token.encode()))
+
 async def require_admin(x_admin_token: str | None = Header(default=None), authorization: str | None = Header(default=None)):
     """Admin access: either a logged-in account with role=admin (Bearer key) or the legacy X-Admin-Token."""
     if authorization and authorization.lower().startswith("bearer "):
@@ -149,9 +162,9 @@ async def require_admin(x_admin_token: str | None = Header(default=None), author
         if record and record["active"]:
             if record["role"] == "admin":
                 return True
-            if not (settings.admin_token and x_admin_token == settings.admin_token):
+            if not _admin_token_ok(x_admin_token):
                 raise HTTPException(403, "admin role required")  # valid session, but not an admin
-    if settings.admin_token and x_admin_token and x_admin_token == settings.admin_token:
+    if _admin_token_ok(x_admin_token):
         return True
     raise HTTPException(401, "invalid or expired session")
 
@@ -191,7 +204,12 @@ async def billing_plans():
     }
 
 @app.post("/auth/register")
-async def auth_register(req: RegisterRequest):
+async def auth_register(req: RegisterRequest, request: Request):
+    ip_key = f"ip:{request.client.host if request.client else 'unknown'}"
+    register_limiter.check(ip_key)
+    register_limiter.hit(ip_key)
+    if len(req.password) < 8:
+        raise HTTPException(400, "La contraseña debe tener al menos 8 caracteres")
     if not req.gdpr_accepted:
         raise HTTPException(400, "Debes aceptar la política de privacidad (RGPD) para crear una cuenta")
     if req.plan not in PLANS:
@@ -222,10 +240,17 @@ async def auth_register(req: RegisterRequest):
     return result
 
 @app.post("/auth/login")
-async def auth_login(req: LoginRequest):
+async def auth_login(req: LoginRequest, request: Request):
+    ip = request.client.host if request.client else "unknown"
+    email_key = f"email:{req.email.strip().lower()}"
+    login_limiter.check(email_key)
+    login_ip_limiter.check(f"ip:{ip}")
     creds = memory.get_account_credentials(req.email)
     if not creds or not creds["active"] or not creds["password_hash"] or not verify_password(req.password, creds["password_hash"]):
+        login_limiter.hit(email_key)
+        login_ip_limiter.hit(f"ip:{ip}")
         raise HTTPException(401, "Correo o contraseña incorrectos")
+    login_limiter.clear(email_key)
     raw, key_hash, prefix = generate_key()
     memory.rotate_api_key(creds["id"], key_hash, prefix)
     return {"id": creds["id"], "api_key": raw}
@@ -354,7 +379,7 @@ async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, 
         r = r.__class__(req.mode, r.difficulty, req.mode in {"think", "code", "long"}, req.max_tokens or forced_tokens)
     role = key.get("role", "user")
     keep_history = role_has_history(role)
-    msgs = (memory.history(sid) if keep_history else []) + [m.model_dump() for m in req.messages]
+    msgs = (memory.history(sid, api_key_id=key.get("id")) if keep_history else []) + [m.model_dump() for m in req.messages]
     allowed_tools = role_tools(role)
     prompt_tokens = completion_tokens = 0
     emit({"type": "status", "text": f"Entendido. Ruta elegida: {r.mode}"})
@@ -530,8 +555,8 @@ class AdminPasswordRequest(BaseModel):
 
 @app.post("/admin/users/{user_id}/password")
 async def admin_set_password(user_id: int, req: AdminPasswordRequest, _=Depends(require_admin)):
-    if len(req.new_password) < 6:
-        raise HTTPException(400, "La contraseña debe tener al menos 6 caracteres")
+    if len(req.new_password) < 8:
+        raise HTTPException(400, "La contraseña debe tener al menos 8 caracteres")
     if not memory.get_api_key(user_id):
         raise HTTPException(404, "Usuario no encontrado")
     memory.set_password_hash(user_id, hash_password(req.new_password))
@@ -621,8 +646,8 @@ async def change_my_password(req: ChangePasswordRequest, key=Depends(require_api
     stored = memory.get_password_hash(key["id"])
     if not stored or not verify_password(req.current_password, stored):
         raise HTTPException(401, "La contraseña actual no es correcta")
-    if len(req.new_password) < 6:
-        raise HTTPException(400, "La nueva contraseña debe tener al menos 6 caracteres")
+    if len(req.new_password) < 8:
+        raise HTTPException(400, "La nueva contraseña debe tener al menos 8 caracteres")
     memory.set_password_hash(key["id"], hash_password(req.new_password))
     return {"ok": True}
 
@@ -822,7 +847,10 @@ async def list_projects(key=Depends(require_creator_access)):
 
 @app.delete("/creator/projects/{project_id}")
 async def delete_project(project_id: str, key=Depends(require_creator_access)):
-    meta = project_manager.get(project_id)
+    try:
+        meta = project_manager.assert_owner(project_id, key["id"])
+    except PermissionError:
+        raise HTTPException(404, "project not found")
     if meta and sandbox_configured():
         try:
             sandbox_for(project_id, meta["container_name"], project_manager.host_workspace_path(project_id)).stop_and_remove()
