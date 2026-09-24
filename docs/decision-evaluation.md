@@ -108,3 +108,5 @@ CDE configuration now fails at settings load, before API/runtime initialization,
 Candidate-aware output budgets are now bound to the exact serialized scorer request instead of being consumed from a positional iterator. That preserves the intended per-question budget even if scorer call ordering changes later, and the tests require the larger candidate set to receive the larger budget.
 
 The `/v1/decide` response preserves the runtime `usage.models` list alongside token counts, so callers can observe which backend model identities actually served structured decisions without relying on configured-provider assumptions.
+
+Promotion evidence now verifies the manifest's `result_rows` against the actual number of non-empty JSONL rows in addition to the SHA-256 binding. Invalid row-count types or count mismatches fail closed, making manifest consistency explicit rather than treating the count as descriptive metadata only.
