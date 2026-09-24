@@ -52,3 +52,8 @@ PYTHONPATH=. python scripts/evaluate_decision_routes.py \
   --cde-results results/cde_routes.jsonl \
   --require-eligible
 ```
+
+
+## Promotion-result integrity
+
+Promotion-result ingestion is strict. Each result row must have a unique non-empty benchmark text, a finite confidence in `[0,1]`, a real boolean `abstained`, an optional boolean `suspected_ood`, and a route consistent with abstention state: decided rows require one of `fast/think/code/agent/long`, while abstained rows require `cde: null`. Duplicate result texts, NaN/infinite confidence, string booleans, unknown routes and results for texts outside the selected benchmark datasets are rejected instead of being coerced or silently ignored.
