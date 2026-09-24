@@ -138,7 +138,7 @@ def test_results_manifest_rejects_previous_schema_version(tmp_path):
     results=tmp_path / "results.jsonl"
     results.write_text("",encoding="utf-8")
     Path(str(results)+".manifest.json").write_text(
-        json.dumps({"format_version":RESULT_FORMAT_VERSION - 1}),
+        json.dumps({"format_version":3}),
         encoding="utf-8",
     )
     try:
@@ -196,7 +196,7 @@ def test_results_manifest_rejects_invalid_result_row_count_type(tmp_path):
         assert "invalid result_rows" in str(exc)
 
 
-def test_dataset_digest_streaming_preserves_schema_v3_bytes(tmp_path):
+def test_schema_v4_digest_streaming_preserves_v3_bytes(tmp_path):
     first=tmp_path / "first.jsonl"
     second=tmp_path / "second.jsonl"
     first.write_bytes((b"a" * (1024 * 1024 + 17)) + b"\n")
