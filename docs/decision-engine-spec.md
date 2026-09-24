@@ -54,3 +54,5 @@ Backend results are environment-specific and are not a CI performance gate. Alte
 
 ## Security
 A decision is advisory until the caller policy authorizes an action. Tool execution and privileged actions remain behind CeltIA authorization and sandbox boundaries.
+
+- The HTTP request schema rejects duplicate question IDs before gateway/model execution; the runtime repeats the invariant for direct callers.
