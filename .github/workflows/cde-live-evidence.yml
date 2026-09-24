@@ -7,13 +7,16 @@ on:
         description: "Type RUN_LIVE_CDE to confirm provider usage/cost"
         required: true
         type: string
+  push:
+    branches:
+      - feature/cde-rollout-evidence-v1
 
 permissions:
   contents: read
 
 jobs:
   collect:
-    if: ${{ inputs.confirm_live_cost == 'RUN_LIVE_CDE' }}
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.confirm_live_cost == 'RUN_LIVE_CDE') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[run-live-cde]')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
