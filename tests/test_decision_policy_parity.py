@@ -2,6 +2,7 @@ import asyncio
 
 from celtia.decision.async_engine import AsyncDecisionEngine
 from celtia.decision.engine import DecisionEngine
+from celtia.decision.policy import decision_policy
 from celtia.decision.schema import DecisionQuestion, DecisionRequest, DecisionType
 
 
@@ -115,3 +116,26 @@ def test_engine_policy_validation_runs_even_for_empty_request():
         assert False
     except ValueError:
         pass
+
+
+
+def test_decision_policy_rejects_malformed_probability_mappings():
+    invalid = (
+        {"a": True, "b": False},
+        {"a": float("nan"), "b": 1.0},
+        {"a": -0.1, "b": 1.1},
+        {"a": 0.2, "b": 0.2},
+        {"a": "bad", "b": 1.0},
+    )
+    for probabilities in invalid:
+        try:
+            decision_policy(
+                probabilities,
+                abstain_below=0.0,
+                reject_suspected_ood=False,
+                ood_entropy_threshold=.9,
+                ood_margin_threshold=.1,
+            )
+            assert False, probabilities
+        except ValueError as exc:
+            assert "probabilities" in str(exc)
