@@ -24,6 +24,7 @@ from scripts.evaluate_decision_routes import (
     validate_backend_provenance,
     validate_policy_provenance,
     validate_results_manifest,
+    validate_selection_provenance,
 )
 
 ROUTES=("fast","think","code","agent","long")
@@ -111,6 +112,17 @@ def _validate_collecting_manifest(manifest: dict, datasets: list[str], results_p
         raise ValueError("resume manifest has invalid backend provenance")
     if not validate_policy_provenance(manifest.get("policy")):
         raise ValueError("resume manifest has invalid policy provenance")
+    dataset_rows=sum(
+        1
+        for raw_path in datasets
+        for line in Path(raw_path).read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    )
+    selected_rows=validate_selection_provenance(
+        manifest.get("selection"),
+        dataset_rows=dataset_rows,
+        require_full_selection=False,
+    )
     expected_dataset_sha=manifest.get("dataset_sha256")
     if (
         not isinstance(expected_dataset_sha,str)
@@ -135,18 +147,29 @@ def _validate_collecting_manifest(manifest: dict, datasets: list[str], results_p
     )
     if expected_rows != actual_rows:
         raise ValueError("resume collecting checkpoint row count does not match provenance manifest")
+    if expected_rows > selected_rows:
+        raise ValueError("resume collecting checkpoint exceeds declared selection")
 
 
-def _runtime_manifest(runtime: CeltIADecisionRuntime, datasets: list[str]) -> dict:
+def _runtime_manifest(runtime: CeltIADecisionRuntime, datasets: list[str], *, dataset_rows: int | None = None, selected_rows: int | None = None, limit: int = 0) -> dict:
     llm=runtime.llm
     primary=getattr(llm,"primary",None)
     fallback=getattr(llm,"fallback",None)
+    if dataset_rows is None:
+        dataset_rows=len(load_datasets(datasets))
+    if selected_rows is None:
+        selected_rows=dataset_rows if limit == 0 else min(limit,dataset_rows)
     return {
         "format_version":RESULT_FORMAT_VERSION,
         "status":"collecting",
         "collected_at":datetime.now(timezone.utc).isoformat(),
         "dataset_sha256":dataset_sha256(datasets),
         "datasets":datasets,
+        "selection":{
+            "dataset_rows":dataset_rows,
+            "selected_rows":selected_rows,
+            "limit":limit,
+        },
         "backend":{
             "client_type":type(llm).__name__,
             "model":getattr(llm,"model",None),
@@ -237,8 +260,10 @@ async def collect(args) -> dict:
         "benchmarks/decision_routes_ood.jsonl",
     ]
     rows=load_datasets(datasets)
+    dataset_rows=len(rows)
     if args.limit:
         rows=rows[:args.limit]
+    selected_rows=len(rows)
 
     output=Path(args.output)
     manifest_output=Path(str(output) + ".manifest.json")
@@ -252,7 +277,7 @@ async def collect(args) -> dict:
         resume_manifest=_load_manifest(manifest_output)
         if resume_manifest.get("status") == "complete":
             try:
-                resume_manifest=validate_results_manifest(output,datasets)
+                resume_manifest=validate_results_manifest(output,datasets,require_full_selection=False)
             except ValueError as exc:
                 raise ValueError(f"resume completed provenance manifest is invalid: {exc}") from exc
         else:
@@ -264,7 +289,7 @@ async def collect(args) -> dict:
             raise ValueError(f"existing result text not present in selected datasets: {first!r}")
 
     runtime=build_runtime()
-    manifest=_runtime_manifest(runtime,datasets)
+    manifest=_runtime_manifest(runtime,datasets,dataset_rows=dataset_rows,selected_rows=selected_rows,limit=args.limit)
     if resume_manifest is not None:
         if resume_manifest.get("dataset_sha256") != manifest["dataset_sha256"]:
             raise ValueError("resume dataset provenance does not match current datasets")
