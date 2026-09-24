@@ -13,29 +13,45 @@ def load_jsonl(path: Path):
         if not line.strip(): continue
         row=json.loads(line)
         expected=row.get("expected")
-        expected_ood=row.get("ood", False)
+        expected_ood=row.get("ood")
         if not isinstance(row.get("text"),str) or not row["text"].strip():
-            raise ValueError(f"invalid benchmark row {n}")
-        if not isinstance(expected_ood, bool):
-            raise ValueError(f"invalid benchmark row {n}")
+            raise ValueError(f"invalid benchmark row {path}:{n}")
+        if expected_ood is not None and not isinstance(expected_ood, bool):
+            raise ValueError(f"invalid benchmark row {path}:{n}")
         if expected not in {"fast","think","code","agent","long"}:
-            if not (expected is None and expected_ood):
-                raise ValueError(f"invalid benchmark row {n}")
+            if not (expected is None and expected_ood is True):
+                raise ValueError(f"invalid benchmark row {path}:{n}")
         rows.append(row)
     return rows
 
 def main():
     p=argparse.ArgumentParser()
-    p.add_argument("--dataset",default="benchmarks/decision_routes.jsonl")
+    p.add_argument(
+        "--dataset",
+        action="append",
+        help="Benchmark JSONL. Repeat to combine route and OOD datasets.",
+    )
     p.add_argument("--cde-results",help="Optional JSONL with text,cde,confidence,abstained")
     p.add_argument("--min-samples",type=int,default=200)
     p.add_argument("--min-coverage",type=float,default=.80)
     p.add_argument("--min-labeled",type=int,default=50)
     p.add_argument("--min-accuracy-delta",type=float,default=.02)
     p.add_argument("--min-labeled-coverage",type=float,default=.80)
+    p.add_argument("--min-ood-labeled",type=int,default=20)
+    p.add_argument("--min-ood-coverage",type=float,default=.80)
+    p.add_argument("--min-ood-recall",type=float,default=.80)
+    p.add_argument("--max-ood-false-positive-rate",type=float,default=.20)
     p.add_argument("--require-eligible",action="store_true",help="Exit non-zero when the promotion gate fails")
     args=p.parse_args()
-    rows=load_jsonl(Path(args.dataset))
+    datasets=args.dataset or ["benchmarks/decision_routes.jsonl"]
+    rows=[]
+    seen_text=set()
+    for dataset in datasets:
+        for row in load_jsonl(Path(dataset)):
+            if row["text"] in seen_text:
+                raise ValueError(f"duplicate benchmark text across datasets: {row['text']!r}")
+            seen_text.add(row["text"])
+            rows.append(row)
     by_text={}
     if args.cde_results:
         for line in Path(args.cde_results).read_text(encoding="utf-8").splitlines():
@@ -57,7 +73,7 @@ def main():
             bool(item.get("abstained",True)) if item else True,
             row.get("expected"),
             suspected_ood=item.get("suspected_ood") if item else None,
-            expected_ood=row.get("ood", False),
+            expected_ood=row.get("ood"),
         ))
     metrics=evaluate_shadow(samples)
     gate=promotion_gate(
@@ -67,6 +83,10 @@ def main():
         min_labeled=args.min_labeled,
         min_accuracy_delta=args.min_accuracy_delta,
         min_labeled_coverage=args.min_labeled_coverage,
+        min_ood_labeled=args.min_ood_labeled,
+        min_ood_coverage=args.min_ood_coverage,
+        min_ood_recall=args.min_ood_recall,
+        max_ood_false_positive_rate=args.max_ood_false_positive_rate,
     )
     print(json.dumps({"metrics":metrics,"gate":gate},indent=2,ensure_ascii=False))
     if args.require_eligible and not gate["eligible"]:
