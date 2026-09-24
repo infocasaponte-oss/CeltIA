@@ -97,6 +97,9 @@ def _validate_collecting_manifest(manifest: dict, datasets: list[str], results_p
     collected_at=manifest.get("collected_at")
     if not valid_aware_timestamp(collected_at):
         raise ValueError("resume manifest has invalid collected_at")
+    resumed_from_collected_at=manifest.get("resumed_from_collected_at")
+    if resumed_from_collected_at is not None and not valid_aware_timestamp(resumed_from_collected_at):
+        raise ValueError("resume manifest has invalid resumed_from_collected_at")
     if not isinstance(manifest.get("backend"),dict):
         raise ValueError("resume manifest has invalid backend provenance")
     if not isinstance(manifest.get("policy"),dict):
