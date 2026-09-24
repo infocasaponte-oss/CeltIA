@@ -126,6 +126,25 @@ def _fsync_directory(path: Path) -> None:
         os.close(fd)
 
 
+def _write_atomic_json(output: Path, value: dict) -> None:
+    output.parent.mkdir(parents=True,exist_ok=True)
+    fd,tmp_name=tempfile.mkstemp(prefix=output.name + ".",suffix=".tmp",dir=output.parent,text=True)
+    tmp=Path(tmp_name)
+    try:
+        with os.fdopen(fd,"w",encoding="utf-8") as handle:
+            json.dump(value,handle,ensure_ascii=False,indent=2,sort_keys=True)
+            handle.write("\n")
+            _fsync(handle)
+        os.replace(tmp,output)
+        _fsync_directory(output.parent)
+    except BaseException:
+        try:
+            tmp.unlink()
+        except FileNotFoundError:
+            pass
+        raise
+
+
 def _write_atomic_jsonl(output: Path, rows: list[dict]) -> None:
     output.parent.mkdir(parents=True,exist_ok=True)
     fd,tmp_name=tempfile.mkstemp(
@@ -170,6 +189,7 @@ async def collect(args) -> dict:
 
     runtime=build_runtime()
     manifest=_runtime_manifest(runtime,datasets)
+    manifest_output=Path(str(output) + ".manifest.json")
     written=0
     skipped=0
     output.parent.mkdir(parents=True,exist_ok=True)
@@ -192,10 +212,12 @@ async def collect(args) -> dict:
 
     # Always materialize a complete valid checkpoint, including zero-write resume runs.
     _write_atomic_jsonl(output,collected)
+    _write_atomic_json(manifest_output,manifest)
 
     return {
         "format_version":RESULT_FORMAT_VERSION,
         "output":str(output),
+        "manifest_output":str(manifest_output),
         "datasets":datasets,
         "selected":len(rows),
         "written":written,
