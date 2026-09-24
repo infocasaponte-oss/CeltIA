@@ -314,3 +314,59 @@ def test_results_manifest_rejects_resume_timestamp_after_collection(tmp_path):
         assert False
     except ValueError as exc:
         assert "after collected_at" in str(exc)
+
+
+
+def test_results_manifest_rejects_incomplete_backend_provenance(tmp_path):
+    dataset=tmp_path / "dataset.jsonl"
+    dataset.write_text('{"text":"one","expected":"fast","ood":false}\n',encoding="utf-8")
+    results=tmp_path / "results.jsonl"
+    results.write_text("",encoding="utf-8")
+    manifest={
+        "format_version":RESULT_FORMAT_VERSION,
+        "collected_at":"2026-01-01T00:00:00+00:00",
+        "datasets":[str(dataset)],
+        "backend":{"client_type":"FakeLLM"},
+        "policy":_policy_provenance(),
+        "status":"complete",
+        "dataset_sha256":dataset_sha256([str(dataset)]),
+        "results_sha256":file_sha256(results),
+        "result_rows":0,
+    }
+    Path(str(results)+".manifest.json").write_text(json.dumps(manifest),encoding="utf-8")
+    try:
+        validate_results_manifest(results,[str(dataset)])
+        assert False
+    except ValueError as exc:
+        assert "backend provenance" in str(exc)
+
+
+def test_results_manifest_rejects_invalid_policy_provenance(tmp_path):
+    dataset=tmp_path / "dataset.jsonl"
+    dataset.write_text('{"text":"one","expected":"fast","ood":false}\n',encoding="utf-8")
+    results=tmp_path / "results.jsonl"
+    results.write_text("",encoding="utf-8")
+    invalid_policies=(
+        {"abstain_below":0.55},
+        {**_policy_provenance(),"reject_suspected_ood":"yes"},
+        {**_policy_provenance(),"ood_entropy_threshold":1.1},
+        {**_policy_provenance(),"temperature":0},
+    )
+    for policy in invalid_policies:
+        manifest={
+            "format_version":RESULT_FORMAT_VERSION,
+            "collected_at":"2026-01-01T00:00:00+00:00",
+            "datasets":[str(dataset)],
+            "backend":_backend_provenance(),
+            "policy":policy,
+            "status":"complete",
+            "dataset_sha256":dataset_sha256([str(dataset)]),
+            "results_sha256":file_sha256(results),
+            "result_rows":0,
+        }
+        Path(str(results)+".manifest.json").write_text(json.dumps(manifest),encoding="utf-8")
+        try:
+            validate_results_manifest(results,[str(dataset)])
+            assert False,policy
+        except ValueError as exc:
+            assert "policy provenance" in str(exc)
