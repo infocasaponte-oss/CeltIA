@@ -1,0 +1,58 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any
+
+class DecisionType(str, Enum):
+    BOOLEAN = "boolean"
+    CHOICE = "choice"
+    SCORE = "score"
+
+@dataclass(frozen=True)
+class DecisionQuestion:
+    MAX_ID_CHARS = 128
+    MAX_PROMPT_CHARS = 8000
+    MAX_OPTION_CHARS = 1000
+
+    id: str
+    prompt: str
+    type: DecisionType
+    options: tuple[str, ...] = ()
+    minimum: int | None = None
+    maximum: int | None = None
+
+    def candidates(self) -> tuple[str, ...]:
+        if not self.id or len(self.id) > self.MAX_ID_CHARS:
+            raise ValueError("question id must contain between 1 and 128 characters")
+        if not self.prompt or len(self.prompt) > self.MAX_PROMPT_CHARS:
+            raise ValueError("question prompt must contain between 1 and 8000 characters")
+        if self.type is DecisionType.BOOLEAN: return ("false", "true")
+        if self.type is DecisionType.CHOICE:
+            if len(self.options) < 2: raise ValueError("choice questions require at least two options")
+            if len(self.options) > 64: raise ValueError("choice questions support at most 64 options")
+            if len(set(self.options)) != len(self.options): raise ValueError("choice options must be unique")
+            if any(not option or len(option) > self.MAX_OPTION_CHARS for option in self.options):
+                raise ValueError("choice options must contain between 1 and 1000 characters")
+            return self.options
+        if self.minimum is None or self.maximum is None or self.minimum > self.maximum:
+            raise ValueError("score questions require a valid minimum/maximum")
+        if self.maximum - self.minimum + 1 > 101:
+            raise ValueError("score questions support at most 101 candidate values")
+        return tuple(str(v) for v in range(self.minimum, self.maximum + 1))
+
+@dataclass(frozen=True)
+class DecisionRequest:
+    context: Any
+    questions: tuple[DecisionQuestion, ...]
+
+@dataclass(frozen=True)
+class DecisionResult:
+    id: str
+    probabilities: dict[str, float]
+    decision: str | None
+    confidence: float
+    abstained: bool
+    abstention_reason: str | None = None
+    normalized_entropy: float | None = None
+    margin: float | None = None
