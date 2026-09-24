@@ -307,37 +307,40 @@ async def collect(args) -> dict:
     manifest_output=Path(str(output) + ".manifest.json")
     existing={}
     resume_manifest=None
-    if output.exists() and not args.resume:
-        raise ValueError("output already exists; use --resume or choose a new output path")
-    if args.resume and output.exists():
-        if not manifest_output.exists():
-            raise ValueError("resume requires the evaluation provenance manifest")
-        resume_manifest=_load_manifest(manifest_output)
-        if resume_manifest.get("status") == "complete":
-            try:
-                resume_manifest=validate_results_manifest(output,datasets,require_full_selection=False,require_clean_code=False,dataset_rows=dataset_rows)
-            except ValueError as exc:
-                raise ValueError(f"resume completed provenance manifest is invalid: {exc}") from exc
-        else:
-            _validate_collecting_manifest(resume_manifest,datasets,output,dataset_rows=dataset_rows)
-        existing=load_cde_results(
-            output,
-            require_models_used=True,
-            allowed_models=declared_backend_models(resume_manifest["backend"]),
-        )
-        previous_selection=resume_manifest["selection"]
-        previous_selected_rows=previous_selection["selected_rows"]
-        previous_selected_texts={row["text"] for row in all_rows[:previous_selected_rows]}
-        unexpected_previous=set(existing)-previous_selected_texts
-        if unexpected_previous:
-            first=sorted(unexpected_previous)[0]
-            raise ValueError(
-                f"existing result text not present in prior deterministic selection: {first!r}"
+    output_exists=output.exists()
+    manifest_exists=manifest_output.exists()
+    if not args.resume and (output_exists or manifest_exists):
+        raise ValueError("evaluation output or manifest already exists; use --resume or choose a new output path")
+    if args.resume:
+        if output_exists != manifest_exists:
+            raise ValueError("resume requires both evaluation results and provenance manifest")
+        if output_exists:
+            resume_manifest=_load_manifest(manifest_output)
+            if resume_manifest.get("status") == "complete":
+                try:
+                    resume_manifest=validate_results_manifest(output,datasets,require_full_selection=False,require_clean_code=False,dataset_rows=dataset_rows)
+                except ValueError as exc:
+                    raise ValueError(f"resume completed provenance manifest is invalid: {exc}") from exc
+            else:
+                _validate_collecting_manifest(resume_manifest,datasets,output,dataset_rows=dataset_rows)
+            existing=load_cde_results(
+                output,
+                require_models_used=True,
+                allowed_models=declared_backend_models(resume_manifest["backend"]),
             )
-        unknown=set(existing)-{row["text"] for row in rows}
-        if unknown:
-            first=sorted(unknown)[0]
-            raise ValueError(f"existing result text not present in selected datasets: {first!r}")
+            previous_selection=resume_manifest["selection"]
+            previous_selected_rows=previous_selection["selected_rows"]
+            previous_selected_texts={row["text"] for row in all_rows[:previous_selected_rows]}
+            unexpected_previous=set(existing)-previous_selected_texts
+            if unexpected_previous:
+                first=sorted(unexpected_previous)[0]
+                raise ValueError(
+                    f"existing result text not present in prior deterministic selection: {first!r}"
+                )
+            unknown=set(existing)-{row["text"] for row in rows}
+            if unknown:
+                first=sorted(unknown)[0]
+                raise ValueError(f"existing result text not present in selected datasets: {first!r}")
 
     runtime=build_runtime()
     manifest=_runtime_manifest(runtime,datasets,dataset_rows=dataset_rows,selected_rows=selected_rows,limit=args.limit)
@@ -355,8 +358,11 @@ async def collect(args) -> dict:
     skipped=0
     output.parent.mkdir(parents=True,exist_ok=True)
     if resume_manifest is None:
-        # Persist provenance before the first checkpoint so an interrupted fresh
-        # collection remains resumable once any result checkpoint exists.
+        # Materialize a cryptographically bound zero-row checkpoint before the
+        # first model call so interruption is resumable even before row one.
+        _write_atomic_jsonl(output,[])
+        manifest["results_sha256"]=file_sha256(output)
+        manifest["result_rows"]=0
         _write_atomic_json(manifest_output,manifest)
     collected=[existing[row["text"]] for row in rows if row["text"] in existing]
     pending_since_checkpoint=0
