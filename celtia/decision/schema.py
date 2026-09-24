@@ -11,6 +11,10 @@ class DecisionType(str, Enum):
 
 @dataclass(frozen=True)
 class DecisionQuestion:
+    MAX_ID_CHARS = 128
+    MAX_PROMPT_CHARS = 8000
+    MAX_OPTION_CHARS = 1000
+
     id: str
     prompt: str
     type: DecisionType
@@ -19,11 +23,17 @@ class DecisionQuestion:
     maximum: int | None = None
 
     def candidates(self) -> tuple[str, ...]:
+        if not self.id or len(self.id) > self.MAX_ID_CHARS:
+            raise ValueError("question id must contain between 1 and 128 characters")
+        if not self.prompt or len(self.prompt) > self.MAX_PROMPT_CHARS:
+            raise ValueError("question prompt must contain between 1 and 8000 characters")
         if self.type is DecisionType.BOOLEAN: return ("false", "true")
         if self.type is DecisionType.CHOICE:
             if len(self.options) < 2: raise ValueError("choice questions require at least two options")
             if len(self.options) > 64: raise ValueError("choice questions support at most 64 options")
             if len(set(self.options)) != len(self.options): raise ValueError("choice options must be unique")
+            if any(not option or len(option) > self.MAX_OPTION_CHARS for option in self.options):
+                raise ValueError("choice options must contain between 1 and 1000 characters")
             return self.options
         if self.minimum is None or self.maximum is None or self.minimum > self.maximum:
             raise ValueError("score questions require a valid minimum/maximum")
