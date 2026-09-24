@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 from pathlib import Path
 
 from core.config import settings
@@ -13,6 +14,8 @@ from core.router import route
 from scripts.evaluate_decision_routes import load_cde_results, load_jsonl
 
 ROUTES=("fast","think","code","agent","long")
+RESULT_FORMAT_VERSION=1
+DEFAULT_CHECKPOINT_EVERY=10
 
 
 def build_runtime() -> CeltIADecisionRuntime:
@@ -72,6 +75,20 @@ def load_datasets(paths: list[str]) -> list[dict]:
     return rows
 
 
+def _fsync(handle) -> None:
+    handle.flush()
+    os.fsync(handle.fileno())
+
+
+def _write_atomic_jsonl(output: Path, rows: list[dict]) -> None:
+    tmp=output.with_name(output.name + ".tmp")
+    with tmp.open("w",encoding="utf-8") as handle:
+        for item in rows:
+            handle.write(json.dumps(item,ensure_ascii=False,separators=(",",":"))+"\n")
+        _fsync(handle)
+    os.replace(tmp,output)
+
+
 async def collect(args) -> dict:
     datasets=args.dataset or [
         "benchmarks/decision_routes.jsonl",
@@ -93,26 +110,35 @@ async def collect(args) -> dict:
     runtime=build_runtime()
     written=0
     skipped=0
-    mode="a" if args.resume and output.exists() else "w"
     output.parent.mkdir(parents=True,exist_ok=True)
-    with output.open(mode,encoding="utf-8") as handle:
-        for row in rows:
-            if row["text"] in existing:
-                skipped+=1
-                continue
-            item=await collect_one(runtime,row)
-            handle.write(json.dumps(item,ensure_ascii=False,separators=(",",":"))+"\n")
-            handle.flush()
-            written+=1
-            if args.sleep_seconds:
-                await asyncio.sleep(args.sleep_seconds)
+    collected=[existing[row["text"]] for row in rows if row["text"] in existing]
+    pending_since_checkpoint=0
+
+    for row in rows:
+        if row["text"] in existing:
+            skipped+=1
+            continue
+        item=await collect_one(runtime,row)
+        collected.append(item)
+        written+=1
+        pending_since_checkpoint+=1
+        if pending_since_checkpoint >= args.checkpoint_every:
+            _write_atomic_jsonl(output,collected)
+            pending_since_checkpoint=0
+        if args.sleep_seconds:
+            await asyncio.sleep(args.sleep_seconds)
+
+    # Always materialize a complete valid checkpoint, including zero-write resume runs.
+    _write_atomic_jsonl(output,collected)
 
     return {
+        "format_version":RESULT_FORMAT_VERSION,
         "output":str(output),
         "datasets":datasets,
         "selected":len(rows),
         "written":written,
         "skipped":skipped,
+        "checkpoint_every":args.checkpoint_every,
     }
 
 
@@ -128,12 +154,20 @@ def main() -> None:
     parser.add_argument("--output",default="decision_eval_results.jsonl")
     parser.add_argument("--limit",type=int,default=0,help="Optional deterministic prefix of samples; 0 means all.")
     parser.add_argument("--sleep-seconds",type=float,default=0.0,help="Delay between model calls.")
-    parser.add_argument("--resume",action="store_true",help="Append only missing texts to an existing valid result file.")
+    parser.add_argument("--resume",action="store_true",help="Reuse valid existing rows and collect only missing texts.")
+    parser.add_argument(
+        "--checkpoint-every",
+        type=int,
+        default=DEFAULT_CHECKPOINT_EVERY,
+        help="Atomically rewrite a complete valid checkpoint after this many new rows.",
+    )
     args=parser.parse_args()
     if args.limit < 0:
         raise ValueError("limit must be non-negative")
     if not 0 <= args.sleep_seconds <= 60:
         raise ValueError("sleep-seconds must be between 0 and 60")
+    if not 1 <= args.checkpoint_every <= 100:
+        raise ValueError("checkpoint-every must be between 1 and 100")
     summary=asyncio.run(collect(args))
     print(json.dumps(summary,indent=2,ensure_ascii=False))
 
