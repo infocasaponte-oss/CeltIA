@@ -13,6 +13,7 @@ from celtia.decision.evaluation import ShadowSample, evaluate_shadow, promotion_
 ROUTES={"fast","think","code","agent","long"}
 RESULT_FORMAT_VERSION=3
 SHA256_RE=re.compile(r"^[0-9a-f]{64}$")
+GIT_REVISION_RE=re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 
 
 def parse_aware_timestamp(value: object) -> datetime | None:
@@ -29,6 +30,13 @@ def parse_aware_timestamp(value: object) -> datetime | None:
 
 def valid_aware_timestamp(value: object) -> bool:
     return parse_aware_timestamp(value) is not None
+
+
+def validate_code_revision(value: object) -> bool:
+    return value is None or (
+        isinstance(value,str)
+        and GIT_REVISION_RE.fullmatch(value) is not None
+    )
 
 
 def declared_backend_models(value: object) -> set[str]:
@@ -159,6 +167,8 @@ def validate_results_manifest(results_path: Path, datasets: list[str], *, requir
         raise ValueError("CDE results manifest has invalid backend provenance")
     if not validate_policy_provenance(manifest.get("policy")):
         raise ValueError("CDE results manifest has invalid policy provenance")
+    if "code_revision" not in manifest or not validate_code_revision(manifest.get("code_revision")):
+        raise ValueError("CDE results manifest has invalid code revision provenance")
     expected_dataset_sha=manifest.get("dataset_sha256")
     if (
         not isinstance(expected_dataset_sha,str)
