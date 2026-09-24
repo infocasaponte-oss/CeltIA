@@ -28,6 +28,7 @@ from core.creator.sandbox import sandbox_configured, sandbox_for
 from core.creator.tools import CREATOR_TOOL_NAMES, build_creator_registry
 from core.inference import VLLMClient
 from core.decision_runtime import CeltIADecisionRuntime
+from core.decision_shadow import evaluate_route_shadow
 from core.memory import Memory
 from core.planner import Planner
 from core.policy import ToolPolicy
@@ -406,6 +407,11 @@ async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, 
         req.max_tokens = min(req.max_tokens, cap)
     text = "\n".join(m.content for m in req.messages if m.role == "user")[-20000:]
     r = route(text)
+    if settings.decision_shadow_routing:
+        shadow = await evaluate_route_shadow(decision_runtime, text, r.mode)
+        if shadow:
+            logger.info("CDE shadow route: %s", shadow)
+            emit({"type": "decision_shadow", **shadow})
     auto_agent = r.mode == "agent"
     if not auto_agent and req.mode in {"fast", "think", "code", "long"}:
         forced_tokens = 512 if req.mode == "fast" else 1024 if req.mode == "think" else 2048
