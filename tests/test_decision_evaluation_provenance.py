@@ -243,3 +243,29 @@ def test_results_manifest_rejects_naive_or_malformed_collection_timestamp(tmp_pa
             assert False,value
         except ValueError as exc:
             assert "collected_at" in str(exc)
+
+
+
+def test_results_manifest_rejects_invalid_resumed_from_collection_timestamp(tmp_path):
+    dataset=tmp_path / "dataset.jsonl"
+    dataset.write_text('{"text":"one","expected":"fast","ood":false}\n',encoding="utf-8")
+    results=tmp_path / "results.jsonl"
+    results.write_text("",encoding="utf-8")
+    manifest={
+        "format_version":RESULT_FORMAT_VERSION,
+        "collected_at":"2026-01-01T00:00:00+00:00",
+        "resumed_from_collected_at":"2025-12-31T23:00:00",
+        "datasets":[str(dataset)],
+        "backend":{},
+        "policy":{},
+        "status":"complete",
+        "dataset_sha256":dataset_sha256([str(dataset)]),
+        "results_sha256":file_sha256(results),
+        "result_rows":0,
+    }
+    Path(str(results)+".manifest.json").write_text(json.dumps(manifest),encoding="utf-8")
+    try:
+        validate_results_manifest(results,[str(dataset)])
+        assert False
+    except ValueError as exc:
+        assert "resumed_from_collected_at" in str(exc)
