@@ -14,7 +14,7 @@ from core import files as files_mod
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from core import billing, diagnostics, oauth, persona
 from core.agent import Agent, tool_content
@@ -151,6 +151,16 @@ class DecisionQuestionInput(BaseModel):
     options: list[DecisionOptionInput] = Field(default_factory=list, max_length=64)
     minimum: int | None = None
     maximum: int | None = None
+
+    @model_validator(mode="after")
+    def validate_type_fields(self):
+        if self.type == "boolean" and (self.options or self.minimum is not None or self.maximum is not None):
+            raise ValueError("boolean questions do not accept options or score bounds")
+        if self.type == "choice" and (self.minimum is not None or self.maximum is not None):
+            raise ValueError("choice questions do not accept score bounds")
+        if self.type == "score" and self.options:
+            raise ValueError("score questions do not accept choice options")
+        return self
 
 class DecisionApiRequest(BaseModel):
     context: object
