@@ -13,8 +13,15 @@ async def evaluate_route_shadow(runtime, text: str, heuristic_route: str) -> dic
             [{"id":"route","prompt":"Select the most appropriate CeltIA execution route.",
               "type":"choice","options":list(ROUTES)}],
         ))[0]
-        return {"heuristic": heuristic_route, "cde": result.decision,
-                "confidence": result.confidence, "abstained": result.abstained}
+        return {
+            "heuristic": heuristic_route,
+            "cde": result.decision,
+            "confidence": result.confidence,
+            "abstained": result.abstained,
+            "abstention_reason": result.abstention_reason,
+            "normalized_entropy": result.normalized_entropy,
+            "margin": result.margin,
+        }
     except Exception as exc:
         logger.warning("CDE shadow routing failed: %s", exc)
         return None
