@@ -38,8 +38,8 @@ def test_results_manifest_matches_exact_dataset_evidence(tmp_path):
     dataset=tmp_path / "dataset.jsonl"
     dataset.write_text('{"text":"one","expected":"fast","ood":false}\\n',encoding="utf-8")
     results=tmp_path / "results.jsonl"
-    results.write_text("",encoding="utf-8")
-    manifest={"format_version":RESULT_FORMAT_VERSION,"status":"complete","collected_at":"2026-01-01T00:00:00+00:00","datasets":[str(dataset)],"selection":_selection(),"backend":_backend_provenance(),"policy":_policy_provenance(),"dataset_sha256":dataset_sha256([str(dataset)]),"results_sha256":file_sha256(results),"result_rows":0}
+    results.write_text('{"text":"one"}\n',encoding="utf-8")
+    manifest={"format_version":RESULT_FORMAT_VERSION,"status":"complete","collected_at":"2026-01-01T00:00:00+00:00","datasets":[str(dataset)],"selection":_selection(),"backend":_backend_provenance(),"policy":_policy_provenance(),"dataset_sha256":dataset_sha256([str(dataset)]),"results_sha256":file_sha256(results),"result_rows":1}
     Path(str(results)+".manifest.json").write_text(json.dumps(manifest),encoding="utf-8")
     loaded=validate_results_manifest(results,[str(dataset)])
     assert loaded["dataset_sha256"] == manifest["dataset_sha256"]
@@ -380,3 +380,69 @@ def test_results_manifest_rejects_invalid_policy_provenance(tmp_path):
             assert False,policy
         except ValueError as exc:
             assert "policy provenance" in str(exc)
+
+
+
+def test_results_manifest_rejects_partial_selection_for_promotion(tmp_path):
+    dataset=tmp_path / "dataset.jsonl"
+    dataset.write_text(
+        '{"text":"one","expected":"fast","ood":false}\n'
+        '{"text":"two","expected":"fast","ood":false}\n',
+        encoding="utf-8",
+    )
+    results=tmp_path / "results.jsonl"
+    results.write_text('{"text":"one"}\n',encoding="utf-8")
+    manifest={
+        "format_version":RESULT_FORMAT_VERSION,
+        "collected_at":"2026-01-01T00:00:00+00:00",
+        "datasets":[str(dataset)],
+        "selection":_selection(dataset_rows=2,selected_rows=1,limit=1),
+        "backend":_backend_provenance(),
+        "policy":_policy_provenance(),
+        "status":"complete",
+        "dataset_sha256":dataset_sha256([str(dataset)]),
+        "results_sha256":file_sha256(results),
+        "result_rows":1,
+    }
+    Path(str(results)+".manifest.json").write_text(json.dumps(manifest),encoding="utf-8")
+    try:
+        validate_results_manifest(results,[str(dataset)])
+        assert False
+    except ValueError as exc:
+        assert "full-dataset collection" in str(exc)
+
+    loaded=validate_results_manifest(
+        results,
+        [str(dataset)],
+        require_full_selection=False,
+    )
+    assert loaded["selection"]["selected_rows"] == 1
+
+
+def test_results_manifest_rejects_selection_count_inconsistent_with_limit(tmp_path):
+    dataset=tmp_path / "dataset.jsonl"
+    dataset.write_text(
+        '{"text":"one","expected":"fast","ood":false}\n'
+        '{"text":"two","expected":"fast","ood":false}\n',
+        encoding="utf-8",
+    )
+    results=tmp_path / "results.jsonl"
+    results.write_text('{"text":"one"}\n',encoding="utf-8")
+    manifest={
+        "format_version":RESULT_FORMAT_VERSION,
+        "collected_at":"2026-01-01T00:00:00+00:00",
+        "datasets":[str(dataset)],
+        "selection":_selection(dataset_rows=2,selected_rows=1,limit=0),
+        "backend":_backend_provenance(),
+        "policy":_policy_provenance(),
+        "status":"complete",
+        "dataset_sha256":dataset_sha256([str(dataset)]),
+        "results_sha256":file_sha256(results),
+        "result_rows":1,
+    }
+    Path(str(results)+".manifest.json").write_text(json.dumps(manifest),encoding="utf-8")
+    try:
+        validate_results_manifest(results,[str(dataset)])
+        assert False
+    except ValueError as exc:
+        assert "selection does not match its limit" in str(exc)
