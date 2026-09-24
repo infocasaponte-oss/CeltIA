@@ -151,6 +151,32 @@ def test_decide_honors_configured_question_limit(monkeypatch):
     assert gateway.keys == []
 
 
+def test_decision_api_schema_rejects_invalid_choice_and_score_semantics():
+    invalid_questions = [
+        {"id":"c","prompt":"choice?","type":"choice","options":[]},
+        {"id":"c","prompt":"choice?","type":"choice","options":["x"]},
+        {"id":"c","prompt":"choice?","type":"choice","options":["x","x"]},
+        {"id":"s","prompt":"score?","type":"score"},
+        {"id":"s","prompt":"score?","type":"score","minimum":5,"maximum":4},
+        {"id":"s","prompt":"score?","type":"score","minimum":0,"maximum":101},
+    ]
+    for question in invalid_questions:
+        try:
+            api_main.DecisionApiRequest.model_validate({"context": {}, "questions": [question]})
+            assert False
+        except ValueError:
+            pass
+
+
+def test_decision_api_schema_accepts_valid_score_range():
+    req = api_main.DecisionApiRequest.model_validate({
+        "context": {},
+        "questions": [{"id":"s","prompt":"score?","type":"score","minimum":0,"maximum":100}],
+    })
+    assert req.questions[0].minimum == 0
+    assert req.questions[0].maximum == 100
+
+
 def test_decision_api_schema_rejects_cross_type_fields():
     invalid_questions = [
         {"id":"b","prompt":"bool?","type":"boolean","options":["x","y"]},
