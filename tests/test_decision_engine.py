@@ -19,3 +19,34 @@ def test_low_confidence_abstains():
 def test_score_candidates_are_generated():
     q = DecisionQuestion("quality", "Quality", DecisionType.SCORE, minimum=1, maximum=5)
     assert q.candidates() == ("1", "2", "3", "4", "5")
+
+
+def test_choice_rejects_duplicate_and_excessive_options():
+    duplicate = DecisionQuestion("route", "Choose route", DecisionType.CHOICE, ("fast", "fast"))
+    try:
+        duplicate.candidates()
+        assert False
+    except ValueError:
+        pass
+    excessive = DecisionQuestion("route", "Choose route", DecisionType.CHOICE, tuple(str(i) for i in range(65)))
+    try:
+        excessive.candidates()
+        assert False
+    except ValueError:
+        pass
+
+def test_score_candidate_range_is_bounded():
+    q = DecisionQuestion("score", "Score", DecisionType.SCORE, minimum=0, maximum=101)
+    try:
+        q.candidates()
+        assert False
+    except ValueError:
+        pass
+
+def test_question_text_limits():
+    q = DecisionQuestion("x", "p" * 8001, DecisionType.BOOLEAN)
+    try:
+        q.candidates()
+        assert False
+    except ValueError:
+        pass
