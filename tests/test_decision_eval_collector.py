@@ -53,6 +53,10 @@ def test_collect_checkpoints_and_resumes_without_duplicate_calls(tmp_path, monke
     saved=[json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
     assert [item["text"] for item in saved] == ["one","two"]
     assert not list(tmp_path.glob("results.jsonl.*.tmp"))
+    manifest_path=tmp_path / "results.jsonl.manifest.json"
+    manifest=json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["format_version"] == 2
+    assert first["manifest_output"] == str(manifest_path)
 
     second=asyncio.run(collector.collect(_args(tmp_path, resume=True, limit=2)))
     assert second["written"] == 0
@@ -113,3 +117,20 @@ def test_dataset_digest_changes_when_evaluation_data_changes(tmp_path):
     dataset.write_text("second\n",encoding="utf-8")
     second=collector._dataset_sha256([str(dataset)])
     assert first != second
+
+
+def test_atomic_json_writer_preserves_destination_on_replace_failure(tmp_path, monkeypatch):
+    path=tmp_path / "manifest.json"
+    path.write_text('{"old":true}\n',encoding="utf-8")
+    monkeypatch.setattr(
+        collector.os,
+        "replace",
+        lambda source,destination: (_ for _ in ()).throw(OSError("replace failed")),
+    )
+    try:
+        collector._write_atomic_json(path,{"new":True})
+        assert False
+    except OSError:
+        pass
+    assert json.loads(path.read_text(encoding="utf-8")) == {"old":True}
+    assert not list(tmp_path.glob("manifest.json.*.tmp"))
