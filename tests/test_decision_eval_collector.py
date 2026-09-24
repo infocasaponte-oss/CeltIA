@@ -19,7 +19,7 @@ class FakeResult:
 class FakeRuntime:
     def __init__(self):
         self.llm=type("FakeLLM", (), {"model":"fake-model"})()
-        self.engine_options={"abstain_below":.55,"temperature":1.0}
+        self.engine_options={"abstain_below":.55,"temperature":1.0,"reject_suspected_ood":True,"ood_entropy_threshold":.90,"ood_margin_threshold":.10}
 
     async def decide(self, context, questions):
         return [FakeResult()]
