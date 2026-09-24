@@ -33,16 +33,21 @@ A request contains shared context plus questions. Each question exposes a finite
 ## Prefix/state caching benchmark
 CDE now includes a deterministic pre-tokenization benchmark that renders the exact scorer messages and measures their longest shared character prefix. The report exposes total, reusable and unique serialized characters plus a reuse fraction. CI exercises a multi-question 12k-character shared-context case and requires at least 75% structural reuse.
 
-This is deliberately a structural proxy, not a performance claim: it does not assume tokenizer boundaries, KV-cache compatibility, backend prefix-cache behavior or latency savings. Production caching remains disabled until a real backend benchmark measures tokens, memory and latency.
+This is deliberately a structural proxy, not a performance claim: it does not assume tokenizer boundaries, KV-cache compatibility, backend prefix-cache behavior or latency savings. Production caching remains disabled until real-backend evidence is collected.
 
-Run it with:
+The repository also includes a real-backend harness. It sends the exact CDE scorer messages for two same-size workloads: one reuses a large shared context across questions, while the control changes the context near the beginning of every request. It reports median/p95 latency, shared-vs-control median reduction, logical usage, and cached prompt tokens when the OpenAI-compatible backend exposes `prompt_tokens_details.cached_tokens`. Demo/offline fallback is rejected rather than benchmarked.
+
+Run both layers with:
 
 ```bash
 PYTHONPATH=. python scripts/benchmark_decision_prefix.py --context-chars 12000 --questions 8
+PYTHONPATH=. python scripts/benchmark_decision_backend_prefix.py --context-chars 12000 --questions 8
 ```
 
+Backend results are environment-specific and are not a CI performance gate. For evidence before runtime enablement, run the backend harness in both workload orders and on a production-equivalent backend with prefix caching disabled/enabled where the backend supports that control.
+
 ## Next milestones
-1. Run backend-level token/latency/memory prefix-cache benchmarks before enabling caching in the runtime.
+1. Collect backend token/latency/memory evidence with the new harness before enabling caching in the runtime.
 2. Expand labeled routing and OOD datasets beyond the initial smoke benchmark.
 3. Evaluate LoRA/trained decision heads against the current LLM-scorer baseline.
 4. Add controlled-routing rollout only after promotion-gate evidence is sufficient.
