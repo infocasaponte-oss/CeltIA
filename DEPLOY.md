@@ -1,5 +1,9 @@
 # Despliegue en celtiaia.com (Cloudflare Tunnel)
 
+> **Estado (24/09/2026): HECHO.** `celtiaia.com` ya sirve esta API/UI por el túnel `celtiav2`. El proyecto antiguo
+> `celtia-llms` sigue en `celtia-llms.pages.dev` (y `www.celtiaia.com` sigue apuntando a él). Los pasos de abajo
+> quedan como referencia y para revertir.
+
 La API + interfaz corren en local (`start_ui.ps1`, puerto 8080) y se publican por el túnel `celtiav2`.
 
 ## Cambios en Cloudflare (dashboard)
