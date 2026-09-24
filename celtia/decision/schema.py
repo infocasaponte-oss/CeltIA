@@ -27,14 +27,21 @@ class DecisionQuestion:
             raise ValueError("question id must contain between 1 and 128 characters")
         if not self.prompt or len(self.prompt) > self.MAX_PROMPT_CHARS:
             raise ValueError("question prompt must contain between 1 and 8000 characters")
-        if self.type is DecisionType.BOOLEAN: return ("false", "true")
+        if self.type is DecisionType.BOOLEAN:
+            if self.options or self.minimum is not None or self.maximum is not None:
+                raise ValueError("boolean questions do not accept options or score bounds")
+            return ("false", "true")
         if self.type is DecisionType.CHOICE:
+            if self.minimum is not None or self.maximum is not None:
+                raise ValueError("choice questions do not accept score bounds")
             if len(self.options) < 2: raise ValueError("choice questions require at least two options")
             if len(self.options) > 64: raise ValueError("choice questions support at most 64 options")
             if len(set(self.options)) != len(self.options): raise ValueError("choice options must be unique")
             if any(not option or len(option) > self.MAX_OPTION_CHARS for option in self.options):
                 raise ValueError("choice options must contain between 1 and 1000 characters")
             return self.options
+        if self.options:
+            raise ValueError("score questions do not accept choice options")
         if self.minimum is None or self.maximum is None or self.minimum > self.maximum:
             raise ValueError("score questions require a valid minimum/maximum")
         if self.maximum - self.minimum + 1 > 101:
