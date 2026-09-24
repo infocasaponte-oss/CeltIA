@@ -71,6 +71,7 @@ decision_runtime = CeltIADecisionRuntime(
     ood_margin_threshold=settings.decision_ood_margin_threshold,
     max_questions=settings.decision_max_questions,
     max_output_tokens=settings.decision_max_output_tokens,
+    max_total_output_tokens=settings.decision_max_total_output_tokens,
 )
 agent = Agent(llm, registry, policy=ToolPolicy(), planner=Planner())
 gateway = Gateway(settings.gateway_max_concurrency, settings.gateway_queue_wait_seconds,
