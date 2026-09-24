@@ -76,6 +76,16 @@ def _dataset_sha256(paths: list[str]) -> str:
     return digest.hexdigest()
 
 
+def _load_manifest(path: Path) -> dict:
+    try:
+        value=json.loads(path.read_text(encoding="utf-8"))
+    except (OSError,json.JSONDecodeError) as exc:
+        raise ValueError(f"invalid evaluation manifest: {path}") from exc
+    if not isinstance(value,dict) or value.get("format_version") != RESULT_FORMAT_VERSION:
+        raise ValueError(f"incompatible evaluation manifest: {path}")
+    return value
+
+
 def _runtime_manifest(runtime: CeltIADecisionRuntime, datasets: list[str]) -> dict:
     llm=runtime.llm
     primary=getattr(llm,"primary",None)
@@ -179,9 +189,14 @@ async def collect(args) -> dict:
         rows=rows[:args.limit]
 
     output=Path(args.output)
+    manifest_output=Path(str(output) + ".manifest.json")
     existing={}
+    resume_manifest=None
     if args.resume and output.exists():
         existing=load_cde_results(output)
+        if not manifest_output.exists():
+            raise ValueError("resume requires the evaluation provenance manifest")
+        resume_manifest=_load_manifest(manifest_output)
         unknown=set(existing)-{row["text"] for row in rows}
         if unknown:
             first=sorted(unknown)[0]
@@ -189,7 +204,13 @@ async def collect(args) -> dict:
 
     runtime=build_runtime()
     manifest=_runtime_manifest(runtime,datasets)
-    manifest_output=Path(str(output) + ".manifest.json")
+    if resume_manifest is not None:
+        if resume_manifest.get("dataset_sha256") != manifest["dataset_sha256"]:
+            raise ValueError("resume dataset provenance does not match current datasets")
+        for field in ("backend","policy"):
+            if resume_manifest.get(field) != manifest[field]:
+                raise ValueError(f"resume {field} provenance does not match current runtime")
+        manifest["resumed_from_collected_at"]=resume_manifest.get("collected_at")
     written=0
     skipped=0
     output.parent.mkdir(parents=True,exist_ok=True)
