@@ -1,6 +1,7 @@
 # Copyright (c) 2026 Luis Manuel Cousido Hermida. All rights reserved.
 from __future__ import annotations
 
+import asyncio
 import json
 
 from celtia.decision.async_engine import AsyncDecisionEngine
@@ -27,6 +28,7 @@ class CeltIADecisionRuntime:
         max_output_tokens: int = 1024,
         max_total_output_tokens: int = 8192,
         max_total_prompt_chars: int = 250000,
+        call_timeout_seconds: float = 30.0,
     ):
         if not 1 <= max_questions <= self.HARD_MAX_QUESTIONS:
             raise ValueError("max_questions must be between 1 and 32")
@@ -38,11 +40,14 @@ class CeltIADecisionRuntime:
             raise ValueError("max_total_output_tokens is too small for max_questions")
         if not 10000 <= max_total_prompt_chars <= 2000000:
             raise ValueError("max_total_prompt_chars must be between 10000 and 2000000")
+        if not 0 < call_timeout_seconds <= 300:
+            raise ValueError("call_timeout_seconds must be greater than 0 and at most 300")
         self.llm = llm
         self.max_questions = max_questions
         self.max_output_tokens = max_output_tokens
         self.max_total_output_tokens = max_total_output_tokens
         self.max_total_prompt_chars = max_total_prompt_chars
+        self.call_timeout_seconds = call_timeout_seconds
         self.engine_options = {
             "abstain_below": abstain_below,
             "temperature": temperature,
@@ -103,12 +108,18 @@ class CeltIADecisionRuntime:
             )
 
         async def chat(messages: list[dict]) -> str:
-            response = await self.llm.chat(
-                messages,
-                thinking=False,
-                max_tokens=per_call_output_tokens,
-                temperature=0.0,
-            )
+            try:
+                response = await asyncio.wait_for(
+                    self.llm.chat(
+                        messages,
+                        thinking=False,
+                        max_tokens=per_call_output_tokens,
+                        temperature=0.0,
+                    ),
+                    timeout=self.call_timeout_seconds,
+                )
+            except asyncio.TimeoutError as exc:
+                raise RuntimeError("decision backend timed out") from exc
             meta = response.get("meta") or {}
             if meta.get("offline_fallback"):
                 raise RuntimeError("decision backend unavailable")
