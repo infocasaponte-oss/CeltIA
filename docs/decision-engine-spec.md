@@ -14,6 +14,7 @@ A request contains shared context plus questions. Each question exposes a finite
 - model/backbone stays behind CandidateScorer;
 - full probability distribution returned;
 - `/v1/decide` uses the same gateway concurrency/rate-limit slot as other model-backed requests;
+- model usage from decision scoring is aggregated per request and fed into CeltIA usage/quota/billing accounting;
 - invalid definitions/output fail closed;
 - low confidence can abstain;
 - deterministic tests need no GPU/model downloads.
