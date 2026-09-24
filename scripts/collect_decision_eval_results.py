@@ -9,6 +9,7 @@ import re
 import subprocess
 import tempfile
 from datetime import datetime, timezone
+from urllib.parse import urlsplit, urlunsplit
 from pathlib import Path
 
 from core.config import settings
@@ -81,6 +82,26 @@ async def collect_one(runtime: CeltIADecisionRuntime, row: dict) -> dict:
         "expected_ood":row.get("ood"),
         "models_used":list(usage.get("models") or []),
     }
+
+
+def _endpoint_identity(client) -> str | None:
+    raw=getattr(client,"base_url",None)
+    if not isinstance(raw,str) or not raw.strip():
+        return None
+    try:
+        parsed=urlsplit(raw.strip())
+        hostname=parsed.hostname
+        port=parsed.port
+    except ValueError:
+        return None
+    if not parsed.scheme or not hostname:
+        return None
+    host=hostname.lower()
+    if ":" in host and not host.startswith("["):
+        host=f"[{host}]"
+    netloc=host + (f":{port}" if port is not None else "")
+    path=parsed.path.rstrip("/")
+    return urlunsplit((parsed.scheme.lower(),netloc,path,"",""))
 
 
 def _code_revision() -> str | None:
@@ -217,6 +238,12 @@ def _runtime_manifest(runtime: CeltIADecisionRuntime, datasets: list[str], *, da
             "model":getattr(llm,"model",None),
             "primary_model":getattr(primary,"model",None),
             "fallback_model":getattr(fallback,"model",None),
+            "endpoint":_endpoint_identity(llm),
+            "primary_endpoint":_endpoint_identity(primary),
+            "fallback_endpoint":_endpoint_identity(fallback),
+            "local":getattr(llm,"local",None) if isinstance(getattr(llm,"local",None),bool) else None,
+            "primary_local":getattr(primary,"local",None) if isinstance(getattr(primary,"local",None),bool) else None,
+            "fallback_local":getattr(fallback,"local",None) if isinstance(getattr(fallback,"local",None),bool) else None,
         },
         "policy":dict(runtime.engine_options),
         "runtime":{
