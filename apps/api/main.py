@@ -192,6 +192,13 @@ class DecisionApiRequest(BaseModel):
     context: object
     questions: list[DecisionQuestionInput] = Field(min_length=1, max_length=32)
 
+    @model_validator(mode="after")
+    def validate_unique_question_ids(self):
+        ids = [question.id for question in self.questions]
+        if len(ids) != len(set(ids)):
+            raise ValueError("question ids must be unique")
+        return self
+
 class ApiKeyCreateRequest(BaseModel):
     name: str
     role: str = "user"
