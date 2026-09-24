@@ -14,7 +14,7 @@ A request contains shared context plus questions. Each question exposes a finite
 - model/backbone stays behind CandidateScorer;
 - full probability distribution returned;
 - ordinal score results also expose the probability-weighted expected score;
-- results expose observable abstention diagnostics (`low_confidence` / `suspected_ood`), normalized entropy and decision margin without exposing hidden reasoning;
+- results expose observable abstention diagnostics (`low_confidence` / `suspected_ood`), an explicit `suspected_ood` signal independent of the chosen abstention reason, normalized entropy and decision margin without exposing hidden reasoning;
 - `/v1/decide` uses the same gateway concurrency/rate-limit slot as other model-backed requests;
 - request-cost bounds are operator-configurable: maximum questions per request (hard-capped at 32), model output tokens per scoring call (64..2048), an aggregate output-token budget divided across all questions, an aggregate serialized prompt-size budget checked before any model call, a per-call timeout (default 30s), and a total request timeout (default 120s);
 - model usage from decision scoring is aggregated per request and fed into CeltIA usage/quota/billing accounting;
@@ -48,7 +48,7 @@ Backend results are environment-specific and are not a CI performance gate. Alte
 
 ## Next milestones
 1. Collect backend token/latency/memory evidence with the new harness before enabling caching in the runtime.
-2. Expand labeled routing and OOD datasets beyond the initial smoke benchmark.
+2. Expand the new labeled routing/OOD evaluation set toward promotion-scale coverage (the current OOD suite is intentionally small and adversarial).
 3. Evaluate LoRA/trained decision heads against the current LLM-scorer baseline.
 4. Add controlled-routing rollout only after promotion-gate evidence is sufficient.
 
