@@ -388,7 +388,10 @@ async def decide(req: DecisionApiRequest, key: dict = Depends(require_api_key)):
             asyncio.create_task(billing.report_usage(customer_id, total_tokens))
     return {"object": "decision.list", "usage": usage, "data": [
         {"id": r.id, "probabilities": r.probabilities, "decision": r.decision,
-         "confidence": r.confidence, "abstained": r.abstained}
+         "confidence": r.confidence, "abstained": r.abstained,
+         "abstention_reason": r.abstention_reason,
+         "normalized_entropy": r.normalized_entropy,
+         "margin": r.margin}
         for r in results
     ]}
 
