@@ -655,3 +655,83 @@ def test_collection_rejects_undeclared_model_before_result_checkpoint(tmp_path, 
     assert manifest_path.exists()
     manifest=json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["status"] == "collecting"
+
+
+
+def test_interruption_before_first_result_is_resumable(tmp_path, monkeypatch):
+    rows=[
+        {"text":"one","expected":"fast","ood":False},
+        {"text":"two","expected":"fast","ood":False},
+    ]
+    monkeypatch.setattr(collector,"load_datasets",lambda paths:rows)
+    monkeypatch.setattr(collector,"build_runtime",FakeRuntime)
+    monkeypatch.setattr(collector,"route",lambda text:type("R",(),{"mode":"fast"})())
+
+    original=collector.collect_one
+
+    async def fail_immediately(runtime,row):
+        raise RuntimeError("simulated pre-checkpoint interruption")
+
+    monkeypatch.setattr(collector,"collect_one",fail_immediately)
+    try:
+        asyncio.run(collector.collect(_args(tmp_path,checkpoint_every=2)))
+        assert False
+    except RuntimeError as exc:
+        assert "pre-checkpoint interruption" in str(exc)
+
+    path=tmp_path / "results.jsonl"
+    manifest_path=tmp_path / "results.jsonl.manifest.json"
+    assert path.exists()
+    assert path.read_text(encoding="utf-8") == ""
+    manifest=json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["status"] == "collecting"
+    assert manifest["result_rows"] == 0
+    assert manifest["results_sha256"] == collector.file_sha256(path)
+
+    monkeypatch.setattr(collector,"collect_one",original)
+    resumed=asyncio.run(collector.collect(_args(tmp_path,resume=True,checkpoint_every=2)))
+    assert resumed["skipped"] == 0
+    assert resumed["written"] == 2
+    saved=[
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+    ]
+    assert [item["text"] for item in saved] == ["one","two"]
+
+
+def test_resume_rejects_orphaned_result_or_manifest(tmp_path, monkeypatch):
+    rows=[{"text":"one","expected":"fast","ood":False}]
+    monkeypatch.setattr(collector,"load_datasets",lambda paths:rows)
+
+    path=tmp_path / "results.jsonl"
+    manifest_path=tmp_path / "results.jsonl.manifest.json"
+
+    path.write_text("",encoding="utf-8")
+    try:
+        asyncio.run(collector.collect(_args(tmp_path,resume=True)))
+        assert False
+    except ValueError as exc:
+        assert "both evaluation results and provenance manifest" in str(exc)
+
+    path.unlink()
+    manifest_path.write_text("{}",encoding="utf-8")
+    try:
+        asyncio.run(collector.collect(_args(tmp_path,resume=True)))
+        assert False
+    except ValueError as exc:
+        assert "both evaluation results and provenance manifest" in str(exc)
+
+
+def test_fresh_collection_refuses_orphaned_manifest(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        collector,
+        "load_datasets",
+        lambda paths:[{"text":"one","expected":"fast","ood":False}],
+    )
+    manifest_path=tmp_path / "results.jsonl.manifest.json"
+    manifest_path.write_text("{}",encoding="utf-8")
+    try:
+        asyncio.run(collector.collect(_args(tmp_path)))
+        assert False
+    except ValueError as exc:
+        assert "output or manifest already exists" in str(exc)
