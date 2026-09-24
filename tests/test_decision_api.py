@@ -34,7 +34,7 @@ class FakeDecisionRuntime:
                 margin=0.8,
                 expected_score=None,
             )
-        ], {"prompt_tokens": 4, "completion_tokens": 2, "total_tokens": 6}
+        ], {"prompt_tokens": 4, "completion_tokens": 2, "total_tokens": 6, "models": ["test-model"]}
 
 
 def test_decide_uses_gateway_slot_and_records_metric(monkeypatch):
@@ -53,6 +53,7 @@ def test_decide_uses_gateway_slot_and_records_metric(monkeypatch):
     assert result["data"][0]["decision"] == "true"
     assert api_main.app.state.metrics["decision_requests"] == before + 1
     assert result["usage"]["total_tokens"] == 6
+    assert result["usage"]["models"] == ["test-model"]
     assert result["data"][0]["abstention_reason"] is None
     assert result["data"][0]["suspected_ood"] is False
     assert result["data"][0]["normalized_entropy"] == 0.2
