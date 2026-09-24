@@ -6,6 +6,7 @@ import re
 import time
 import uuid
 from pathlib import Path
+from typing import Annotated, Literal
 
 import httpx
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
@@ -139,17 +140,19 @@ class ChatRequest(BaseModel):
     temperature:float|None=None
     max_tokens:int|None=None
 
+DecisionOptionInput = Annotated[str, Field(min_length=1, max_length=1000)]
+
 class DecisionQuestionInput(BaseModel):
-    id: str
-    prompt: str
-    type: str
-    options: list[str] = Field(default_factory=list)
+    id: str = Field(min_length=1, max_length=128)
+    prompt: str = Field(min_length=1, max_length=8000)
+    type: Literal["boolean", "choice", "score"]
+    options: list[DecisionOptionInput] = Field(default_factory=list, max_length=64)
     minimum: int | None = None
     maximum: int | None = None
 
 class DecisionApiRequest(BaseModel):
     context: object
-    questions: list[DecisionQuestionInput]
+    questions: list[DecisionQuestionInput] = Field(min_length=1, max_length=32)
 
 class ApiKeyCreateRequest(BaseModel):
     name: str
