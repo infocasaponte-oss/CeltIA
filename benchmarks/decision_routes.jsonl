@@ -1,0 +1,10 @@
+{"text":"Resume este parágrafo en dúas frases.","expected":"fast"}
+{"text":"Explica paso a paso por que este algoritmo ten complexidade O(n log n) e compara alternativas.","expected":"think"}
+{"text":"Implementa unha función Python que valide JWT e escribe tests unitarios.","expected":"code"}
+{"text":"Busca na web as novidades publicadas hoxe sobre este proxecto e resume as fontes.","expected":"agent"}
+{"text":"Analiza este documento moi longo e mantén coherencia entre todas as súas seccións.","expected":"long"}
+{"text":"Traduceme esta frase ao galego: Good morning.","expected":"fast"}
+{"text":"Deseña unha estratexia de migración con riscos, trade-offs e plan de rollback.","expected":"think"}
+{"text":"Corrixe este bug de TypeScript e propón un patch con probas.","expected":"code"}
+{"text":"Investiga información actualizada en internet e contrasta polo menos tres fontes.","expected":"agent"}
+{"text":"Traballa sobre un contexto superior ao límite normal e sintetiza todos os apartados.","expected":"long"}
