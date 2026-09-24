@@ -19,30 +19,6 @@ def _unique_object(pairs):
     return result
 
 
-MAX_JSON_NESTING = 100
-
-
-def validate_json_nesting(value: object, *, max_depth: int = MAX_JSON_NESTING) -> None:
-    """Reject excessively nested JSON-like inputs without relying on interpreter recursion limits."""
-    stack=[(value,0)]
-    seen=set()
-    while stack:
-        current,depth=stack.pop()
-        if depth > max_depth:
-            raise ValueError("decision input must be JSON serializable")
-        if isinstance(current, dict):
-            identity=id(current)
-            if identity in seen:
-                raise ValueError("decision input must be JSON serializable")
-            seen.add(identity)
-            stack.extend((item,depth+1) for item in current.values())
-        elif isinstance(current, (list, tuple)):
-            identity=id(current)
-            if identity in seen:
-                raise ValueError("decision input must be JSON serializable")
-            seen.add(identity)
-            stack.extend((item,depth+1) for item in current)
-
 
 class AsyncLLMDecisionScorer:
     """Model adapter using observable structured output, not hidden reasoning.
@@ -54,7 +30,6 @@ class AsyncLLMDecisionScorer:
 
     @staticmethod
     def messages_for(context: object, question: DecisionQuestion, candidates: Sequence[str]) -> list[dict]:
-        validate_json_nesting(context)
         candidate_items = [
             {"id": f"c{index}", "value": candidate}
             for index, candidate in enumerate(candidates)
