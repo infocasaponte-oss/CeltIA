@@ -72,21 +72,15 @@ def validate_policy_provenance(value: object) -> bool:
         return False
     for field in ("abstain_below","ood_entropy_threshold","ood_margin_threshold"):
         raw=value.get(field)
-        if isinstance(raw,bool):
+        if isinstance(raw,bool) or not isinstance(raw,(int,float)):
             return False
-        try:
-            number=float(raw)
-        except (TypeError,ValueError,OverflowError):
-            return False
+        number=float(raw)
         if not math.isfinite(number) or not 0 <= number <= 1:
             return False
     temperature=value.get("temperature")
-    if isinstance(temperature,bool):
+    if isinstance(temperature,bool) or not isinstance(temperature,(int,float)):
         return False
-    try:
-        temperature_value=float(temperature)
-    except (TypeError,ValueError,OverflowError):
-        return False
+    temperature_value=float(temperature)
     return math.isfinite(temperature_value) and temperature_value > 0
 
 
