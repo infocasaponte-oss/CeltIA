@@ -79,3 +79,22 @@ def test_runtime_aggregates_usage_across_questions():
     results, usage = asyncio.run(runtime.decide_with_usage({}, questions))
     assert len(results) == 2
     assert usage == {"prompt_tokens":22,"completion_tokens":14,"total_tokens":36}
+
+
+class MalformedUsageLLM:
+    async def chat(self, messages, **kwargs):
+        return {
+            "choices":[{"message":{"content":'{"scores":{"fast":0.1,"think":2.0}}'}}],
+            "usage":{"prompt_tokens":-5,"completion_tokens":"bad","total_tokens":999999},
+        }
+
+
+def test_runtime_ignores_malformed_or_inconsistent_usage_totals():
+    runtime = CeltIADecisionRuntime(MalformedUsageLLM(), abstain_below=0.0, reject_suspected_ood=False)
+    _, usage = asyncio.run(runtime.decide_with_usage({}, [{
+        "id":"route","prompt":"route","type":"choice","options":["fast","think"]
+    }]))
+    assert usage["prompt_tokens"] > 0
+    assert usage["completion_tokens"] > 0
+    assert usage["total_tokens"] == usage["prompt_tokens"] + usage["completion_tokens"]
+    assert usage["total_tokens"] != 999999
