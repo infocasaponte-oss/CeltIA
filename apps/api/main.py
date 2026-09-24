@@ -73,6 +73,7 @@ decision_runtime = CeltIADecisionRuntime(
     max_output_tokens=settings.decision_max_output_tokens,
     max_total_output_tokens=settings.decision_max_total_output_tokens,
     max_total_prompt_chars=settings.decision_max_total_prompt_chars,
+    call_timeout_seconds=settings.decision_call_timeout_seconds,
 )
 agent = Agent(llm, registry, policy=ToolPolicy(), planner=Planner())
 gateway = Gateway(settings.gateway_max_concurrency, settings.gateway_queue_wait_seconds,
