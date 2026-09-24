@@ -1,6 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
+import math
 
 @dataclass(frozen=True)
 class ShadowSample:
@@ -92,6 +93,31 @@ def evaluate_shadow(samples: Iterable[ShadowSample]) -> dict:
         "ood_accuracy": (true_positive+true_negative)/len(ood_evaluated) if ood_evaluated else None,
     }
 
+def _validate_gate_thresholds(**values) -> None:
+    integer_names={"min_samples","min_labeled","min_route_labeled","min_ood_labeled"}
+    delta_names={"min_accuracy_delta"}
+    for name,value in values.items():
+        if value is None:
+            continue
+        if name in integer_names:
+            if isinstance(value,bool) or not isinstance(value,int) or value < 0:
+                raise ValueError(f"{name} must be a non-negative integer")
+            continue
+        if isinstance(value,bool):
+            raise ValueError(f"{name} must be numeric")
+        try:
+            number=float(value)
+        except (TypeError,ValueError,OverflowError) as exc:
+            raise ValueError(f"{name} must be numeric") from exc
+        if not math.isfinite(number):
+            raise ValueError(f"{name} must be finite")
+        if name in delta_names:
+            if not -1 <= number <= 1:
+                raise ValueError(f"{name} must be between -1 and 1")
+        elif not 0 <= number <= 1:
+            raise ValueError(f"{name} must be between 0 and 1")
+
+
 def promotion_gate(metrics: dict, *, min_samples: int = 200, min_coverage: float = 0.80,
                    min_labeled: int = 50, min_accuracy_delta: float = 0.02,
                    min_labeled_coverage: float = 0.80,
@@ -102,6 +128,20 @@ def promotion_gate(metrics: dict, *, min_samples: int = 200, min_coverage: float
                    min_ood_coverage: float | None = None,
                    min_ood_recall: float | None = None,
                    max_ood_false_positive_rate: float | None = None) -> dict:
+    _validate_gate_thresholds(
+        min_samples=min_samples,
+        min_coverage=min_coverage,
+        min_labeled=min_labeled,
+        min_accuracy_delta=min_accuracy_delta,
+        min_labeled_coverage=min_labeled_coverage,
+        min_route_labeled=min_route_labeled,
+        min_route_coverage=min_route_coverage,
+        min_route_accuracy=min_route_accuracy,
+        min_ood_labeled=min_ood_labeled,
+        min_ood_coverage=min_ood_coverage,
+        min_ood_recall=min_ood_recall,
+        max_ood_false_positive_rate=max_ood_false_positive_rate,
+    )
     reasons=[]
     if metrics.get("samples",0) < min_samples: reasons.append("insufficient_samples")
     if (metrics.get("coverage") or 0) < min_coverage: reasons.append("insufficient_coverage")
