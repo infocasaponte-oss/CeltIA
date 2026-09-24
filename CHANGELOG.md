@@ -24,3 +24,26 @@ Autor: Luis Manuel Cousido Hermida
 - **Engadido:** contrasinal mínimo de 8 caracteres, comparación en tempo constante do token admin,
   validación do id de proxecto e cabeceiras de seguridade.
 - **Restrinxido:** `install_package` (pip no host) só para administradores.
+
+## 2026-09 — Chat profesional
+- **Contexto de conversación:** o cliente envía os últimos turnos en cada petición; o modelo xa non "esquece" o anterior.
+- **Lectura de enlaces:** nova ferramenta `fetch_url` (protexida contra SSRF) e lectura automática dos enlaces
+  que o usuario pega ou menciona ("o enlace que me deches").
+- **Ferramentas encadeadas:** ata 3 rondas (buscar → ler páxina → responder).
+- **Rede de seguridade:** se o modelo devolve baleiro, reintenta unha vez; se non, mensaxe clara.
+- **Data actual** no prompt e detección de idioma (español/galego/inglés) para evitar respostas mesturadas.
+- **Estilo profesional** no prompt (resposta primeiro, fontes con enlace, informes xa redactados).
+- **Interface:** Markdown seguro (listas, táboas, código, enlaces), botón Copiar e mensaxes de erro claras.
+- **Data e hora actuais sempre presentes:** o prompt leva data, hora e zona horaria (a do navegador), con datas
+  relativas precalculadas e cálculo verificado para "dentro de N días/semanas/meses" e "hai/hace N ...".
+- **A conversa non se perde ao recargar:** gárdase no navegador por conta (`localStorage`), tamén nos plans sen historial.
+
+## 2026-09 — Stripe (test), imaxes con Grok e preparación de celtiaia.com
+- **Plans mensuais Basic/Pro/Ultra** (5/18/48 €; 500k/2M/6M tokens) con produtos propios en Stripe (test).
+- **Webhook de Stripe** (`checkout.session.completed`, `invoice.paid`, `invoice.payment_failed`,
+  `customer.subscription.deleted`): activación e renovación mensual de tokens, idempotentes.
+- **Corrixido:** `/billing/complete` acreditaba tokens en cada recarga da URL de éxito.
+- **Corrixido:** `.env.local` tiña `STRIPE_SECRET_KEY=` e `STRIPE_WEBHOOK_SECRET=` baleiros que pisaban o `.env`.
+- **Imaxes con Grok Imagine:** `POST /v1/images/generations` (premium/admin) e comando `/imagen …` no chat.
+- **Seguridade:** documentación pública da API desactivada; IP real detrás do túnel (`CF-Connecting-IP`) para o
+  límite de intentos; contrasinais admin rotados.
