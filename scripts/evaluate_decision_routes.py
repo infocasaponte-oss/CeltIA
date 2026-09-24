@@ -12,8 +12,15 @@ def load_jsonl(path: Path):
     for n,line in enumerate(path.read_text(encoding="utf-8").splitlines(),1):
         if not line.strip(): continue
         row=json.loads(line)
-        if not isinstance(row.get("text"),str) or row.get("expected") not in {"fast","think","code","agent","long"}:
+        expected=row.get("expected")
+        expected_ood=row.get("ood", False)
+        if not isinstance(row.get("text"),str) or not row["text"].strip():
             raise ValueError(f"invalid benchmark row {n}")
+        if not isinstance(expected_ood, bool):
+            raise ValueError(f"invalid benchmark row {n}")
+        if expected not in {"fast","think","code","agent","long"}:
+            if not (expected is None and expected_ood):
+                raise ValueError(f"invalid benchmark row {n}")
         rows.append(row)
     return rows
 
@@ -33,14 +40,25 @@ def main():
     if args.cde_results:
         for line in Path(args.cde_results).read_text(encoding="utf-8").splitlines():
             if line.strip():
-                item=json.loads(line); by_text[item["text"]]=item
+                item=json.loads(line)
+                if not isinstance(item.get("text"), str):
+                    raise ValueError("invalid CDE result row")
+                if "suspected_ood" in item and not isinstance(item["suspected_ood"], bool):
+                    raise ValueError("invalid CDE result row")
+                by_text[item["text"]]=item
     samples=[]
     for row in rows:
         h=route(row["text"]).mode
         item=by_text.get(row["text"])
-        samples.append(ShadowSample(h,item.get("cde") if item else None,
+        samples.append(ShadowSample(
+            h,
+            item.get("cde") if item else None,
             float(item.get("confidence",0.0)) if item else 0.0,
-            bool(item.get("abstained",True)) if item else True,row["expected"]))
+            bool(item.get("abstained",True)) if item else True,
+            row.get("expected"),
+            suspected_ood=item.get("suspected_ood") if item else None,
+            expected_ood=row.get("ood", False),
+        ))
     metrics=evaluate_shadow(samples)
     gate=promotion_gate(
         metrics,
