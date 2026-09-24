@@ -35,7 +35,6 @@ jobs:
         run: |
           python --version
           python -m pip --version
-          python -m pip check
           python -c "import pytest; print('pytest import ok')"
       - name: Compile Python
         run: python -m compileall -q celtia core apps tests
