@@ -1,3 +1,4 @@
+import hashlib
 import json
 from pathlib import Path
 
@@ -131,3 +132,21 @@ def test_results_manifest_rejects_invalid_result_row_count_type(tmp_path):
         assert False
     except ValueError as exc:
         assert "invalid result_rows" in str(exc)
+
+
+def test_dataset_digest_streaming_preserves_schema_v3_bytes(tmp_path):
+    first=tmp_path / "first.jsonl"
+    second=tmp_path / "second.jsonl"
+    first.write_bytes((b"a" * (1024 * 1024 + 17)) + b"\n")
+    second.write_bytes(b"second\n")
+
+    paths=[str(first),str(second)]
+    expected=hashlib.sha256()
+    for raw_path in paths:
+        path=Path(raw_path)
+        expected.update(str(path).encode("utf-8"))
+        expected.update(b"\0")
+        expected.update(path.read_bytes())
+        expected.update(b"\0")
+
+    assert dataset_sha256(paths) == expected.hexdigest()
