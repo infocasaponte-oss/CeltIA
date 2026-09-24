@@ -87,3 +87,25 @@ def test_llm_scorer_uses_compact_ids_for_long_candidate_text():
     assert values == [0.25, 0.75]
     assert '"id":"c0"' in seen["payload"]
     assert '"id":"c1"' in seen["payload"]
+
+
+def test_llm_scorer_rejects_duplicate_envelope_key():
+    async def chat(messages):
+        return '{"scores":{"c0":1.0,"c1":2.0},"scores":{"c0":3.0,"c1":4.0}}'
+    q = DecisionQuestion("route", "route", DecisionType.CHOICE, ("fast", "think"))
+    try:
+        asyncio.run(AsyncLLMDecisionScorer(chat).score({}, q, q.candidates()))
+        assert False
+    except ValueError as exc:
+        assert "duplicate JSON key" in str(exc)
+
+
+def test_llm_scorer_rejects_duplicate_candidate_key():
+    async def chat(messages):
+        return '{"scores":{"c0":1.0,"c0":9.0,"c1":2.0}}'
+    q = DecisionQuestion("route", "route", DecisionType.CHOICE, ("fast", "think"))
+    try:
+        asyncio.run(AsyncLLMDecisionScorer(chat).score({}, q, q.candidates()))
+        assert False
+    except ValueError as exc:
+        assert "duplicate JSON key" in str(exc)
