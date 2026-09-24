@@ -92,3 +92,37 @@ def test_decide_accounts_usage_for_authenticated_key(monkeypatch):
     assert memory.decrements == [(7, 6)]
     assert memory.usage[0][:3] == (7, 4, 2)
     assert memory.usage[0][3]["client_key_id"] == 9
+
+
+def test_decision_api_schema_rejects_invalid_type_and_bounds():
+    invalid_payloads = [
+        {"context": {}, "questions": []},
+        {"context": {}, "questions": [{"id":"","prompt":"x","type":"boolean"}]},
+        {"context": {}, "questions": [{"id":"q","prompt":"","type":"boolean"}]},
+        {"context": {}, "questions": [{"id":"q","prompt":"x","type":"unknown"}]},
+        {"context": {}, "questions": [{
+            "id":"q","prompt":"x","type":"choice","options":["x" * 1001, "b"]
+        }]},
+        {"context": {}, "questions": [
+            {"id":f"q{i}","prompt":"x","type":"boolean"} for i in range(33)
+        ]},
+    ]
+    for payload in invalid_payloads:
+        try:
+            api_main.DecisionApiRequest.model_validate(payload)
+            assert False
+        except ValueError:
+            pass
+
+
+def test_decision_api_schema_accepts_maximum_supported_sizes():
+    req = api_main.DecisionApiRequest.model_validate({
+        "context": {},
+        "questions": [{
+            "id":"i" * 128,
+            "prompt":"p" * 8000,
+            "type":"choice",
+            "options":[str(i) for i in range(64)],
+        }],
+    })
+    assert len(req.questions[0].options) == 64
