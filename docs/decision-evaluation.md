@@ -96,3 +96,5 @@ Resume is provenance-safe: if a result file already exists, `--resume` now requi
 Promotion evaluation now enforces the same evidence boundary: whenever `--cde-results` is supplied, the evaluator requires the adjacent version-2 manifest and recomputes the digest of the selected datasets before calculating metrics or eligibility. Results collected against different or subsequently modified benchmark evidence are rejected rather than scored.
 
 Fresh collection is overwrite-safe and interruption-resumable: if the output JSONL already exists, the collector now requires `--resume` instead of replacing prior evidence implicitly. For a new output path it persists the provenance sidecar before the first model call, so once the first atomic checkpoint is written an interrupted run has the matching manifest required for safe resume.
+
+Each collected result row now records `models_used`, derived from the actual model metadata returned by the decision backend for that row. This complements the manifest's configured primary/fallback model identities and makes mixed-provider or fallback evaluation runs auditable at row granularity.
