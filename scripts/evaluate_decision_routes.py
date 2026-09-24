@@ -11,7 +11,7 @@ from pathlib import Path
 from celtia.decision.evaluation import ShadowSample, evaluate_shadow, promotion_gate
 
 ROUTES={"fast","think","code","agent","long"}
-RESULT_FORMAT_VERSION=3
+RESULT_FORMAT_VERSION=4
 SHA256_RE=re.compile(r"^[0-9a-f]{64}$")
 GIT_REVISION_RE=re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 
