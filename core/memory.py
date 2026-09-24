@@ -31,6 +31,7 @@ class Memory:
             "CREATE TABLE IF NOT EXISTS decision_shadow(id INTEGER PRIMARY KEY,api_key_id INTEGER,"
             "heuristic_route TEXT,cde_route TEXT,confidence REAL,abstained INTEGER,"
             "abstention_reason TEXT,suspected_ood INTEGER,normalized_entropy REAL,margin REAL,"
+            "prompt_tokens INTEGER,completion_tokens INTEGER,total_tokens INTEGER,"
             "agreed INTEGER,created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"
         )
         self.db.execute(
@@ -65,6 +66,9 @@ class Memory:
             "suspected_ood": "INTEGER",
             "normalized_entropy": "REAL",
             "margin": "REAL",
+            "prompt_tokens": "INTEGER",
+            "completion_tokens": "INTEGER",
+            "total_tokens": "INTEGER",
         }
         for column, decl in additions.items():
             if column not in existing:
@@ -359,11 +363,13 @@ class Memory:
         self.db.commit()
 
     def record_decision_shadow(self, api_key_id, heuristic_route, cde_route, confidence, abstained,
-                               abstention_reason=None, suspected_ood=None, normalized_entropy=None, margin=None):
+                               abstention_reason=None, suspected_ood=None, normalized_entropy=None, margin=None,
+                               prompt_tokens=None, completion_tokens=None, total_tokens=None):
         agreed = bool(cde_route and cde_route == heuristic_route and not abstained)
         self.db.execute(
             "INSERT INTO decision_shadow(api_key_id,heuristic_route,cde_route,confidence,abstained,"
-            "abstention_reason,suspected_ood,normalized_entropy,margin,agreed) VALUES(?,?,?,?,?,?,?,?,?,?)",
+            "abstention_reason,suspected_ood,normalized_entropy,margin,prompt_tokens,completion_tokens,total_tokens,agreed) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 api_key_id,
                 heuristic_route,
@@ -374,6 +380,9 @@ class Memory:
                 int(bool(suspected_ood)) if suspected_ood is not None else None,
                 float(normalized_entropy) if normalized_entropy is not None else None,
                 float(margin) if margin is not None else None,
+                int(prompt_tokens) if prompt_tokens is not None else None,
+                int(completion_tokens) if completion_tokens is not None else None,
+                int(total_tokens) if total_tokens is not None else None,
                 int(agreed),
             ),
         )
@@ -383,11 +392,15 @@ class Memory:
         since = f"-{max(1, int(days))} days"
         row = self.db.execute(
             "SELECT COUNT(*),COALESCE(SUM(agreed),0),COALESCE(SUM(abstained),0),"
-            "COALESCE(SUM(suspected_ood),0),AVG(confidence),AVG(normalized_entropy),AVG(margin) "
+            "COALESCE(SUM(suspected_ood),0),AVG(confidence),AVG(normalized_entropy),AVG(margin),"
+            "COALESCE(SUM(prompt_tokens),0),COALESCE(SUM(completion_tokens),0),COALESCE(SUM(total_tokens),0) "
             "FROM decision_shadow WHERE created_at>=datetime('now',?)",
             (since,),
         ).fetchone()
-        total, agreed, abstained, suspected_ood, avg_confidence, avg_entropy, avg_margin = row
+        (
+            total, agreed, abstained, suspected_ood, avg_confidence, avg_entropy, avg_margin,
+            prompt_tokens, completion_tokens, total_tokens,
+        ) = row
         disagreements = self.db.execute(
             "SELECT heuristic_route,cde_route,COUNT(*) FROM decision_shadow "
             "WHERE created_at>=datetime('now',?) AND abstained=0 AND heuristic_route<>cde_route "
@@ -404,6 +417,10 @@ class Memory:
             "suspected_ood": suspected_ood,
             "suspected_ood_rate": (suspected_ood / total) if total else None,
             "avg_confidence": avg_confidence, "avg_normalized_entropy": avg_entropy, "avg_margin": avg_margin,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": total_tokens,
+            "avg_tokens_per_sample": (total_tokens / total) if total else None,
             "abstention_reasons": {reason: count for reason, count in abstention_reasons},
             "top_disagreements": [{"heuristic": a, "cde": b, "count": n} for a,b,n in disagreements],
         }
