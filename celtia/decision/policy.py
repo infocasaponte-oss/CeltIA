@@ -102,11 +102,24 @@ def decision_policy(
     candidates = tuple(probabilities)
     if not candidates:
         raise ValueError("probabilities cannot be empty")
+    raw_values = [probabilities[candidate] for candidate in candidates]
+    if any(isinstance(value, bool) for value in raw_values):
+        raise ValueError("probabilities must be finite numbers in [0,1] summing to 1")
+    try:
+        values = [float(value) for value in raw_values]
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("probabilities must be finite numbers in [0,1] summing to 1") from exc
+    if (
+        not all(math.isfinite(value) and 0 <= value <= 1 for value in values)
+        or not math.isclose(sum(values), 1.0, rel_tol=1e-9, abs_tol=1e-9)
+    ):
+        raise ValueError("probabilities must be finite numbers in [0,1] summing to 1")
+    normalized = dict(zip(candidates, values, strict=True))
 
-    best = max(candidates, key=probabilities.__getitem__)
-    confidence = float(probabilities[best])
+    best = max(candidates, key=normalized.__getitem__)
+    confidence = normalized[best]
     risk = ood_signal(
-        probabilities,
+        normalized,
         entropy_threshold=ood_entropy_threshold,
         margin_threshold=ood_margin_threshold,
     )
