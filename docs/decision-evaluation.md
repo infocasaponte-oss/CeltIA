@@ -86,3 +86,5 @@ Use `--resume` to continue an interrupted collection without re-running already 
 Route summaries are complete: if any route has no labels, `min_route_coverage` and `min_route_accuracy` are `null`, with `routes_with_labels` and `routes_without_labels` exposing the missing evidence.
 
 Promotion threshold configuration is validated before evaluation: sample-count floors must be non-negative integers, probability/rate thresholds must be finite values in `[0,1]`, and the allowed accuracy delta is finite and bounded to `[-1,1]`. Invalid programmatic or CLI-derived gate configuration fails closed instead of producing a misleading eligibility result.
+
+The live collector summary includes a versioned provenance manifest with a UTC collection timestamp, SHA-256 digest over the exact selected dataset files (including their path/order), backend client/model identifiers available from the runtime, and the active CDE policy settings. This makes a saved evaluation run attributable to its evidence and decision configuration without storing API keys or other credentials.
