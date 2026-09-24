@@ -9,6 +9,7 @@ def test_route_benchmark_schema():
     assert rows
     assert all(isinstance(r["text"],str) and r["text"].strip() for r in rows)
     assert all(r["expected"] in ALLOWED for r in rows)
+    assert all(r.get("ood") is False for r in rows)
     assert len({r["text"] for r in rows}) == len(rows)
 
 
