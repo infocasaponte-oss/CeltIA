@@ -102,6 +102,7 @@ jobs:
         env:
           PYTHONPATH: .
         run: |
+          python scripts/collect_decision_eval_results.py --help >/dev/null
           python scripts/evaluate_decision_routes.py \
             --dataset benchmarks/decision_routes.jsonl
           python scripts/evaluate_decision_routes.py \
