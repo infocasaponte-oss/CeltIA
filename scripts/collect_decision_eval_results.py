@@ -5,6 +5,7 @@ import argparse
 import asyncio
 import json
 import os
+import tempfile
 from pathlib import Path
 
 from core.config import settings
@@ -80,13 +81,41 @@ def _fsync(handle) -> None:
     os.fsync(handle.fileno())
 
 
+def _fsync_directory(path: Path) -> None:
+    if not hasattr(os, "O_DIRECTORY"):
+        return
+    try:
+        fd=os.open(path,os.O_RDONLY | os.O_DIRECTORY)
+    except OSError:
+        return
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
 def _write_atomic_jsonl(output: Path, rows: list[dict]) -> None:
-    tmp=output.with_name(output.name + ".tmp")
-    with tmp.open("w",encoding="utf-8") as handle:
-        for item in rows:
-            handle.write(json.dumps(item,ensure_ascii=False,separators=(",",":"))+"\n")
-        _fsync(handle)
-    os.replace(tmp,output)
+    output.parent.mkdir(parents=True,exist_ok=True)
+    fd,tmp_name=tempfile.mkstemp(
+        prefix=output.name + ".",
+        suffix=".tmp",
+        dir=output.parent,
+        text=True,
+    )
+    tmp=Path(tmp_name)
+    try:
+        with os.fdopen(fd,"w",encoding="utf-8") as handle:
+            for item in rows:
+                handle.write(json.dumps(item,ensure_ascii=False,separators=(",",":"))+"\n")
+            _fsync(handle)
+        os.replace(tmp,output)
+        _fsync_directory(output.parent)
+    except BaseException:
+        try:
+            tmp.unlink()
+        except FileNotFoundError:
+            pass
+        raise
 
 
 async def collect(args) -> dict:
