@@ -1,6 +1,8 @@
 # Copyright (c) 2026 Luis Manuel Cousido Hermida. All rights reserved.
 from __future__ import annotations
 
+import json
+
 from celtia.decision.async_engine import AsyncDecisionEngine
 from celtia.decision.llm_scorer import AsyncLLMDecisionScorer
 from celtia.decision.schema import DecisionQuestion, DecisionRequest, DecisionType
@@ -8,6 +10,7 @@ from celtia.decision.schema import DecisionQuestion, DecisionRequest, DecisionTy
 
 class CeltIADecisionRuntime:
     MAX_CONTEXT_CHARS = 50000
+    MAX_QUESTIONS = 32
 
     """Bridge between the independent CDE core and CeltIA's existing local LLM client."""
 
@@ -41,12 +44,16 @@ class CeltIADecisionRuntime:
 
     async def decide(self, context, questions):
         try:
-            import json
-            context_size = len(json.dumps(context, ensure_ascii=False, default=str))
+            serialized_context = json.dumps(context, ensure_ascii=False)
         except (TypeError, ValueError, OverflowError) as exc:
             raise ValueError("context must be JSON-serializable") from exc
-        if context_size > self.MAX_CONTEXT_CHARS:
+        if len(serialized_context) > self.MAX_CONTEXT_CHARS:
             raise ValueError("decision context exceeds 50000 serialized characters")
+        if not questions or len(questions) > self.MAX_QUESTIONS:
+            raise ValueError("questions must contain between 1 and 32 items")
+        ids = [q.get("id") for q in questions]
+        if len(ids) != len(set(ids)):
+            raise ValueError("question ids must be unique")
         request = DecisionRequest(
             context=context,
             questions=tuple(
