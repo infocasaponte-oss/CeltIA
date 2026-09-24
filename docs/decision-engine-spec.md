@@ -30,8 +30,19 @@ A request contains shared context plus questions. Each question exposes a finite
 - direct runtime callers get normalized validation errors for malformed question containers or missing required question fields;
 - deterministic tests need no GPU/model downloads.
 
+## Prefix/state caching benchmark
+CDE now includes a deterministic pre-tokenization benchmark that renders the exact scorer messages and measures their longest shared character prefix. The report exposes total, reusable and unique serialized characters plus a reuse fraction. CI exercises a multi-question 12k-character shared-context case and requires at least 75% structural reuse.
+
+This is deliberately a structural proxy, not a performance claim: it does not assume tokenizer boundaries, KV-cache compatibility, backend prefix-cache behavior or latency savings. Production caching remains disabled until a real backend benchmark measures tokens, memory and latency.
+
+Run it with:
+
+```bash
+PYTHONPATH=. python scripts/benchmark_decision_prefix.py --context-chars 12000 --questions 8
+```
+
 ## Next milestones
-1. Benchmark prefix/state caching before adding it to the runtime.
+1. Run backend-level token/latency/memory prefix-cache benchmarks before enabling caching in the runtime.
 2. Expand labeled routing and OOD datasets beyond the initial smoke benchmark.
 3. Evaluate LoRA/trained decision heads against the current LLM-scorer baseline.
 4. Add controlled-routing rollout only after promotion-gate evidence is sufficient.
