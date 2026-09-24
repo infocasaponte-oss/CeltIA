@@ -75,7 +75,10 @@ def main():
         action="append",
         help="Benchmark JSONL. Repeat to combine route and OOD datasets.",
     )
-    p.add_argument("--cde-results",help="Optional JSONL with text,cde,confidence,abstained")
+    p.add_argument(
+        "--cde-results",
+        help="Optional JSONL with text,cde,confidence,abstained and optional suspected_ood",
+    )
     p.add_argument("--min-samples",type=int,default=200)
     p.add_argument("--min-coverage",type=float,default=.80)
     p.add_argument("--min-labeled",type=int,default=50)
