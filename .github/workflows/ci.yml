@@ -53,6 +53,21 @@ jobs:
             tests/test_decision_robustness.py \
             tests/test_decision_calibration.py \
             tests/test_decision_benchmark.py
+      - name: Validate routing benchmark and promotion gate behavior
+        env:
+          PYTHONPATH: .
+        run: |
+          python scripts/evaluate_decision_routes.py \
+            --dataset benchmarks/decision_routes.jsonl
+          if python scripts/evaluate_decision_routes.py \
+            --dataset benchmarks/decision_routes.jsonl \
+            --require-eligible; then
+            echo "promotion gate unexpectedly passed without CDE results"
+            exit 1
+          else
+            code=$?
+            test "$code" -eq 2
+          fi
 
   app:
     name: App Python ${{ matrix.python-version }}
