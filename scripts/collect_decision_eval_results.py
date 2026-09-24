@@ -13,10 +13,9 @@ from core.config import settings
 from core.decision_runtime import CeltIADecisionRuntime
 from core.inference import build_llm
 from core.router import route
-from scripts.evaluate_decision_routes import dataset_sha256, file_sha256, load_cde_results, load_jsonl
+from scripts.evaluate_decision_routes import RESULT_FORMAT_VERSION, dataset_sha256, file_sha256, load_cde_results, load_jsonl
 
 ROUTES=("fast","think","code","agent","long")
-RESULT_FORMAT_VERSION=2
 DEFAULT_CHECKPOINT_EVERY=10
 
 
