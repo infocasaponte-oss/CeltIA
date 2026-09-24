@@ -1,0 +1,8 @@
+#! 0-mini-council-namespace.yaml
+# Generated code, do not edit
+apiVersion: v1
+kind: Namespace
+metadata:
+    name: mini-council
+    labels:
+        com.docker.compose.project: mini-council

@@ -1,0 +1,1902 @@
+<!-- Copyright (c) 2026 Luis Manuel Cousido Hermida. All rights reserved. -->
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CeltIA</title>
+    <style>
+      :root {
+        --bg: #041a0d;
+        --bg-2: #0b3319;
+        --panel: rgba(6, 32, 17, 0.82);
+        --panel-strong: rgba(8, 40, 21, 0.96);
+        --primary: #35e07a;
+        --primary-soft: #9dffc2;
+        --secondary: #16a34a;
+        --muted: #7fd9a1;
+        --text: #d9ffe6;
+        --success: #6fe7b5;
+        --warning: #f7d57d;
+        --danger: #ff7a7a;
+        --border: rgba(53, 224, 122, 0.18);
+        --shadow: rgba(0,0,0,0.45);
+      }
+
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        padding: 0;
+        min-height: 100%;
+        background:
+          radial-gradient(circle at top, rgba(53, 224, 122, 0.18), transparent 30%),
+          radial-gradient(circle at right, rgba(53, 224, 122, 0.10), transparent 28%),
+          linear-gradient(145deg, var(--bg) 0%, var(--bg-2) 100%);
+        color: var(--text);
+        font-family: "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
+      }
+
+      body {
+        height: 100vh;
+        width: 100vw;
+        display: flex;
+        overflow: hidden;
+        padding: 0;
+      }
+
+      .app {
+        width: 100%;
+        height: 100%;
+        display: grid;
+        grid-template-columns: 240px 1fr;
+        background: rgba(4, 26, 13, 0.82);
+        border: none;
+        border-radius: 0;
+        overflow: hidden;
+        box-shadow: none;
+        backdrop-filter: blur(8px);
+        transition: grid-template-columns 0.2s ease;
+      }
+
+      .app.sidebar-collapsed { grid-template-columns: 64px 1fr; }
+
+      @media (max-width: 720px) {
+        .app { grid-template-columns: 64px 1fr; }
+        .app.sidebar-collapsed { grid-template-columns: 0 1fr; }
+      }
+
+      .sidebar {
+        background: linear-gradient(180deg, rgba(8, 40, 21, 0.85), rgba(3, 20, 10, 0.96));
+        border-right: 1px solid var(--border);
+        padding: 20px 14px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .brand-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .brand {
+        font-size: 1.35rem;
+        font-weight: 800;
+        letter-spacing: 0.02em;
+        color: var(--primary-soft);
+        white-space: nowrap;
+        overflow: hidden;
+      }
+
+      .collapse-btn {
+        border: none;
+        background: rgba(255,255,255,0.04);
+        color: var(--muted);
+        border-radius: 8px;
+        width: 28px;
+        height: 28px;
+        cursor: pointer;
+        flex-shrink: 0;
+        font-size: 0.9rem;
+      }
+
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.78rem;
+        color: var(--muted);
+        white-space: nowrap;
+        overflow: hidden;
+      }
+
+      .dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: var(--success);
+        box-shadow: 0 0 12px rgba(111, 231, 181, 0.9);
+        flex-shrink: 0;
+      }
+
+      .sidebar-nav {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border: none;
+        background: transparent;
+        color: var(--muted);
+        padding: 10px 12px;
+        border-radius: 12px;
+        font-weight: 700;
+        font-size: 0.9rem;
+        cursor: pointer;
+        text-align: left;
+        white-space: nowrap;
+        overflow: hidden;
+        transition: all 0.15s ease;
+      }
+
+      .nav-item .nav-icon { flex-shrink: 0; }
+
+      .nav-item:hover { background: rgba(255,255,255,0.04); }
+
+      .nav-item.active {
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        color: #161b2b;
+      }
+
+      .sidebar-collapsed .brand, .sidebar-collapsed .status span:not(.dot),
+      .sidebar-collapsed .nav-item span.nav-label { display: none; }
+
+      .main {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        min-height: 0;
+        background: rgba(5, 28, 15, 0.7);
+      }
+
+      .toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--border);
+        background: rgba(6, 30, 16, 0.65);
+      }
+
+      .toolbar h2 {
+        margin: 0;
+        font-size: 1.05rem;
+        color: var(--primary-soft);
+      }
+
+      .mode-select {
+        display: inline-flex;
+        gap: 8px;
+        background: rgba(255,255,255,0.02);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 6px;
+      }
+
+      .mode-button {
+        border: none;
+        background: transparent;
+        color: var(--muted);
+        padding: 9px 14px;
+        border-radius: 10px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .mode-button.active {
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        color: #161b2b;
+        box-shadow: 0 10px 32px rgba(53, 224, 122, 0.25);
+      }
+
+      .intensity-select {
+        display: inline-flex;
+        flex-direction: column;
+        gap: 4px;
+        background: rgba(255,255,255,0.02);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 8px 14px;
+        min-width: 180px;
+      }
+
+      .intensity-select input[type="range"] {
+        width: 100%;
+        accent-color: var(--primary);
+        cursor: pointer;
+      }
+
+      .intensity-ticks {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.72rem;
+        color: var(--muted);
+      }
+
+      .intensity-label { font-weight: 600; }
+      .intensity-label.active { color: var(--primary-soft); }
+
+      .view {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+
+      .view.scrollable { overflow-y: auto; padding: 20px; }
+
+      .chat-area {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        padding: 18px 20px 0;
+        gap: 16px;
+      }
+
+      .messages {
+        flex: 1;
+        padding: 16px;
+        background: rgba(255,255,255,0.02);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        overflow: auto;
+      }
+
+      .bubble {
+        max-width: 82%;
+        padding: 12px 14px;
+        border-radius: 16px;
+        margin-bottom: 12px;
+        line-height: 1.55;
+        white-space: pre-wrap;
+        font-size: 0.97rem;
+      }
+
+      .live-steps { font-size: 12px; opacity: .75; margin-bottom: 6px; }
+      .live-step.err { color: #e5484d; }
+      .live-step.done { opacity: .9; }
+      .bubble.user {
+        margin-left: auto;
+        background: linear-gradient(135deg, rgba(53,224,122,0.22), rgba(22,163,74,0.18));
+        border: 1px solid rgba(53,224,122,0.3);
+      }
+
+      .bubble.assistant {
+        background: rgba(255,255,255,0.03);
+        border: 1px solid var(--border);
+      }
+
+      .composer {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 12px;
+        padding: 18px 20px 20px;
+      }
+
+      textarea {
+        width: 100%;
+        min-height: 96px;
+        resize: vertical;
+        background: rgba(255,255,255,0.02);
+        border: 1px solid var(--border);
+        color: var(--text);
+        border-radius: 16px;
+        padding: 12px 14px;
+        font: inherit;
+        outline: none;
+      }
+
+      textarea:focus {
+        border-color: rgba(217,182,106,0.5);
+        box-shadow: 0 0 0 3px rgba(217,182,106,0.12);
+      }
+
+      .send-btn {
+        border: none;
+        border-radius: 16px;
+        padding: 0 24px;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        color: #151b2b;
+        font-weight: 800;
+        cursor: pointer;
+        min-width: 118px;
+        box-shadow: 0 14px 30px rgba(53, 224, 122, 0.18);
+      }
+
+      .send-btn:disabled { opacity: 0.7; cursor: wait; }
+
+      .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        margin-bottom: 18px;
+      }
+
+      .stat {
+        background: rgba(255,255,255,0.02);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 12px 10px;
+        min-height: 80px;
+      }
+
+      .stat-label {
+        display: block;
+        font-size: 0.7rem;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+        margin-bottom: 8px;
+        text-transform: uppercase;
+      }
+
+      .stat-value { font-size: 1.2rem; font-weight: 700; }
+
+      .panel {
+        background: rgba(255,255,255,0.02);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 16px;
+        margin-bottom: 18px;
+      }
+
+      .panel h4 {
+        margin: 0 0 12px;
+        font-size: 0.78rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .metric-list { display: grid; gap: 8px; }
+
+      .metric-item {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 0.9rem;
+      }
+
+      .key-form {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        padding: 0 0 18px;
+        flex-wrap: wrap;
+      }
+
+      .key-form input[type="text"] {
+        background: rgba(255,255,255,0.02);
+        border: 1px solid var(--border);
+        color: var(--text);
+        border-radius: 12px;
+        padding: 10px 12px;
+        font: inherit;
+        min-width: 220px;
+      }
+
+      .key-result {
+        font-size: 0.85rem;
+        color: var(--success);
+        margin-bottom: 12px;
+        word-break: break-all;
+      }
+
+      .key-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+        margin-bottom: 24px;
+      }
+
+      .key-table th, .key-table td {
+        text-align: left;
+        padding: 10px 8px;
+        border-bottom: 1px solid var(--border);
+        color: var(--muted);
+      }
+
+      .key-table td { color: var(--text); }
+
+      .key-table button {
+        border: none;
+        background: rgba(255,122,122,0.15);
+        color: var(--danger);
+        border-radius: 8px;
+        padding: 6px 10px;
+        cursor: pointer;
+        font-weight: 700;
+        font-size: 0.78rem;
+        margin-right: 6px;
+      }
+
+      .key-table button.credit-btn {
+        background: rgba(111,231,181,0.15);
+        color: var(--success);
+      }
+
+      .billing-note { color: var(--muted); font-size: 0.85rem; padding-bottom: 16px; }
+
+      .balance-bar-track {
+        width: 100%;
+        height: 14px;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.06);
+        overflow: hidden;
+        margin: 10px 0 6px;
+      }
+
+      .balance-bar-fill {
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, var(--danger), var(--warning), var(--success));
+      }
+
+      .conv-list { display: grid; gap: 8px; margin-bottom: 18px; }
+
+      .conv-item {
+        background: rgba(255,255,255,0.02);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 12px 14px;
+        cursor: pointer;
+        transition: border-color 0.15s ease;
+      }
+
+      .conv-item:hover { border-color: rgba(217,182,106,0.4); }
+
+      .conv-item .conv-meta { font-size: 0.75rem; color: var(--muted); margin-bottom: 4px; }
+      .conv-item .conv-preview { font-size: 0.88rem; }
+
+      .empty-state {
+        color: var(--muted);
+        font-size: 0.9rem;
+        text-align: center;
+        padding: 40px 20px;
+      }
+
+      @media (max-width: 900px) {
+        .app { grid-template-columns: 64px 1fr; }
+        .brand, .status span:not(.dot), .nav-item span.nav-label { display: none; }
+        .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.min.js"></script>
+  </head>
+  <body>
+    <div id="authGate" style="position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;background:rgba(10,12,16,0.92);backdrop-filter:blur(4px);">
+      <div style="width:100%;max-width:420px;background:var(--panel,#161922);border:1px solid var(--border,#262b38);border-radius:14px;padding:28px;color:var(--text,#e6e8ec);max-height:90vh;overflow-y:auto;">
+        <h2 style="margin-top:0;">CeltIA</h2>
+        <div style="display:flex;gap:8px;margin-bottom:16px;">
+          <button id="authTabLogin" class="nav-item active" style="flex:1;">Entrar</button>
+          <button id="authTabRegister" class="nav-item" style="flex:1;">Crear cuenta</button>
+        </div>
+
+        <div id="authOauthButtons" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
+          <button id="authGoogleBtn" type="button">Continuar con Google</button>
+          <button id="authGithubBtn" type="button">Continuar con GitHub</button>
+        </div>
+        <div style="text-align:center;color:var(--muted,#9aa2b1);font-size:0.8rem;margin-bottom:16px;">— o con correo —</div>
+
+        <form id="authForm" style="display:flex;flex-direction:column;gap:8px;">
+          <input id="authName" type="text" placeholder="Nombre" style="display:none;padding:8px;" />
+          <input id="authEmail" type="email" placeholder="Correo electrónico" required style="padding:8px;" />
+          <input id="authPassword" type="password" placeholder="Contraseña" required style="padding:8px;" />
+          <select id="authPlan" style="display:none;padding:8px;">
+            <option value="free">Free — tokens de prueba, sin tarjeta</option>
+            <option value="pro">Pro — cuota fija mensual, tokens incluidos</option>
+            <option value="payg">Pay-as-you-go — sin cuota, pagas lo que consumes</option>
+          </select>
+
+          <label style="display:flex;gap:8px;align-items:flex-start;font-size:0.82rem;margin-top:8px;">
+            <input id="authGdpr" type="checkbox" style="margin-top:3px;" />
+            <span>He leído y acepto la <a href="privacidad.html" target="_blank" rel="noopener">Política de Privacidad (RGPD)</a> y el tratamiento de mis datos para prestar el servicio.</span>
+          </label>
+          <label style="display:flex;gap:8px;align-items:flex-start;font-size:0.82rem;">
+            <input id="authCookies" type="checkbox" />
+            <span>Permitir cookies/almacenamiento analítico opcional (siempre se usa almacenamiento local necesario para mantener tu sesión).</span>
+          </label>
+
+          <button id="authSubmitBtn" type="submit" style="margin-top:10px;">Entrar</button>
+          <div id="authError" style="color:#f87171;font-size:0.82rem;min-height:1em;"></div>
+        </form>
+      </div>
+    </div>
+
+    <div class="app" id="appRoot">
+      <aside class="sidebar" id="sidebar">
+        <div class="brand-row">
+          <div class="brand">CeltIA</div>
+          <button class="collapse-btn" id="collapseBtn" title="Amosar/ocultar barra">☰</button>
+        </div>
+        <div class="status"><span class="dot"></span><span>Sistema local activo</span></div>
+
+        <nav class="sidebar-nav" id="sidebarNav">
+          <button class="nav-item active" data-view="chat"><span class="nav-icon">💬</span><span class="nav-label">Nuevo Chat</span></button>
+          <button class="nav-item" data-view="history"><span class="nav-icon">🕘</span><span class="nav-label">Historial</span></button>
+          <button class="nav-item" data-view="creator"><span class="nav-icon">🛠</span><span class="nav-label">Creador</span></button>
+          <button class="nav-item" data-view="user"><span class="nav-icon">👤</span><span class="nav-label">Usuario</span></button>
+          <button class="nav-item" data-view="settings"><span class="nav-icon">⚙️</span><span class="nav-label">Configuración</span></button>
+        </nav>
+        <a class="nav-item" href="privacidad.html" target="_blank" rel="noopener" style="text-decoration:none;"><span class="nav-icon">🔒</span><span class="nav-label">Privacidad</span></a>
+      </aside>
+
+      <main class="main">
+        <!-- Nuevo Chat -->
+        <div id="chatView" class="view">
+          <div class="toolbar">
+            <h2>Nuevo Chat</h2>
+            <div class="intensity-select" id="intensitySelect">
+              <input type="range" id="intensityRange" min="0" max="2" step="1" value="0" />
+              <div class="intensity-ticks">
+                <span class="intensity-label active" data-level="0">Baixo</span>
+                <span class="intensity-label" data-level="1">Medio</span>
+                <span class="intensity-label" data-level="2">Alto</span>
+              </div>
+            </div>
+          </div>
+          <div class="chat-area">
+            <div class="messages" id="messages">
+              <div class="bubble assistant">Bienvenido a CeltIA. Hazme una consulta, un cálculo, una corrección de código o un análisis más profundo y lo encaminaré con precisión.</div>
+            </div>
+          </div>
+          <div class="composer">
+            <textarea id="prompt" placeholder="Pregunta a CeltIA sobre razonamiento, código, planificación o herramientas..."></textarea>
+            <button class="send-btn" id="sendBtn">Enviar</button>
+          </div>
+        </div>
+
+        <!-- Historial -->
+        <div id="historyView" class="view scrollable" style="display:none">
+          <h2>Historial</h2>
+          <div id="historyList" class="conv-list"></div>
+          <div id="historyViewer" style="display:none">
+            <button class="send-btn" id="historyBackBtn" style="margin-bottom:14px">← Volver á lista</button>
+            <div class="messages" id="historyMessages" style="max-height:50vh"></div>
+            <button class="send-btn" id="historyContinueBtn" style="margin-top:14px">Continuar esta conversa</button>
+          </div>
+        </div>
+
+        <!-- Creador Studio -->
+        <div id="creatorView" class="view" style="display:none">
+          <div class="toolbar">
+            <h2>Creador Studio</h2>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <select id="creatorProjectSelect" style="background:rgba(255,255,255,0.03);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 10px;"></select>
+              <button class="send-btn" id="creatorNewProjectBtn" style="min-width:auto;padding:0 14px;">+ Proxecto</button>
+              <button class="send-btn" id="creatorDeleteProjectBtn" style="min-width:auto;padding:0 14px;background:transparent;border:1px solid var(--danger);color:var(--danger);">Eliminar</button>
+            </div>
+          </div>
+
+          <div id="creatorEmptyState" class="empty-state" style="padding:40px;text-align:center;">
+            Crea un proxecto para abrir o Studio: árbore de ficheiros, editor, vista previa en vivo e terminal.
+          </div>
+
+          <div id="creatorStudio" style="display:none;flex:1;min-height:0;flex-direction:column;">
+            <div style="flex:1;min-height:0;display:grid;grid-template-columns:200px 1fr 340px;gap:1px;background:var(--border);">
+              <div id="creatorFileTree" style="overflow-y:auto;background:rgba(0,0,0,0.15);padding:8px;font-size:0.85rem;"></div>
+              <div style="display:flex;flex-direction:column;min-width:0;min-height:0;">
+                <div id="creatorEditorTab" style="padding:6px 10px;font-size:0.8rem;color:var(--muted);border-bottom:1px solid var(--border);background:rgba(0,0,0,0.1);">Ningún ficheiro aberto</div>
+                <div id="creatorEditorHost" style="flex:1;min-height:0;"></div>
+              </div>
+              <div style="display:flex;flex-direction:column;background:rgba(0,0,0,0.1);">
+                <div style="padding:6px 10px;font-size:0.8rem;color:var(--muted);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">
+                  <span>Vista previa</span>
+                  <button id="creatorRefreshPreviewBtn" style="background:none;border:none;color:var(--primary-soft);cursor:pointer;">↻ Reiniciar</button>
+                </div>
+                <iframe id="creatorPreviewFrame" style="flex:1;border:none;background:#fff;"></iframe>
+              </div>
+            </div>
+
+            <div style="height:220px;display:flex;flex-direction:column;border-top:1px solid var(--border);">
+              <div style="display:flex;gap:4px;padding:6px 10px;border-bottom:1px solid var(--border);">
+                <button class="mode-button creator-tab active" data-tab="chat">Chat / Axente</button>
+                <button class="mode-button creator-tab" data-tab="logs">Logs</button>
+                <button class="mode-button creator-tab" data-tab="git">Git</button>
+              </div>
+              <div id="creatorTabChat" class="creator-tab-panel" style="flex:1;display:flex;flex-direction:column;min-height:0;padding:8px;gap:8px;">
+                <div class="messages" id="creatorMessages" style="flex:1;"></div>
+                <div class="composer" style="grid-template-columns:1fr auto;">
+                  <textarea id="creatorPrompt" placeholder="Ex: Créame un CRM pequeno para unha inmobiliaria..."></textarea>
+                  <button class="send-btn" id="creatorSendBtn">Enviar</button>
+                </div>
+              </div>
+              <div id="creatorTabLogs" class="creator-tab-panel" style="display:none;flex:1;overflow:auto;padding:10px;font-family:monospace;font-size:0.78rem;white-space:pre-wrap;"></div>
+              <div id="creatorTabGit" class="creator-tab-panel" style="display:none;flex:1;overflow:auto;padding:10px;">
+                <div style="display:flex;gap:8px;margin-bottom:8px;">
+                  <button class="send-btn" id="creatorGitStatusBtn" style="min-width:auto;padding:0 12px;">Status</button>
+                  <button class="send-btn" id="creatorGitDiffBtn" style="min-width:auto;padding:0 12px;">Diff</button>
+                  <input id="creatorCommitMsg" placeholder="Mensaxe de commit" style="flex:1;padding:6px;background:rgba(255,255,255,0.03);border:1px solid var(--border);color:var(--text);border-radius:6px;" />
+                  <button class="send-btn" id="creatorGitCommitBtn" style="min-width:auto;padding:0 12px;">Commit</button>
+                </div>
+                <pre id="creatorGitOutput" style="white-space:pre-wrap;font-size:0.78rem;color:var(--muted);"></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Usuario -->
+        <div id="userView" class="view scrollable" style="display:none">
+          <h2>Usuario</h2>
+          <div id="userContent"><p class="empty-state">Cargando...</p></div>
+        </div>
+
+        <!-- Configuración -->
+        <div id="settingsView" class="view scrollable" style="display:none">
+          <h2>Configuración</h2>
+
+          <div class="stat-grid">
+            <div class="stat"><span class="stat-label">Ruta</span><span class="stat-value" id="routeStat">fast</span></div>
+            <div class="stat"><span class="stat-label">Latencia</span><span class="stat-value" id="latencyStat">--</span></div>
+            <div class="stat"><span class="stat-label">Pasos</span><span class="stat-value" id="stepsStat">0</span></div>
+            <div class="stat"><span class="stat-label">Herramientas</span><span class="stat-value" id="toolsStat">0</span></div>
+          </div>
+
+          <div class="panel">
+            <h4>Métricas en vivo</h4>
+            <div class="metric-list">
+              <div class="metric-item"><span>Modelo</span><strong id="modelMetric">CeltIA V4</strong></div>
+              <div class="metric-item"><span>Contexto</span><strong>32K</strong></div>
+              <div class="metric-item"><span>Modo</span><strong id="modeMetric">fast</strong></div>
+              <div class="metric-item"><span>Verificador</span><strong id="verifyMetric">inactivo</strong></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h4>Clave de API</h4>
+            <p id="apiKeyDisplay" style="color:var(--muted);font-size:0.9rem">Ningunha clave gardada.</p>
+            <button class="send-btn" id="changeKeyBtn" style="min-width:auto;padding:0 18px">Cambiar clave</button>
+          </div>
+
+          <div class="panel" id="apiPanel">
+            <h4>API Keys para clientes externos</h4>
+            <p class="billing-note">Cada clave móstrase unha soa vez; só se garda o seu hash. Úsaa como <code>Authorization: Bearer sk_live_…</code>.</p>
+            <div style="display:flex;gap:8px;margin-bottom:10px">
+              <input id="ckName" placeholder="Nome da clave (p. ex. Produción)" maxlength="60" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border,#262b38);background:transparent;color:inherit">
+              <button class="send-btn" id="createKeyBtn" style="min-width:auto;padding:0 18px">+ Crear key</button>
+            </div>
+            <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;font-size:0.8rem;color:var(--muted)">
+              <label>Peticións/min <input id="newKeyRpm" type="number" min="1" placeholder="sen límite" style="width:100px;padding:5px;border-radius:6px;border:1px solid var(--border,#262b38);background:transparent;color:inherit"></label>
+              <label>Tokens/min <input id="newKeyTpm" type="number" min="1" placeholder="sen límite" style="width:100px;padding:5px;border-radius:6px;border:1px solid var(--border,#262b38);background:transparent;color:inherit"></label>
+              <label>Tokens/mes <input id="newKeyMonthly" type="number" min="1" placeholder="sen límite" style="width:110px;padding:5px;border-radius:6px;border:1px solid var(--border,#262b38);background:transparent;color:inherit"></label>
+            </div>
+            <div id="newKeyReveal" style="display:none;margin-bottom:10px;padding:10px;border-radius:8px;border:1px solid var(--accent,#3ddc84)">
+              <div style="font-size:0.85rem;margin-bottom:6px">Copia a clave agora, non volverá a mostrarse:</div>
+              <code id="newKeyValue" style="word-break:break-all"></code>
+              <button class="send-btn" id="copyKeyBtn" style="min-width:auto;padding:0 12px;margin-left:8px">Copiar</button>
+            </div>
+            <table style="width:100%;font-size:0.85rem;border-collapse:collapse">
+              <thead><tr style="text-align:left;color:var(--muted)"><th>Nome</th><th>Clave</th><th>Creada</th><th>Último uso</th><th>Límites propios</th><th></th></tr></thead>
+              <tbody id="clientKeysBody"></tbody>
+            </table>
+            <p class="empty-state" id="clientKeysEmpty" style="display:none">Aínda non tes claves.</p>
+          </div>
+
+          <div class="panel" id="usagePanel">
+            <h4>Consumo (últimos 30 días)</h4>
+            <div class="stat-grid" style="margin-bottom:10px">
+              <div class="stat"><span class="stat-label">Peticións</span><span class="stat-value" id="useReq">--</span></div>
+              <div class="stat"><span class="stat-label">Tokens</span><span class="stat-value" id="useTok">--</span></div>
+              <div class="stat"><span class="stat-label">Latencia media</span><span class="stat-value" id="useLat">--</span></div>
+              <div class="stat"><span class="stat-label">Saldo</span><span class="stat-value" id="useBal">--</span></div>
+            </div>
+            <div id="useBars" style="display:flex;align-items:flex-end;gap:3px;height:70px;margin-bottom:6px"></div>
+            <div id="monthBarWrap" style="display:none;margin-bottom:8px">
+              <div class="billing-note" id="monthLabel" style="padding-bottom:4px"></div>
+              <div style="height:8px;border-radius:4px;background:rgba(255,255,255,0.08);overflow:hidden"><div id="monthBar" style="height:100%;width:0;background:var(--accent,#3ddc84)"></div></div>
+            </div>
+            <div class="billing-note" id="useLimits"></div>
+            <h4 style="margin-top:12px">Por clave</h4>
+            <table style="width:100%;font-size:0.85rem;border-collapse:collapse">
+              <thead><tr style="text-align:left;color:var(--muted)"><th>Clave</th><th>Peticións</th><th>Tokens</th></tr></thead>
+              <tbody id="useByKeyBody"></tbody>
+            </table>
+            <details><summary style="cursor:pointer;color:var(--muted);font-size:0.85rem">Exemplo de uso (curl)</summary>
+              <pre id="curlExample" style="white-space:pre-wrap;font-size:0.78rem"></pre>
+            </details>
+          </div>
+
+          <div class="panel">
+            <h4>Personalización</h4>
+            <p style="color:var(--muted);font-size:0.85rem;margin-top:-6px;">Estas preferencias se guardan por rol de usuario en este navegador.</p>
+            <div style="display:flex;flex-direction:column;gap:14px;margin-top:10px;">
+              <label style="display:flex;flex-direction:column;gap:6px;font-size:0.85rem;">
+                Tono principal (verde terminal, claro → oscuro)
+                <input type="range" id="themeShadeRange" min="0" max="100" value="45" />
+              </label>
+              <label style="display:flex;flex-direction:column;gap:6px;font-size:0.85rem;">
+                Color de acento
+                <input type="color" id="themeAccentColor" value="#35e07a" style="width:60px;height:32px;padding:0;border:none;background:none;cursor:pointer;" />
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:0.85rem;">
+                <input type="checkbox" id="themeLightMode" />
+                Modo brillo (fondo claro en vez de oscuro)
+              </label>
+              <div style="display:flex;gap:8px;">
+                <button class="send-btn" id="themeApplyBtn" style="min-width:auto;padding:0 18px;">Aplicar</button>
+                <button class="send-btn" id="themeResetBtn" style="min-width:auto;padding:0 18px;background:transparent;border:1px solid var(--border);">Restablecer</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script>
+      const apiBase = location.port === '4173' ? 'http://localhost:8080' : location.origin;
+
+      // ---------- API key / admin token helpers ----------
+      function getApiKey() {
+        const key = localStorage.getItem('celtia_api_key');
+        if (!key) {
+          showAuthGate();
+          throw new Error('auth-required');
+        }
+        return key.trim();
+      }
+
+      // ---------- Auth gate (login / register / OAuth / RGPD & cookie consent) ----------
+      let authMode = 'login';
+      function showAuthGate() {
+        document.getElementById('authGate').style.display = 'flex';
+      }
+      function hideAuthGate() {
+        document.getElementById('authGate').style.display = 'none';
+      }
+      function setAuthMode(mode) {
+        authMode = mode;
+        document.getElementById('authTabLogin').classList.toggle('active', mode === 'login');
+        document.getElementById('authTabRegister').classList.toggle('active', mode === 'register');
+        document.getElementById('authName').style.display = mode === 'register' ? 'block' : 'none';
+        document.getElementById('authPlan').style.display = mode === 'register' ? 'block' : 'none';
+        document.getElementById('authSubmitBtn').textContent = mode === 'register' ? 'Crear cuenta' : 'Entrar';
+        document.getElementById('authError').textContent = '';
+      }
+
+      function initAuthGate() {
+        // OAuth redirect returns the new key as a URL fragment: #key=...
+        const hashMatch = location.hash.match(/key=([^&]+)/);
+        if (hashMatch) {
+          localStorage.setItem('celtia_api_key', decodeURIComponent(hashMatch[1]));
+          history.replaceState(null, '', location.pathname + location.search);
+        }
+        if (!localStorage.getItem('celtia_api_key')) {
+          showAuthGate();
+        }
+        if (location.hash.includes('billing=success')) {
+          history.replaceState(null, '', location.pathname + location.search);
+          window.addEventListener('load', () => alert('Pago confirmado: tu cuenta ya es premium y se han añadido tus tokens.'));
+        }
+
+        document.getElementById('authTabLogin').addEventListener('click', () => setAuthMode('login'));
+        document.getElementById('authTabRegister').addEventListener('click', () => setAuthMode('register'));
+
+        function oauthUrl(provider) {
+          const gdpr = document.getElementById('authGdpr').checked;
+          const analytics = document.getElementById('authCookies').checked;
+          if (!gdpr) {
+            document.getElementById('authError').textContent = 'Debes aceptar la Política de Privacidad (RGPD) para continuar.';
+            return null;
+          }
+          return `${apiBase}/auth/${provider}/start?gdpr_accepted=true&analytics=${analytics}`;
+        }
+        document.getElementById('authGoogleBtn').addEventListener('click', () => {
+          const url = oauthUrl('google');
+          if (url) location.href = url;
+        });
+        document.getElementById('authGithubBtn').addEventListener('click', () => {
+          const url = oauthUrl('github');
+          if (url) location.href = url;
+        });
+
+        document.getElementById('authForm').addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const errEl = document.getElementById('authError');
+          errEl.textContent = '';
+          const email = document.getElementById('authEmail').value.trim();
+          const password = document.getElementById('authPassword').value;
+          try {
+            if (authMode === 'register') {
+              const name = document.getElementById('authName').value.trim() || email;
+              const gdpr = document.getElementById('authGdpr').checked;
+              const analytics = document.getElementById('authCookies').checked;
+              if (!gdpr) { errEl.textContent = 'Debes aceptar la Política de Privacidad (RGPD) para continuar.'; return; }
+              const plan = document.getElementById('authPlan').value;
+              const res = await fetch(`${apiBase}/auth/register`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, email, password, gdpr_accepted: gdpr, cookies: { necessary: true, analytics }, plan })
+              });
+              if (!res.ok) { const d = await res.json().catch(() => ({})); errEl.textContent = d.detail || 'No se pudo crear la cuenta.'; return; }
+              const data = await res.json();
+              localStorage.setItem('celtia_api_key', data.api_key);
+              if (data.checkout_url) {
+                location.href = data.checkout_url;
+                return;
+              }
+            } else {
+              const res = await fetch(`${apiBase}/auth/login`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+              });
+              if (!res.ok) { const d = await res.json().catch(() => ({})); errEl.textContent = d.detail || 'Correo o contraseña incorrectos.'; return; }
+              const data = await res.json();
+              localStorage.setItem('celtia_api_key', data.api_key);
+            }
+            hideAuthGate();
+            location.reload();
+          } catch (err) {
+            errEl.textContent = 'No se pudo conectar con el servidor.';
+          }
+        });
+      }
+      initAuthGate();
+
+
+      // ---------- Adxuntos (paperclip) para todas as barras de chat ----------
+      const MAX_ATTACH_TOTAL_CHARS = 8000; // o modelo local ten unha xanela de contexto pequena
+      function setupAttachments(composer, promptEl) {
+        const files = []; // { name, text, truncated }
+        const input = document.createElement('input');
+        input.type = 'file'; input.multiple = true; input.style.display = 'none';
+
+        const btn = document.createElement('button');
+        btn.type = 'button'; btn.className = 'send-btn'; btn.textContent = '📎'; btn.title = 'Adxuntar arquivos (PDF, DOCX, XLSX, texto, código, CSV, JSON…)';
+        btn.style.cssText = 'min-width:auto;padding:0 14px;background:transparent;border:1px solid var(--border,#262b38)';
+        btn.addEventListener('click', () => input.click());
+
+        const chips = document.createElement('div');
+        chips.style.cssText = 'display:none;flex-wrap:wrap;gap:6px;padding:0 20px 6px;font-size:0.8rem';
+
+        composer.style.gridTemplateColumns = 'auto 1fr auto';
+        composer.insertBefore(btn, composer.firstChild);
+        composer.appendChild(input);
+        composer.parentNode.insertBefore(chips, composer);
+
+        function renderChips() {
+          chips.replaceChildren();
+          chips.style.display = files.length ? 'flex' : 'none';
+          files.forEach((f, i) => {
+            const chip = document.createElement('span');
+            chip.style.cssText = 'padding:3px 8px;border-radius:12px;border:1px solid var(--border,#262b38);background:rgba(255,255,255,0.05)';
+            chip.textContent = `📎 ${f.name}${f.truncated ? ' (recortado)' : ''} `;
+            const x = document.createElement('a');
+            x.textContent = '✕'; x.style.cssText = 'cursor:pointer;margin-left:4px';
+            x.addEventListener('click', () => { files.splice(i, 1); renderChips(); });
+            chip.appendChild(x);
+            chips.appendChild(chip);
+          });
+        }
+
+        async function upload(file) {
+          const body = new FormData();
+          body.append('file', file);
+          const res = await fetch(`${apiBase}/v1/files/extract`, {
+            method: 'POST', headers: { Authorization: `Bearer ${getApiKey()}` }, body,
+          });
+          if (res.status === 401) throw sessionExpired();
+          if (!res.ok) {
+            let detail = `erro ${res.status}`;
+            try { detail = (await res.json()).detail || detail; } catch (_) {}
+            throw new Error(detail);
+          }
+          return res.json();
+        }
+
+        input.addEventListener('change', async () => {
+          const picked = Array.from(input.files);
+          input.value = '';
+          btn.disabled = true;
+          for (const file of picked) {
+            btn.textContent = '⏳';
+            try { files.push(await upload(file)); }
+            catch (err) { if (err.message !== 'unauthorized') alert(`${file.name}: ${err.message}`); }
+          }
+          btn.textContent = '📎'; btn.disabled = false;
+          renderChips();
+          promptEl.focus();
+        });
+
+        return {
+          count: () => files.length,
+          // Devolve o texto a antepoñer á mensaxe e os nomes; baleira os adxuntos.
+          consume() {
+            if (!files.length) return { prefix: '', names: [] };
+            let budget = MAX_ATTACH_TOTAL_CHARS;
+            const blocks = files.map((f) => {
+              const t = f.text.slice(0, Math.max(0, budget));
+              budget -= t.length;
+              return `[Arquivo adxunto: ${f.name}]\n${t}\n[Fin do arquivo]`;
+            });
+            const names = files.map((f) => f.name);
+            files.length = 0; renderChips();
+            return { prefix: blocks.join('\n\n') + '\n\n', names };
+          },
+        };
+      }
+
+      // Session expired / key revoked: forget it and send the user back to the login gate.
+      function sessionExpired() {
+        localStorage.removeItem('celtia_api_key');
+        showAuthGate();
+        return new Error('unauthorized');
+      }
+
+      async function meFetch(path, options = {}) {
+        const key = getApiKey();
+        const res = await fetch(`${apiBase}${path}`, {
+          ...options,
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}`, ...(options.headers || {}) }
+        });
+        if (res.status === 401) throw sessionExpired();
+        if (!res.ok) throw new Error(`request failed: ${res.status}`);
+        return res.json();
+      }
+
+      async function adminFetch(path, options = {}) {
+        const key = getApiKey();
+        const res = await fetch(`${apiBase}${path}`, {
+          ...options,
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}`, ...(options.headers || {}) }
+        });
+        if (res.status === 401) throw sessionExpired();
+        if (res.status === 403) throw new Error('Esta acción require unha conta de administrador.');
+        if (!res.ok) throw new Error(`request failed: ${res.status}`);
+        return res.json();
+      }
+
+
+      // ---------- API Keys + consumo ----------
+      function fmtDate(v) { return v ? String(v).slice(0, 16).replace('T', ' ') : '—'; }
+
+      async function loadApiPanel() {
+        const body = document.getElementById('clientKeysBody');
+        try {
+          const [{ keys }, usage] = await Promise.all([meFetch('/v1/me/keys'), meFetch('/v1/me/usage?days=30')]);
+          body.replaceChildren();
+          const active = keys.filter((k) => !k.revoked);
+          document.getElementById('clientKeysEmpty').style.display = active.length ? 'none' : '';
+          active.forEach((k) => {
+            const tr = document.createElement('tr');
+            const kl = k.limits || {};
+            const limitTxt = [kl.requests_per_minute && `${kl.requests_per_minute} req/min`,
+              kl.tokens_per_minute && `${kl.tokens_per_minute.toLocaleString()} tok/min`,
+              kl.monthly_tokens && `${k.month_tokens.toLocaleString()}/${kl.monthly_tokens.toLocaleString()} tok/mes`]
+              .filter(Boolean).join(' · ') || 'só os do rol';
+            [k.name, k.prefix, fmtDate(k.created_at), fmtDate(k.last_used_at), limitTxt].forEach((t) => {
+              const td = document.createElement('td'); td.style.padding = '4px 6px'; td.textContent = t; tr.appendChild(td);
+            });
+            const td = document.createElement('td');
+            const editBtn = document.createElement('button');
+            editBtn.className = 'send-btn'; editBtn.style.cssText = 'min-width:auto;padding:0 10px;height:28px;margin-right:6px'; editBtn.textContent = 'Límites';
+            editBtn.addEventListener('click', async () => {
+              const ask = (label, cur) => {
+                const v = window.prompt(`${label} (baleiro = sen límite)`, cur ?? '');
+                if (v === null) return undefined;
+                const n = parseInt(v, 10);
+                return v.trim() === '' ? null : (Number.isFinite(n) && n > 0 ? n : undefined);
+              };
+              const rpm = ask('Peticións por minuto', kl.requests_per_minute); if (rpm === undefined) return;
+              const tpm = ask('Tokens por minuto', kl.tokens_per_minute); if (tpm === undefined) return;
+              const monthly = ask('Tokens por mes', kl.monthly_tokens); if (monthly === undefined) return;
+              try {
+                await meFetch(`/v1/me/keys/${k.id}/limits`, { method: 'POST',
+                  body: JSON.stringify({ requests_per_minute: rpm, tokens_per_minute: tpm, monthly_tokens: monthly }) });
+              } catch (e) { alert('Non se puido gardar: ' + e.message); }
+              loadApiPanel();
+            });
+            td.appendChild(editBtn);
+            const btn = document.createElement('button');
+            btn.className = 'send-btn'; btn.style.cssText = 'min-width:auto;padding:0 10px;height:28px'; btn.textContent = 'Revogar';
+            btn.addEventListener('click', async () => {
+              if (!confirm(`Revogar a clave "${k.name}"? Os clientes que a usen deixarán de funcionar.`)) return;
+              try { await meFetch(`/v1/me/keys/${k.id}`, { method: 'DELETE' }); } catch (e) { alert('Non se puido revogar: ' + e.message); }
+              loadApiPanel();
+            });
+            td.appendChild(btn); tr.appendChild(td); body.appendChild(tr);
+          });
+          document.getElementById('useReq').textContent = usage.requests;
+          document.getElementById('useTok').textContent = usage.total_tokens.toLocaleString();
+          document.getElementById('useLat').textContent = usage.avg_latency_ms != null ? `${usage.avg_latency_ms} ms` : '--';
+          document.getElementById('useBal').textContent = usage.token_balance == null ? 'ilimitado' : usage.token_balance.toLocaleString();
+          const bars = document.getElementById('useBars');
+          bars.replaceChildren();
+          const max = Math.max(1, ...usage.daily.map((d) => d.tokens));
+          usage.daily.forEach((d) => {
+            const bar = document.createElement('div');
+            bar.title = `${d.date}: ${d.requests} peticións, ${d.tokens} tokens`;
+            bar.style.cssText = `flex:1;min-width:4px;background:var(--accent,#3ddc84);border-radius:2px 2px 0 0;height:${Math.max(4, Math.round((d.tokens / max) * 70))}px`;
+            bars.appendChild(bar);
+          });
+          const l = usage.limits;
+          document.getElementById('useLimits').textContent =
+            `Límites: ${l.requests_per_minute} peticións/min · ${l.tokens_per_minute.toLocaleString()} tokens/min · ${l.concurrent_requests} simultáneas · máx. ${l.max_tokens_per_request} tokens/resposta`;
+          const wrap = document.getElementById('monthBarWrap');
+          if (l.monthly_tokens) {
+            wrap.style.display = '';
+            document.getElementById('monthLabel').textContent =
+              `Cota mensual: ${usage.month_tokens.toLocaleString()} / ${l.monthly_tokens.toLocaleString()} tokens`;
+            document.getElementById('monthBar').style.width = Math.min(100, (usage.month_tokens / l.monthly_tokens) * 100) + '%';
+          } else { wrap.style.display = 'none'; }
+          const byKey = document.getElementById('useByKeyBody');
+          byKey.replaceChildren();
+          usage.by_key.forEach((r) => {
+            const tr = document.createElement('tr');
+            [r.prefix ? `${r.name} (${r.prefix})` : r.name, r.requests, r.tokens.toLocaleString()].forEach((t) => {
+              const td = document.createElement('td'); td.style.padding = '4px 6px'; td.textContent = t; tr.appendChild(td);
+            });
+            byKey.appendChild(tr);
+          });
+          document.getElementById('curlExample').textContent =
+            'curl ' + apiBase + '/v1/chat/completions \\\n  -H "Authorization: Bearer sk_live_..." \\\n  -H "Content-Type: application/json" \\\n  -d \'{"messages":[{"role":"user","content":"Hola"}]}\'';
+        } catch (err) {
+          body.replaceChildren();
+          document.getElementById('useLimits').textContent = 'Erro cargando as claves: ' + err.message;
+        }
+      }
+
+      document.getElementById('createKeyBtn').addEventListener('click', async () => {
+        const input = document.getElementById('ckName');
+        const name = input.value.trim();
+        if (!name) { input.focus(); return; }
+        try {
+          const num = (id) => { const v = parseInt(document.getElementById(id).value, 10); return Number.isFinite(v) && v > 0 ? v : null; };
+          const created = await meFetch('/v1/me/keys', { method: 'POST', body: JSON.stringify({
+            name, requests_per_minute: num('newKeyRpm'), tokens_per_minute: num('newKeyTpm'), monthly_tokens: num('newKeyMonthly') }) });
+          input.value = '';
+          ['newKeyRpm', 'newKeyTpm', 'newKeyMonthly'].forEach((id) => { document.getElementById(id).value = ''; });
+          document.getElementById('newKeyValue').textContent = created.api_key;
+          document.getElementById('newKeyReveal').style.display = '';
+          loadApiPanel();
+        } catch (err) { alert('Non se puido crear a clave: ' + err.message); }
+      });
+      document.getElementById('copyKeyBtn').addEventListener('click', () => {
+        navigator.clipboard?.writeText(document.getElementById('newKeyValue').textContent);
+      });
+
+      // ---------- Sidebar navigation ----------
+      const appRoot = document.getElementById('appRoot');
+      const views = {
+        chat: document.getElementById('chatView'),
+        history: document.getElementById('historyView'),
+        creator: document.getElementById('creatorView'),
+        user: document.getElementById('userView'),
+        settings: document.getElementById('settingsView'),
+      };
+
+      document.getElementById('collapseBtn').addEventListener('click', () => {
+        appRoot.classList.toggle('sidebar-collapsed');
+      });
+
+      document.querySelectorAll('.nav-item[data-view]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const wasActive = btn.classList.contains('active');
+          document.querySelectorAll('.nav-item[data-view]').forEach((b) => b.classList.toggle('active', b === btn));
+          const target = btn.dataset.view;
+          Object.entries(views).forEach(([name, el]) => { el.style.display = name === target ? '' : 'none'; });
+          if (target === 'chat' && wasActive) startNewMainChat();
+          if (target === 'creator') loadCreatorProjects();
+          if (target === 'history') loadHistory();
+          if (target === 'user') loadUserView();
+          if (target === 'settings') { refreshApiKeyDisplay(); loadApiPanel(); }
+        });
+      });
+
+      // ---------- Intensity slider (Nuevo Chat) ----------
+      const intensityRange = document.getElementById('intensityRange');
+      const intensityModes = ['fast', 'think', 'long'];
+      const modeMetric = document.getElementById('modeMetric');
+      let mainMode = 'fast';
+
+      function setIntensityActive(level) {
+        document.querySelectorAll('.intensity-label').forEach((label) => {
+          label.classList.toggle('active', Number(label.dataset.level) === level);
+        });
+      }
+
+      intensityRange.addEventListener('input', () => {
+        const level = Number(intensityRange.value);
+        mainMode = intensityModes[level];
+        setIntensityActive(level);
+        modeMetric.textContent = mainMode;
+      });
+
+      // ---------- Generic chat controller (used by Nuevo Chat and Creador) ----------
+      function createChatController({ messagesId, promptId, sendBtnId, sessionId, getMode }) {
+        const messagesEl = document.getElementById(messagesId);
+        const promptEl = document.getElementById(promptId);
+        const sendBtn = document.getElementById(sendBtnId);
+        let currentSession = sessionId;
+        const attach = setupAttachments(promptEl.closest('.composer'), promptEl);
+
+        function addMessage(role, content) {
+          const bubble = document.createElement('div');
+          bubble.className = `bubble ${role}`;
+          bubble.textContent = content;
+          messagesEl.appendChild(bubble);
+          messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        async function submitPrompt() {
+          if (sendBtn.disabled) return;
+          let text = promptEl.value.trim();
+          if (!text && !attach.count()) return;
+          if (!text) text = 'Analiza os arquivos adxuntos.';
+          const att = attach.consume();
+          addMessage('user', att.names.length ? `${text}\n📎 ${att.names.join(', ')}` : text);
+          promptEl.value = '';
+          const started = Date.now();
+          const payload = {
+            model: 'CeltIA V4',
+            messages: [{ role: 'user', content: att.prefix + text }],
+            mode: getMode(),
+            session_id: currentSession,
+          };
+
+          sendBtn.disabled = true;
+          addMessage('assistant', 'Pensando…');
+
+          try {
+            const apiKey = getApiKey();
+            const res = await fetch(`${apiBase}/v1/chat/completions/stream`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) },
+              body: JSON.stringify(payload),
+            });
+            if (res.status === 401) throw sessionExpired();
+            if (res.status === 402) throw new Error('no-balance');
+
+            const lastAssistant = messagesEl.querySelector('.bubble.assistant:last-of-type');
+            lastAssistant.textContent = '';
+            const liveEl = document.createElement('div');
+            liveEl.className = 'live-steps';
+            const answerEl = document.createElement('div');
+            lastAssistant.append(liveEl, answerEl);
+            const addLive = (text, cls) => {
+              const line = document.createElement('div');
+              line.className = `live-step ${cls || ''}`;
+              line.textContent = text;
+              liveEl.appendChild(line);
+              messagesEl.scrollTop = messagesEl.scrollHeight;
+            };
+
+            let data = null;
+            let streamError = null;
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            const handle = (ev) => {
+              if (ev.type === 'status') addLive('🤔 ' + ev.text);
+              else if (ev.type === 'tool_start') addLive(`🔧 Usando ${ev.name}${ev.args?.query ? ': ' + ev.args.query : ''}`);
+              else if (ev.type === 'tool_result') addLive(ev.ok ? `✅ ${ev.name} completado` : `⚠️ ${ev.name} falló`, ev.ok ? '' : 'err');
+              else if (ev.type === 'token') { answerEl.textContent += ev.text; messagesEl.scrollTop = messagesEl.scrollHeight; }
+              else if (ev.type === 'token_reset') answerEl.textContent = '';
+              else if (ev.type === 'chunk') data = ev.data;
+              else if (ev.type === 'error') streamError = ev;
+            };
+            for (;;) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+              let idx;
+              while ((idx = buffer.indexOf('\n\n')) >= 0) {
+                const frame = buffer.slice(0, idx).trim();
+                buffer = buffer.slice(idx + 2);
+                if (!frame.startsWith('data:')) continue;
+                const body = frame.slice(5).trim();
+                if (body === '[DONE]') continue;
+                try { handle(JSON.parse(body)); } catch (_) {}
+              }
+            }
+            if (streamError) {
+              if (streamError.status === 401) throw sessionExpired();
+              if (streamError.status === 402) throw new Error('no-balance');
+              throw new Error(streamError.detail || 'stream-error');
+            }
+            const finalAnswer = data?.choices?.[0]?.message?.content || 'No se devolvió ninguna respuesta.';
+            const latency = Date.now() - started;
+            answerEl.textContent = finalAnswer;
+            if (liveEl.children.length) {
+              const summary = document.createElement('div');
+              summary.className = 'live-step done';
+              summary.textContent = `✔ Listo en ${(latency / 1000).toFixed(1)} s`;
+              liveEl.appendChild(summary);
+            }
+
+            document.getElementById('routeStat').textContent = data?.metadata?.route || getMode();
+            document.getElementById('latencyStat').textContent = `${latency} ms`;
+            document.getElementById('stepsStat').textContent = String(data?.metadata?.steps || 0);
+            document.getElementById('toolsStat').textContent = String(data?.metadata?.tool_calls || 0);
+            document.getElementById('verifyMetric').textContent = data?.metadata?.verified ? 'verificado' : 'no ejecutado';
+          } catch (err) {
+            const lastAssistant = messagesEl.querySelector('.bubble.assistant:last-of-type');
+            let message = 'La solicitud falló. Comprueba que la API local esté activa en el puerto 8080.';
+            if (err?.message === 'unauthorized') {
+              message = 'A sesión caducou ou a clave foi revogada. Inicia sesión de novo.';
+            } else if (err?.message === 'no-prompt-support') {
+              message = 'Este visor (p.ex. o Simple Browser de VS Code) non permite pedir a clave de API mediante unha xanela emerxente. Abre esta páxina nun navegador normal.';
+            } else if (err?.message === 'no-balance') {
+              message = 'Sen saldo de tokens dispoñible. Recarga a túa conta na pestana Usuario.';
+            }
+            if (lastAssistant) lastAssistant.textContent = message;
+          } finally {
+            sendBtn.disabled = false;
+          }
+        }
+
+        sendBtn.addEventListener('click', submitPrompt);
+        promptEl.addEventListener('keydown', (event) => {
+          const shouldSubmit = event.key === 'Enter' && !event.shiftKey;
+          if (shouldSubmit || ((event.ctrlKey || event.metaKey) && event.key === 'Enter')) {
+            event.preventDefault();
+            submitPrompt();
+          }
+        });
+
+        return {
+          setSession(id) { currentSession = id; },
+          clearMessages() { messagesEl.innerHTML = ''; },
+          addMessage,
+        };
+      }
+
+      function newSessionId() {
+        return 'sess-' + (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2));
+      }
+
+      const mainChat = createChatController({
+        messagesId: 'messages', promptId: 'prompt', sendBtnId: 'sendBtn',
+        sessionId: newSessionId(), getMode: () => mainMode,
+      });
+
+      function startNewMainChat() {
+        mainChat.clearMessages();
+        mainChat.setSession(newSessionId());
+        mainChat.addMessage('assistant', 'Benvido a CeltIA. Fai unha consulta, un cálculo, unha corrección de código ou unha análise máis profunda.');
+      }
+
+      // ---------- Historial ----------
+      async function loadHistory() {
+        const list = document.getElementById('historyList');
+        const viewer = document.getElementById('historyViewer');
+        viewer.style.display = 'none';
+        list.style.display = '';
+        list.innerHTML = '<p class="empty-state">Cargando...</p>';
+        try {
+          const data = await meFetch('/v1/conversations');
+          if (!data.conversations.length) {
+            list.innerHTML = '<p class="empty-state">Aínda non tes conversas gardadas.</p>';
+            return;
+          }
+          list.innerHTML = '';
+          data.conversations.forEach((c) => {
+            const div = document.createElement('div');
+            div.className = 'conv-item';
+            div.style.position = 'relative';
+            div.innerHTML = `<div class="conv-meta">${c.last_at} · ${c.message_count} mensaxes</div>` +
+              `<div class="conv-preview">${(c.last_message || '').slice(0, 140)}</div>` +
+              `<button class="conv-delete-btn" title="Eliminar conversa" style="position:absolute;top:8px;right:8px;border:none;background:transparent;color:var(--danger);cursor:pointer;font-size:1rem;">🗑</button>`;
+            div.addEventListener('click', (e) => {
+              if (e.target.closest('.conv-delete-btn')) return;
+              openConversation(c.session_id);
+            });
+            div.querySelector('.conv-delete-btn').addEventListener('click', async (e) => {
+              e.stopPropagation();
+              if (!confirm('¿Eliminar esta conversa definitivamente?')) return;
+              try {
+                await meFetch(`/v1/conversations/${encodeURIComponent(c.session_id)}`, { method: 'DELETE' });
+                loadHistory();
+              } catch (err) {
+                alert('Non se puido eliminar a conversa.');
+              }
+            });
+            list.appendChild(div);
+          });
+        } catch (err) {
+          if (err.message.includes('403')) {
+            list.innerHTML = '<p class="empty-state">O teu plan actual non inclúe historial de conversas. Pasa a premium para gardar e recuperar conversas.</p>';
+          } else {
+            list.innerHTML = `<p class="empty-state">Erro cargando o historial: ${err.message}</p>`;
+          }
+        }
+      }
+
+      async function openConversation(sessionId) {
+        const list = document.getElementById('historyList');
+        const viewer = document.getElementById('historyViewer');
+        const historyMessages = document.getElementById('historyMessages');
+        try {
+          const data = await meFetch(`/v1/conversations/${encodeURIComponent(sessionId)}`);
+          list.style.display = 'none';
+          viewer.style.display = '';
+          historyMessages.innerHTML = '';
+          data.messages.forEach((m) => {
+            const bubble = document.createElement('div');
+            bubble.className = `bubble ${m.role === 'user' ? 'user' : 'assistant'}`;
+            bubble.textContent = m.content;
+            historyMessages.appendChild(bubble);
+          });
+          document.getElementById('historyContinueBtn').onclick = () => {
+            mainChat.setSession(sessionId);
+            document.querySelector('.nav-item[data-view="chat"]').click();
+          };
+        } catch (err) {
+          historyMessages.innerHTML = `<p class="empty-state">Erro cargando a conversa: ${err.message}</p>`;
+        }
+      }
+
+      document.getElementById('historyBackBtn').addEventListener('click', () => {
+        document.getElementById('historyViewer').style.display = 'none';
+        document.getElementById('historyList').style.display = '';
+      });
+
+      // ---------- Usuario (role-aware) ----------
+      async function loadUserView() {
+        const content = document.getElementById('userContent');
+        content.innerHTML = '<p class="empty-state">Cargando...</p>';
+        let me;
+        try {
+          me = await meFetch('/v1/me');
+        } catch (err) {
+          content.innerHTML = `<p class="empty-state">Erro cargando a conta: ${err.message}</p>`;
+          return;
+        }
+
+        if (me.role === 'admin') {
+          renderAdminPanel(content);
+          return;
+        }
+
+        const balanceHtml = me.token_balance_max
+          ? `<div class="panel"><h4>Saldo de tokens</h4>
+              <div class="balance-bar-track"><div class="balance-bar-fill" style="width:${Math.max(0, Math.min(100, (me.token_balance / me.token_balance_max) * 100))}%"></div></div>
+              <div style="color:var(--muted);font-size:0.85rem">${me.token_balance} / ${me.token_balance_max} tokens</div>
+            </div>`
+          : '';
+
+        content.innerHTML = `
+          <div class="panel">
+            <h4>Conta</h4>
+            <div class="metric-list">
+              <div class="metric-item"><span>Nome</span><strong>${me.name}</strong></div>
+              <div class="metric-item"><span>Rol</span><strong>${me.role}</strong></div>
+              <div class="metric-item"><span>Creada</span><strong>${me.created_at}</strong></div>
+              <div class="metric-item"><span>Historial</span><strong>${me.history_enabled ? 'Activado' : 'Non incluído'}</strong></div>
+            </div>
+          </div>
+          <div class="panel">
+            <h4>Facturación</h4>
+            <div class="metric-list">
+              <div class="metric-item"><span>Uso total (tokens)</span><strong>${me.usage.total_tokens}</strong></div>
+              <div class="metric-item"><span>Peticións</span><strong>${me.usage.requests}</strong></div>
+              <div class="metric-item"><span>Subscrición Stripe</span><strong>${me.subscription_status || (me.stripe_customer_id ? 'descoñecido' : 'sen subscrición')}</strong></div>
+            </div>
+          </div>
+          ${balanceHtml}
+        `;
+      }
+
+      function renderAdminPanel(content) {
+        content.innerHTML = `
+          <div class="panel">
+            <h4>Usuarios</h4>
+            <p class="billing-note">Cambia o rol, activa/desactiva contas ou restablece o contrasinal.</p>
+            <table class="key-table">
+              <thead><tr><th>Nome</th><th>Email</th><th>Rol</th><th>Activa</th><th>Creada</th><th></th></tr></thead>
+              <tbody id="usersTableBody"></tbody>
+            </table>
+          </div>
+          <div class="panel">
+            <h4>Claves API</h4>
+            <form id="createKeyForm" class="key-form">
+              <input type="text" id="newKeyName" placeholder="Nombre da nova clave" required />
+              <select id="newKeyRole">
+                <option value="user">user — chat sen historial</option>
+                <option value="premium">premium — historial + suite de código</option>
+                <option value="admin">admin — acceso total ao sistema</option>
+              </select>
+              <button type="submit" class="send-btn" style="min-width:auto;padding:0 18px">Crear clave</button>
+            </form>
+            <div id="newKeyResult" class="key-result"></div>
+            <table class="key-table">
+              <thead><tr><th>Nome</th><th>Prefixo</th><th>Email</th><th>Rol</th><th>Activa</th><th>Creada</th><th></th></tr></thead>
+              <tbody id="keysTableBody"></tbody>
+            </table>
+          </div>
+          <div class="panel">
+            <h4>Facturación</h4>
+            <p class="billing-note" id="billingNote"></p>
+            <table class="key-table">
+              <thead><tr><th>Nome</th><th>Email</th><th>Uso (tokens)</th><th>Peticións</th><th>Saldo</th><th>Subscrición Stripe</th></tr></thead>
+              <tbody id="billingTableBody"></tbody>
+            </table>
+          </div>
+        `;
+
+        document.getElementById('createKeyForm').addEventListener('submit', async (event) => {
+          event.preventDefault();
+          const name = document.getElementById('newKeyName').value.trim();
+          const role = document.getElementById('newKeyRole').value;
+          if (!name) return;
+          try {
+            const data = await adminFetch('/admin/api-keys', { method: 'POST', body: JSON.stringify({ name, role }) });
+            document.getElementById('newKeyResult').textContent = `Nova clave (gárdaa xa, non se volverá amosar): ${data.api_key}`;
+            document.getElementById('newKeyName').value = '';
+            loadKeys();
+          } catch (err) {
+            document.getElementById('newKeyResult').textContent = `Erro creando a clave: ${err.message}`;
+          }
+        });
+
+        loadUsers();
+        loadKeys();
+        loadBilling();
+      }
+
+      async function loadUsers() {
+        const tbody = document.getElementById('usersTableBody');
+        try {
+          const data = await adminFetch('/admin/api-keys');
+          tbody.replaceChildren();
+          data.keys.forEach((u) => {
+            const tr = document.createElement('tr');
+            const cell = (node) => { const td = document.createElement('td'); td.append(node); tr.appendChild(td); return td; };
+            cell(document.createTextNode(u.name || '—'));
+            cell(document.createTextNode(u.email || '—'));
+
+            const sel = document.createElement('select');
+            ['user', 'premium', 'admin'].forEach((r) => {
+              const o = document.createElement('option'); o.value = r; o.textContent = r; o.selected = u.role === r; sel.appendChild(o);
+            });
+            sel.addEventListener('change', async () => {
+              try { await adminFetch(`/admin/api-keys/${u.id}`, { method: 'PATCH', body: JSON.stringify({ role: sel.value }) }); }
+              catch (err) { alert('Non se puido cambiar o rol: ' + err.message); }
+              loadUsers();
+            });
+            cell(sel);
+
+            const activeBtn = document.createElement('button');
+            activeBtn.textContent = u.active ? 'Si · desactivar' : 'Non · activar';
+            activeBtn.addEventListener('click', async () => {
+              try { await adminFetch(`/admin/api-keys/${u.id}`, { method: 'PATCH', body: JSON.stringify({ active: !u.active }) }); }
+              catch (err) { alert('Non se puido cambiar o estado: ' + err.message); }
+              loadUsers();
+            });
+            cell(activeBtn);
+
+            cell(document.createTextNode(String(u.created_at || '').slice(0, 16)));
+
+            const pwBtn = document.createElement('button');
+            pwBtn.textContent = 'Contrasinal';
+            pwBtn.addEventListener('click', async () => {
+              const pw = window.prompt(`Novo contrasinal para ${u.email || u.name} (mín. 6 caracteres):`);
+              if (!pw) return;
+              try { await adminFetch(`/admin/users/${u.id}/password`, { method: 'POST', body: JSON.stringify({ new_password: pw }) }); alert('Contrasinal actualizado.'); }
+              catch (err) { alert('Non se puido cambiar o contrasinal: ' + err.message); }
+            });
+            cell(pwBtn);
+            tbody.appendChild(tr);
+          });
+        } catch (err) {
+          tbody.replaceChildren();
+          const tr = document.createElement('tr'); const td = document.createElement('td');
+          td.colSpan = 6; td.textContent = 'Erro cargando usuarios: ' + err.message; tr.appendChild(td); tbody.appendChild(tr);
+        }
+      }
+
+      async function loadKeys() {
+        const tbody = document.getElementById('keysTableBody');
+        try {
+          const data = await adminFetch('/admin/api-keys');
+          tbody.innerHTML = '';
+          data.keys.forEach((k) => {
+            const tr = document.createElement('tr');
+            const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+            tr.innerHTML = `<td>${esc(k.name)}</td><td>${esc(k.prefix)}</td><td>${esc(k.email) || '—'}</td>` +
+              `<td>${k.role}</td><td>${k.active ? 'Si' : 'Non'}</td><td>${k.created_at}</td>` +
+              `<td><button data-revoke="${k.id}">Revogar</button><button class="credit-btn" data-credit="${k.id}">+ tokens</button></td>`;
+            tbody.appendChild(tr);
+          });
+          tbody.querySelectorAll('[data-revoke]').forEach((btn) => {
+            btn.addEventListener('click', async () => {
+              await adminFetch(`/admin/api-keys/${btn.dataset.revoke}`, { method: 'DELETE' });
+              loadKeys();
+            });
+          });
+          tbody.querySelectorAll('[data-credit]').forEach((btn) => {
+            btn.addEventListener('click', async () => {
+              const amount = Number(window.prompt('Cantos tokens queres engadir?', '100000'));
+              if (!amount || amount <= 0) return;
+              await adminFetch(`/admin/api-keys/${btn.dataset.credit}/credit`, { method: 'POST', body: JSON.stringify({ amount }) });
+              loadKeys();
+              loadBilling();
+            });
+          });
+        } catch (err) {
+          tbody.innerHTML = `<tr><td colspan="7">Erro cargando claves: ${err.message}</td></tr>`;
+        }
+      }
+
+      async function loadBilling() {
+        const note = document.getElementById('billingNote');
+        const tbody = document.getElementById('billingTableBody');
+        try {
+          const data = await adminFetch('/admin/api-keys');
+          note.textContent = '';
+          tbody.innerHTML = '';
+          for (const k of data.keys) {
+            const detail = await adminFetch(`/admin/api-keys/${k.id}/billing`);
+            if (!detail.stripe_configured && tbody.childElementCount === 0) {
+              note.textContent = 'Stripe aínda non está configurado — o uso rexístrase igualmente, pero non se reporta a Stripe.';
+            }
+            const balance = detail.token_balance_max ? `${detail.token_balance}/${detail.token_balance_max}` : '—';
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${k.name}</td><td>${detail.email || '—'}</td>` +
+              `<td>${detail.usage.total_tokens}</td><td>${detail.usage.requests}</td><td>${balance}</td>` +
+              `<td>${detail.subscription_status || (detail.stripe_customer_id ? 'descoñecido' : 'sen subscrición')}</td>`;
+            tbody.appendChild(tr);
+          }
+        } catch (err) {
+          tbody.innerHTML = `<tr><td colspan="6">Erro cargando facturación: ${err.message}</td></tr>`;
+        }
+      }
+
+      // ---------- Personalización (por rol de usuario) ----------
+      let themeRole = 'guest';
+
+      function applyThemePrefs(p) {
+        const root = document.documentElement.style;
+        root.setProperty('--primary', p.accent);
+        root.setProperty('--secondary', `color-mix(in srgb, ${p.accent} 60%, black)`);
+        root.setProperty('--primary-soft', `color-mix(in srgb, ${p.accent} 55%, white)`);
+        root.setProperty('--border', `color-mix(in srgb, ${p.accent} 25%, transparent)`);
+        const dark = 2 + (p.shade / 100) * 12;
+        if (p.light) {
+          root.setProperty('--bg', `hsl(150, 35%, 93%)`);
+          root.setProperty('--bg-2', `hsl(150, 35%, 87%)`);
+          root.setProperty('--text', `#08240f`);
+          root.setProperty('--muted', `#2f6b45`);
+        } else {
+          root.setProperty('--bg', `hsl(150, 70%, ${dark}%)`);
+          root.setProperty('--bg-2', `hsl(150, 60%, ${dark + 8}%)`);
+          root.setProperty('--text', `#d9ffe6`);
+          root.setProperty('--muted', `#7fd9a1`);
+        }
+      }
+
+      function themeStorageKey(role) { return `celtia_theme_${role}`; }
+
+      function loadThemePrefs(role) {
+        try {
+          const raw = localStorage.getItem(themeStorageKey(role));
+          if (raw) return JSON.parse(raw);
+        } catch (err) { /* almacenamiento no disponible, se usan valores por defecto */ }
+        return { accent: '#35e07a', shade: 45, light: false };
+      }
+
+      function saveThemePrefs(role, prefs) {
+        try { localStorage.setItem(themeStorageKey(role), JSON.stringify(prefs)); } catch (err) { /* ignorar */ }
+      }
+
+      function initThemeControls() {
+        const shadeEl = document.getElementById('themeShadeRange');
+        const accentEl = document.getElementById('themeAccentColor');
+        const lightEl = document.getElementById('themeLightMode');
+        const prefs = loadThemePrefs(themeRole);
+        shadeEl.value = prefs.shade;
+        accentEl.value = prefs.accent;
+        lightEl.checked = prefs.light;
+        applyThemePrefs(prefs);
+
+        document.getElementById('themeApplyBtn').addEventListener('click', () => {
+          const next = { accent: accentEl.value, shade: Number(shadeEl.value), light: lightEl.checked };
+          applyThemePrefs(next);
+          saveThemePrefs(themeRole, next);
+        });
+        document.getElementById('themeResetBtn').addEventListener('click', () => {
+          const def = { accent: '#35e07a', shade: 45, light: false };
+          shadeEl.value = def.shade; accentEl.value = def.accent; lightEl.checked = def.light;
+          applyThemePrefs(def);
+          saveThemePrefs(themeRole, def);
+        });
+      }
+
+      async function initThemeForCurrentUser() {
+        try {
+          const me = await meFetch('/v1/me');
+          themeRole = me.role || 'guest';
+        } catch (err) {
+          themeRole = 'guest';
+        }
+        applyThemePrefs(loadThemePrefs(themeRole));
+        const shadeEl = document.getElementById('themeShadeRange');
+        const accentEl = document.getElementById('themeAccentColor');
+        const lightEl = document.getElementById('themeLightMode');
+        const prefs = loadThemePrefs(themeRole);
+        if (shadeEl) shadeEl.value = prefs.shade;
+        if (accentEl) accentEl.value = prefs.accent;
+        if (lightEl) lightEl.checked = prefs.light;
+      }
+
+      initThemeControls();
+      initThemeForCurrentUser();
+
+      // ---------- Configuración: API key display ----------
+      function refreshApiKeyDisplay() {
+        const el = document.getElementById('apiKeyDisplay');
+        const key = localStorage.getItem('celtia_api_key');
+        el.textContent = key ? `Clave gardada: ${key.slice(0, 14)}…` : 'Ningunha clave gardada.';
+      }
+
+      document.getElementById('changeKeyBtn').addEventListener('click', () => {
+        localStorage.removeItem('celtia_api_key');
+        refreshApiKeyDisplay();
+        try { getApiKey(); } catch (err) { /* ignore */ }
+        refreshApiKeyDisplay();
+      });
+
+      // ---------- Creador Studio ----------
+      let creatorProjectId = null;
+      let creatorOpenFile = null;
+      let monacoEditor = null;
+      let monacoReady = null;
+
+      function ensureMonaco() {
+        if (monacoReady) return monacoReady;
+        monacoReady = new Promise((resolve) => {
+          require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
+          require(['vs/editor/editor.main'], () => {
+            monacoEditor = monaco.editor.create(document.getElementById('creatorEditorHost'), {
+              value: '', language: 'plaintext', theme: 'vs-dark', automaticLayout: true, fontSize: 13,
+            });
+            resolve();
+          });
+        });
+        return monacoReady;
+      }
+
+      function languageForPath(path) {
+        const ext = (path.split('.').pop() || '').toLowerCase();
+        const map = { js: 'javascript', jsx: 'javascript', ts: 'typescript', tsx: 'typescript',
+          json: 'json', html: 'html', css: 'css', py: 'python', md: 'markdown', yml: 'yaml', yaml: 'yaml' };
+        return map[ext] || 'plaintext';
+      }
+
+      async function creatorApiFetch(path, options = {}) {
+        return meFetch(`/creator${path}`, options);
+      }
+
+      async function loadCreatorProjects() {
+        const select = document.getElementById('creatorProjectSelect');
+        try {
+          const data = await creatorApiFetch('/projects');
+          select.innerHTML = data.projects.map((p) => `<option value="${p.id}">${p.name}</option>`).join('');
+          if (data.projects.length) {
+            creatorProjectId = select.value;
+            document.getElementById('creatorEmptyState').style.display = 'none';
+            document.getElementById('creatorStudio').style.display = 'flex';
+            await openCreatorProject(creatorProjectId);
+          } else {
+            document.getElementById('creatorEmptyState').style.display = '';
+            document.getElementById('creatorStudio').style.display = 'none';
+          }
+        } catch (err) {
+          document.getElementById('creatorEmptyState').textContent = 'Erro cargando os teus proxectos: ' + err.message;
+          document.getElementById('creatorEmptyState').style.display = '';
+        }
+      }
+
+      async function openCreatorProject(projectId) {
+        creatorProjectId = projectId;
+        creatorOpenFile = null;
+        document.getElementById('creatorEditorTab').textContent = 'Ningún ficheiro aberto';
+        document.getElementById('creatorMessages').innerHTML =
+          '<div class="bubble assistant">Studio listo. Pídeme que cree unha app e traballarei directamente sobre os ficheiros deste proxecto.</div>';
+        await refreshCreatorFileTree();
+      }
+
+      async function refreshCreatorFileTree(path = '') {
+        const tree = document.getElementById('creatorFileTree');
+        try {
+          const data = await creatorApiFetch(`/projects/${creatorProjectId}/files?path=${encodeURIComponent(path)}`);
+          if (!path) tree.innerHTML = '';
+          const container = path ? tree.querySelector(`[data-dir="${CSS.escape(path)}"] .children`) : tree;
+          if (!container) return;
+          data.entries.forEach((entry) => {
+            const row = document.createElement('div');
+            row.style.cssText = 'padding:3px 4px;cursor:pointer;white-space:nowrap;';
+            row.textContent = (entry.type === 'dir' ? '📁 ' : '📄 ') + entry.name;
+            if (entry.type === 'dir') {
+              row.dataset.dir = entry.path;
+              const children = document.createElement('div');
+              children.className = 'children';
+              children.style.cssText = 'display:none;padding-left:14px;';
+              row.addEventListener('click', async () => {
+                const isOpen = children.style.display !== 'none';
+                children.style.display = isOpen ? 'none' : 'block';
+                if (!isOpen && !children.dataset.loaded) {
+                  children.dataset.loaded = '1';
+                  const wrapper = document.createElement('div');
+                  wrapper.dataset.dir = entry.path;
+                  wrapper.appendChild(children);
+                  await refreshCreatorFileTree(entry.path);
+                }
+              });
+              container.appendChild(row);
+              container.appendChild(children);
+            } else {
+              row.addEventListener('click', () => openCreatorFile(entry.path));
+              container.appendChild(row);
+            }
+          });
+        } catch (err) {
+          tree.innerHTML = `<div class="empty-state">${err.message}</div>`;
+        }
+      }
+
+      async function openCreatorFile(path) {
+        try {
+          const data = await creatorApiFetch(`/projects/${creatorProjectId}/file?path=${encodeURIComponent(path)}`);
+          await ensureMonaco();
+          creatorOpenFile = path;
+          document.getElementById('creatorEditorTab').textContent = path;
+          monaco.editor.setModelLanguage(monacoEditor.getModel(), languageForPath(path));
+          monacoEditor.setValue(data.content);
+        } catch (err) {
+          alert('Non se puido abrir o ficheiro: ' + err.message);
+        }
+      }
+
+      document.getElementById('creatorEditorHost').addEventListener('keydown', () => {}); // placeholder para foco
+
+      async function saveOpenCreatorFile() {
+        if (!creatorOpenFile || !monacoEditor) return;
+        await creatorApiFetch(`/projects/${creatorProjectId}/file`, {
+          method: 'PUT',
+          body: JSON.stringify({ path: creatorOpenFile, content: monacoEditor.getValue() }),
+        });
+      }
+
+      document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 's' && creatorOpenFile) {
+          e.preventDefault();
+          saveOpenCreatorFile();
+        }
+      });
+
+      document.getElementById('creatorProjectSelect').addEventListener('change', (e) => openCreatorProject(e.target.value));
+
+      document.getElementById('creatorNewProjectBtn').addEventListener('click', async () => {
+        const name = prompt('Nome do novo proxecto:');
+        if (!name) return;
+        try {
+          await creatorApiFetch('/projects', { method: 'POST', body: JSON.stringify({ name }) });
+          await loadCreatorProjects();
+        } catch (err) {
+          alert('Non se puido crear o proxecto: ' + err.message);
+        }
+      });
+
+      document.getElementById('creatorDeleteProjectBtn').addEventListener('click', async () => {
+        if (!creatorProjectId) return;
+        if (!confirm('¿Eliminar este proxecto e todos os seus ficheiros?')) return;
+        await creatorApiFetch(`/projects/${creatorProjectId}`, { method: 'DELETE' });
+        await loadCreatorProjects();
+      });
+
+      document.getElementById('creatorRefreshPreviewBtn').addEventListener('click', async () => {
+        try {
+          const data = await creatorApiFetch(`/projects/${creatorProjectId}/preview/start`, {
+            method: 'POST', body: JSON.stringify({}),
+          });
+          if (data.url) document.getElementById('creatorPreviewFrame').src = data.url;
+        } catch (err) {
+          alert('Non se puido iniciar a vista previa: ' + err.message);
+        }
+      });
+
+      document.querySelectorAll('.creator-tab').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.creator-tab').forEach((b) => b.classList.toggle('active', b === btn));
+          ['chat', 'logs', 'git'].forEach((name) => {
+            document.getElementById(`creatorTab${name[0].toUpperCase()}${name.slice(1)}`).style.display =
+              name === btn.dataset.tab ? 'flex' : 'none';
+          });
+          if (btn.dataset.tab === 'logs') loadCreatorLogs();
+        });
+      });
+
+      async function loadCreatorLogs() {
+        const el = document.getElementById('creatorTabLogs');
+        try {
+          const data = await creatorApiFetch(`/projects/${creatorProjectId}/logs`);
+          el.textContent = data.logs || '(sen actividade aínda)';
+        } catch (err) {
+          el.textContent = 'Erro: ' + err.message;
+        }
+      }
+
+      document.getElementById('creatorGitStatusBtn').addEventListener('click', async () => {
+        const data = await creatorApiFetch(`/projects/${creatorProjectId}/git/status`);
+        document.getElementById('creatorGitOutput').textContent = data.stdout || '(sen cambios)';
+      });
+      document.getElementById('creatorGitDiffBtn').addEventListener('click', async () => {
+        const data = await creatorApiFetch(`/projects/${creatorProjectId}/git/diff`);
+        document.getElementById('creatorGitOutput').textContent = data.stdout || '(sen diferenzas)';
+      });
+      document.getElementById('creatorGitCommitBtn').addEventListener('click', async () => {
+        const message = document.getElementById('creatorCommitMsg').value.trim() || 'Cambios desde Creador Studio';
+        const data = await creatorApiFetch(`/projects/${creatorProjectId}/git/commit`, {
+          method: 'POST', body: JSON.stringify({ message }),
+        });
+        document.getElementById('creatorGitOutput').textContent = (data.stdout || '') + '\n' + (data.stderr || '');
+        document.getElementById('creatorCommitMsg').value = '';
+      });
+
+      const creatorAttach = setupAttachments(document.getElementById('creatorPrompt').closest('.composer'),
+                                             document.getElementById('creatorPrompt'));
+
+      async function submitCreatorPrompt() {
+        const promptEl = document.getElementById('creatorPrompt');
+        const sendBtn = document.getElementById('creatorSendBtn');
+        const messagesEl = document.getElementById('creatorMessages');
+        let text = promptEl.value.trim();
+        if ((!text && !creatorAttach.count()) || !creatorProjectId) return;
+        if (!text) text = 'Analiza os arquivos adxuntos.';
+        await saveOpenCreatorFile();
+        const att = creatorAttach.consume();
+
+        const userBubble = document.createElement('div');
+        userBubble.className = 'bubble user';
+        userBubble.textContent = att.names.length ? `${text}\n📎 ${att.names.join(', ')}` : text;
+        messagesEl.appendChild(userBubble);
+        promptEl.value = '';
+
+        const thinkingBubble = document.createElement('div');
+        thinkingBubble.className = 'bubble assistant';
+        thinkingBubble.textContent = 'Traballando no proxecto…';
+        messagesEl.appendChild(thinkingBubble);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+
+        sendBtn.disabled = true;
+        try {
+          const data = await creatorApiFetch(`/projects/${creatorProjectId}/chat`, {
+            method: 'POST', body: JSON.stringify({ message: att.prefix + text }),
+          });
+          thinkingBubble.textContent = data.answer || 'Sen resposta.';
+          await refreshCreatorFileTree();
+          if (creatorOpenFile) await openCreatorFile(creatorOpenFile);
+        } catch (err) {
+          thinkingBubble.textContent = 'Erro: ' + err.message;
+        } finally {
+          sendBtn.disabled = false;
+          messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+      }
+
+      document.getElementById('creatorSendBtn').addEventListener('click', submitCreatorPrompt);
+      document.getElementById('creatorPrompt').addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+          event.preventDefault();
+          submitCreatorPrompt();
+        }
+      });
+    </script>
+  </body>
+</html>

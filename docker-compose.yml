@@ -1,0 +1,102 @@
+# Copyright (c) 2026 Luis Manuel Cousido Hermida. All rights reserved.
+services:
+  model:
+    image: vllm/vllm-openai:latest
+    restart: unless-stopped
+    ipc: host
+
+    env_file:
+      - .env
+      - .env.local
+
+    environment:
+      VLLM_USE_V2_MODEL_RUNNER: "0"
+      VLLM_WORKER_MULTIPROC_METHOD: spawn
+      VLLM_ATTENTION_BACKEND: FLASH_ATTN
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+
+    volumes:
+      - hf-cache:/root/.cache/huggingface
+
+    ports:
+      - "${MODEL_PORT:-18000}:8000"
+
+    command:
+      - --model
+      - ${MODEL_NAME:-openbmb/MiniCPM5-2B}
+      - --served-model-name
+      - ${MODEL_SERVE_NAME:-MiniCPM5-2B}
+      - --dtype
+      - bfloat16
+      - --max-model-len
+      - "4096"
+      - --gpu-memory-utilization
+      - "0.85"
+      - --max-num-seqs
+      - "4"
+      - --enforce-eager
+      - --enable-auto-tool-choice
+      - --tool-call-parser
+      - minicpm5
+      - --port
+      - "8000"
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities:
+                - gpu
+
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+
+    env_file:
+      - .env
+      - .env.local
+
+    environment:
+      VLLM_BASE_URL: http://model:8000/v1
+      MODEL_SERVE_NAME: ${MODEL_SERVE_NAME:-MiniCPM5-2B}
+      SQLITE_PATH: /data/mini_council.db
+      MAX_AGENT_STEPS: ${MAX_AGENT_STEPS:-8}
+      MAX_TOOL_CALLS: ${MAX_TOOL_CALLS:-12}
+      PYTHON_TOOL_TIMEOUT_SECONDS: ${PYTHON_TOOL_TIMEOUT_SECONDS:-8}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:18080}
+      CREATOR_PROJECTS_DIR: /data/projects
+
+    volumes:
+      - app-data:/data
+      - workspace:/workspace
+      - ./data/projects:/data/projects
+      - /var/run/docker.sock:/var/run/docker.sock
+
+    ports:
+      - "${API_PORT:-18080}:8080"
+
+    depends_on:
+      - model
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel run --token ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    env_file:
+      - .env.local
+    depends_on:
+      - api
+    profiles:
+      - public
+
+volumes:
+  hf-cache:
+  app-data:
+  workspace:

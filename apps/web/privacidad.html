@@ -1,0 +1,111 @@
+<!-- Copyright (c) 2026 Luis Manuel Cousido Hermida. All rights reserved. -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Política de Privacidad — CeltIA</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #161922;
+    --text: #e6e8ec;
+    --muted: #9aa2b1;
+    --accent: #6ee7b7;
+    --border: #262b38;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #f7f8fa;
+      --panel: #ffffff;
+      --text: #1a1d24;
+      --muted: #5a6272;
+      --border: #e2e5ec;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    line-height: 1.6;
+  }
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 32px 16px 64px;
+  }
+  h1 { font-size: 1.6rem; margin-bottom: 4px; }
+  .updated { color: var(--muted); font-size: 0.85rem; margin-bottom: 32px; }
+  h2 { font-size: 1.1rem; margin-top: 32px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+  p, li { color: var(--text); font-size: 0.95rem; }
+  ul { padding-left: 20px; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-top: 12px;
+  }
+  code {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 0.85em;
+  }
+  a { color: var(--accent); }
+  .back { display: inline-block; margin-bottom: 8px; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="index.html">← Volver a CeltIA</a>
+  <h1>Política de Privacidad de CeltIA</h1>
+  <div class="updated">Última actualización: 18 de septiembre de 2026</div>
+
+  <h2>Responsable del tratamiento</h2>
+  <div class="card">
+    <p>
+      <strong>Luis Manuel Cousido Hermida</strong><br />
+      Contacto: <a href="mailto:infocasaponte@gmail.com">infocasaponte@gmail.com</a>
+    </p>
+  </div>
+
+  <h2>Qué datos tratamos</h2>
+  <ul>
+    <li><strong>Datos de cuenta</strong>: nombre asociado a la clave de API, correo electrónico (si se facilita), rol de acceso.</li>
+    <li><strong>Historial de conversaciones</strong>: solo para cuentas con rol premium o admin. Las cuentas con rol "user" no generan historial persistente.</li>
+    <li><strong>Datos de uso y facturación</strong>: tokens consumidos, saldo prepago, y —si tienes suscripción activa— identificador de cliente de Stripe.</li>
+    <li><strong>Registro de actividad técnica</strong>: búsquedas realizadas, herramientas invocadas y errores del sistema, para depuración y seguridad.</li>
+  </ul>
+
+  <h2>Con qué finalidad y base legal</h2>
+  <p>Tratamos estos datos para prestar el servicio que has solicitado (ejecución de un contrato o de medidas precontractuales, art. 6.1.b RGPD) y, en el caso del registro de actividad técnica, por interés legítimo en mantener la seguridad y estabilidad del servicio (art. 6.1.f RGPD).</p>
+
+  <h2>Con quién se comparten</h2>
+  <ul>
+    <li><strong>Brave Search API</strong>: cuando el asistente necesita buscar información en internet, tu consulta de búsqueda (no el resto de la conversación) se envía a este proveedor para obtener resultados.</li>
+    <li><strong>Stripe</strong>: únicamente si tienes activada la facturación por uso, para gestionar el cobro. No compartimos con Stripe el contenido de tus conversaciones.</li>
+    <li>No vendemos ni cedemos tus datos a terceros con fines publicitarios.</li>
+  </ul>
+  <p>El modelo de IA y la base de datos de CeltIA se ejecutan en infraestructura propia; tus conversaciones no se envían a OpenAI, Anthropic, Google ni ningún otro proveedor de modelos de terceros.</p>
+
+  <h2>Cuánto tiempo conservamos tus datos</h2>
+  <p>El historial de conversaciones y el registro de actividad se conservan un máximo de 365 días desde su creación, transcurridos los cuales se eliminan automáticamente. Los datos de tu cuenta se conservan mientras la clave de API permanezca activa.</p>
+
+  <h2>Tus derechos</h2>
+  <p>Como usuario puedes ejercer en cualquier momento, de forma directa y sin coste, los derechos de acceso, portabilidad y supresión sobre tus propios datos:</p>
+  <ul>
+    <li><strong>Acceder y exportar tus datos</strong>: <code>GET /v1/me/export</code> (autenticado con tu clave de API) te devuelve toda la información personal asociada a tu cuenta.</li>
+    <li><strong>Eliminar tus datos ("derecho al olvido")</strong>: <code>DELETE /v1/me</code> borra tu historial, uso y actividad, y desactiva tu cuenta de forma irreversible.</li>
+    <li><strong>Rectificación o cualquier otra consulta</strong>: escríbenos a <a href="mailto:infocasaponte@gmail.com">infocasaponte@gmail.com</a>.</li>
+  </ul>
+  <p>Si consideras que el tratamiento de tus datos no se ajusta a la normativa, puedes presentar una reclamación ante la <a href="https://www.aepd.es" target="_blank" rel="noopener">Agencia Española de Protección de Datos (AEPD)</a>.</p>
+
+  <h2>Cambios en esta política</h2>
+  <p>Podemos actualizar esta política para reflejar cambios en el servicio o en la normativa aplicable. La fecha de la última actualización aparece siempre en la parte superior de esta página.</p>
+</div>
+</body>
+</html>

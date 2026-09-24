@@ -1,0 +1,55 @@
+#! api-deployment.yaml
+# Generated code, do not edit
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: api
+    namespace: mini-council
+    labels:
+        com.docker.compose.project: mini-council
+        com.docker.compose.service: api
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            com.docker.compose.project: mini-council
+            com.docker.compose.service: api
+    strategy:
+        type: Recreate
+    template:
+        metadata:
+            labels:
+                com.docker.compose.project: mini-council
+                com.docker.compose.service: api
+                com.docker.compose.network.default: "true"
+        spec:
+            restartPolicy: unless-stopped
+            containers:
+                - name: api
+                  image: mini-council-api
+                  imagePullPolicy: IfNotPresent
+                  env:
+                    - name: LOG_LEVEL
+                      value: "INFO"
+                    - name: MAX_AGENT_STEPS
+                      value: "8"
+                    - name: MAX_TOOL_CALLS
+                      value: "12"
+                    - name: MODEL_SERVE_NAME
+                      value: "MiniCPM5-2B"
+                    - name: PYTHON_TOOL_TIMEOUT_SECONDS
+                      value: "8"
+                    - name: SQLITE_PATH
+                      value: "/data/mini_council.db"
+                    - name: VLLM_BASE_URL
+                      value: "http://model:8000/v1"
+                  ports:
+                    - name: api-8080
+                      containerPort: 8080
+                  volumeMounts:
+                    - name: data
+                      mountPath: /data
+            volumes:
+                - name: data
+                  persistentVolumeClaim:
+                    claimName: api-app-data
