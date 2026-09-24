@@ -44,7 +44,7 @@ Decision results expose `suspected_ood` separately from `abstention_reason`. Thi
 
 `evaluate_shadow` now reports OOD label coverage plus true/false positives and negatives, precision, recall, specificity, false-positive rate and accuracy whenever samples provide `expected_ood` and `suspected_ood`. Route labels and OOD labels are independent, so an in-domain route sample can contribute to both routing accuracy and OOD specificity.
 
-`benchmarks/decision_routes_ood.jsonl` now contains 40 adversarial seed cases spanning malformed, injection-like, candidate-label and route-manipulation inputs. The in-domain routing benchmark contains 60 balanced cases (12 each for `fast`, `think`, `code`, `agent` and `long`). The normal routing benchmark is explicitly labeled `"ood": false`, while OOD rows use `"expected": null, "ood": true`. The evaluator accepts multiple repeatable `--dataset` arguments so both sets can be measured together, rejects duplicate texts across files, and consumes optional `suspected_ood` values from CDE-result JSONL. Both sets are schema- and cardinality-validated in CI. Together they are materially broader than the original smoke set, but still below the 200-sample promotion floor and should not be treated as sufficient production evidence.
+`benchmarks/decision_routes_ood.jsonl` now contains 80 adversarial cases spanning malformed, injection-like, candidate-label and route-manipulation inputs. The in-domain routing benchmark contains 120 balanced cases (24 each for `fast`, `think`, `code`, `agent` and `long`). The normal routing benchmark is explicitly labeled `"ood": false`, while OOD rows use `"expected": null, "ood": true`. The evaluator accepts multiple repeatable `--dataset` arguments so both sets can be measured together, rejects duplicate texts across files, and consumes optional `suspected_ood` values from CDE-result JSONL. Both sets are schema- and cardinality-validated in CI. Together they now reach the 200-sample promotion floor structurally. This only removes the sample-count blocker: promotion still requires a real CDE result artifact whose coverage, routing accuracy, per-route metrics and OOD behavior satisfy every gate.
 
 Example combined evaluation:
 
@@ -64,7 +64,7 @@ Promotion-result ingestion is strict. Each result row must have a unique non-emp
 
 ## Collecting real CDE results
 
-`scripts/collect_decision_eval_results.py` runs the same route-decision shape used by shadow routing against the configured CeltIA LLM stack and writes strict JSONL suitable for the offline evaluator. By default it combines the 60 in-domain routing cases and 40 OOD cases. It records the CDE route, confidence, abstention, explicit `suspected_ood`, uncertainty diagnostics, heuristic route and benchmark labels.
+`scripts/collect_decision_eval_results.py` runs the same route-decision shape used by shadow routing against the configured CeltIA LLM stack and writes strict JSONL suitable for the offline evaluator. By default it combines the 120 in-domain routing cases and 80 OOD cases. It records the CDE route, confidence, abstention, explicit `suspected_ood`, uncertainty diagnostics, heuristic route and benchmark labels.
 
 Because the collector uses `build_llm()`, it follows the active CeltIA provider configuration: when the hosted primary is enabled and credentialed, running the collector can send benchmark prompts to that provider and consume billable model usage. CI only smoke-tests `--help`; it never executes live model calls.
 
