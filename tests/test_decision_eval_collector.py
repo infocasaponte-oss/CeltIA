@@ -340,7 +340,7 @@ def test_resume_rejects_collecting_manifest_missing_structural_provenance(tmp_pa
     )
     monkeypatch.setattr(collector,"build_runtime",FakeRuntime)
 
-    for field in ("collected_at","backend","policy"):
+    for field in ("collected_at","backend","policy","code_revision"):
         manifest=collector._runtime_manifest(FakeRuntime(),[str(dataset)])
         manifest.pop(field)
         (tmp_path / "results.jsonl.manifest.json").write_text(
@@ -548,3 +548,28 @@ def test_resume_rejects_rows_outside_prior_deterministic_selection(tmp_path, mon
         assert False
     except ValueError as exc:
         assert "prior deterministic selection" in str(exc)
+
+
+
+def test_resume_rejects_collecting_manifest_invalid_code_revision(tmp_path, monkeypatch):
+    dataset=tmp_path / "dataset.jsonl"
+    dataset.write_text('{"text":"one","expected":"fast","ood":false}\n',encoding="utf-8")
+    path=tmp_path / "results.jsonl"
+    path.write_text(
+        '{"text":"one","cde":"fast","confidence":0.9,"abstained":false,"models_used":["fake-model"]}\n',
+        encoding="utf-8",
+    )
+    manifest=collector._runtime_manifest(FakeRuntime(),[str(dataset)])
+    manifest["code_revision"]="NOT-A-SHA"
+    manifest["results_sha256"]=collector.file_sha256(path)
+    manifest["result_rows"]=1
+    (tmp_path / "results.jsonl.manifest.json").write_text(json.dumps(manifest),encoding="utf-8")
+    monkeypatch.setattr(collector,"build_runtime",FakeRuntime)
+
+    args=_args(tmp_path,resume=True)
+    args.dataset=[str(dataset)]
+    try:
+        asyncio.run(collector.collect(args))
+        assert False
+    except ValueError as exc:
+        assert "code revision provenance" in str(exc)
