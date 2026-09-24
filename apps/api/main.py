@@ -369,6 +369,10 @@ async def decide(req: DecisionApiRequest, key: dict = Depends(require_api_key)):
 async def metrics():
     return {"status":"ok","metrics":app.state.metrics}
 
+@app.get("/admin/decision-shadow")
+async def decision_shadow_report(days: int = 30, _: bool = Depends(require_admin)):
+    return memory.decision_shadow_summary(days=min(max(days, 1), 365))
+
 @app.get("/v1/models")
 async def models():
     return {"object":"list","data":[{"id":"CeltIA V4","object":"model","owned_by":"local"}]}
@@ -411,6 +415,7 @@ async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, 
         shadow = await evaluate_route_shadow(decision_runtime, text, r.mode)
         if shadow:
             logger.info("CDE shadow route: %s", shadow)
+            memory.record_decision_shadow(key.get("id"), shadow["heuristic"], shadow["cde"], shadow["confidence"], shadow["abstained"])
             emit({"type": "decision_shadow", **shadow})
     auto_agent = r.mode == "agent"
     if not auto_agent and req.mode in {"fast", "think", "code", "long"}:
