@@ -9,7 +9,7 @@ from pathlib import Path
 from celtia.decision.evaluation import ShadowSample, evaluate_shadow, promotion_gate
 
 ROUTES={"fast","think","code","agent","long"}
-RESULT_FORMAT_VERSION=2
+RESULT_FORMAT_VERSION=3
 
 
 def file_sha256(path: Path) -> str:
