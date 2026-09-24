@@ -55,7 +55,8 @@ jobs:
             tests/test_decision_benchmark.py \
             tests/test_decision_provenance.py \
             tests/test_decision_order_eval.py \
-            tests/test_decision_policy_parity.py
+            tests/test_decision_policy_parity.py \
+            tests/test_decision_prefix_eval.py
 
   app:
     name: App Python ${{ matrix.python-version }}
@@ -81,6 +82,14 @@ jobs:
           pip install -r requirements-dev.txt
       - name: Verify dependency environment
         run: python -m pip check
+      - name: Validate CDE prefix-reuse benchmark
+        env:
+          PYTHONPATH: .
+        run: |
+          python scripts/benchmark_decision_prefix.py \
+            --context-chars 12000 \
+            --questions 8 \
+            --min-reuse-fraction 0.75
       - name: Compile application
         run: python -m compileall -q celtia core apps tests
       - name: Run runtime bridge test
