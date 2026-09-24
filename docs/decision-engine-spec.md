@@ -16,17 +16,16 @@ A request contains shared context plus questions. Each question exposes a finite
 - results expose observable abstention diagnostics (`low_confidence` / `suspected_ood`), normalized entropy and decision margin without exposing hidden reasoning;
 - `/v1/decide` uses the same gateway concurrency/rate-limit slot as other model-backed requests;
 - model usage from decision scoring is aggregated per request and fed into CeltIA usage/quota/billing accounting;
-- invalid definitions/output fail closed;
+- API schema and runtime both enforce bounded request/question/option sizes; invalid definitions/output fail closed;
 - low confidence can abstain;
 - sync and async engines share the same optional OOD rejection semantics (entropy/margin thresholds);
 - deterministic tests need no GPU/model downloads.
 
 ## Next milestones
-1. Local-model scorer using the existing runtime.
-2. NLL, Brier, ECE, option-order and OOD/abstention evaluation.
-3. Prefix/state caching after benchmarking.
-4. /v1/decide using existing authentication/authorization conventions.
-5. Evaluate LoRA/trained decision heads against baseline.
+1. Benchmark prefix/state caching before adding it to the runtime.
+2. Expand labeled routing and OOD datasets beyond the initial smoke benchmark.
+3. Evaluate LoRA/trained decision heads against the current LLM-scorer baseline.
+4. Add controlled-routing rollout only after promotion-gate evidence is sufficient.
 
 ## Security
 A decision is advisory until the caller policy authorizes an action. Tool execution and privileged actions remain behind CeltIA authorization and sandbox boundaries.
