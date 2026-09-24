@@ -17,6 +17,7 @@ from scripts.evaluate_decision_routes import (
     RESULT_FORMAT_VERSION,
     SHA256_RE,
     dataset_sha256,
+    declared_backend_models,
     file_sha256,
     load_cde_results,
     load_jsonl,
@@ -275,7 +276,7 @@ async def collect(args) -> dict:
                 raise ValueError(f"resume completed provenance manifest is invalid: {exc}") from exc
         else:
             _validate_collecting_manifest(resume_manifest,datasets,output,dataset_rows=dataset_rows)
-        existing=load_cde_results(output,require_models_used=True)
+        existing=load_cde_results(\n            output,\n            require_models_used=True,\n            allowed_models=declared_backend_models(resume_manifest["backend"]),\n        )
         previous_selection=resume_manifest["selection"]
         previous_selected_rows=previous_selection["selected_rows"]
         previous_selected_texts={row["text"] for row in all_rows[:previous_selected_rows]}
