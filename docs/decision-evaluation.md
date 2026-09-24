@@ -128,4 +128,4 @@ Resume now applies the same evidence boundary. Completed manifests are revalidat
 
 Interrupted checkpoints are now bound to their partial JSONL too. Every persisted checkpoint refreshes `results_sha256` and `result_rows` in the `collecting` manifest, and resume verifies both before loading any existing row. A modified or truncated partial result file therefore fails closed instead of being accepted merely because its rows remain syntactically valid.
 
-Collection timestamps are validated as timezone-aware ISO-8601 values rather than arbitrary non-empty strings. Promotion and resume reject malformed or timezone-naive `collected_at` values, preserving an unambiguous audit timeline across hosts and environments.
+Collection timestamps are validated as timezone-aware ISO-8601 values rather than arbitrary non-empty strings. Promotion and resume reject malformed or timezone-naive `collected_at` values, preserving an unambiguous audit timeline across hosts and environments. When present, `resumed_from_collected_at` is held to the same requirement so a resume chain cannot preserve malformed root chronology.
