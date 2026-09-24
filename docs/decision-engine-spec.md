@@ -16,6 +16,7 @@ A request contains shared context plus questions. Each question exposes a finite
 - ordinal score results also expose the probability-weighted expected score;
 - results expose observable abstention diagnostics (`low_confidence` / `suspected_ood`), normalized entropy and decision margin without exposing hidden reasoning;
 - `/v1/decide` uses the same gateway concurrency/rate-limit slot as other model-backed requests;
+- request-cost bounds are operator-configurable: maximum questions per request (hard-capped at 32) and model output tokens per scoring call (64..2048);
 - model usage from decision scoring is aggregated per request and fed into CeltIA usage/quota/billing accounting;
 - API schema and runtime both enforce bounded request/question/option sizes; invalid definitions/output fail closed;
 - the LLM scorer serializes context/question/candidates as untrusted JSON data and rejects non-serializable context instead of coercing it;
