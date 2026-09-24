@@ -253,10 +253,9 @@ async def collect(args) -> dict:
         "benchmarks/decision_routes.jsonl",
         "benchmarks/decision_routes_ood.jsonl",
     ]
-    rows=load_datasets(datasets)
-    dataset_rows=len(rows)
-    if args.limit:
-        rows=rows[:args.limit]
+    all_rows=load_datasets(datasets)
+    dataset_rows=len(all_rows)
+    rows=all_rows[:args.limit] if args.limit else all_rows
     selected_rows=len(rows)
 
     output=Path(args.output)
@@ -277,6 +276,15 @@ async def collect(args) -> dict:
         else:
             _validate_collecting_manifest(resume_manifest,datasets,output,dataset_rows=dataset_rows)
         existing=load_cde_results(output,require_models_used=True)
+        previous_selection=resume_manifest["selection"]
+        previous_selected_rows=previous_selection["selected_rows"]
+        previous_selected_texts={row["text"] for row in all_rows[:previous_selected_rows]}
+        unexpected_previous=set(existing)-previous_selected_texts
+        if unexpected_previous:
+            first=sorted(unexpected_previous)[0]
+            raise ValueError(
+                f"existing result text not present in prior deterministic selection: {first!r}"
+            )
         unknown=set(existing)-{row["text"] for row in rows}
         if unknown:
             first=sorted(unknown)[0]
