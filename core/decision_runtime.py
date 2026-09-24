@@ -7,7 +7,7 @@ from collections.abc import Mapping
 
 from celtia.decision.async_engine import AsyncDecisionEngine
 from celtia.decision.json_safety import validate_json_depth
-from celtia.decision.llm_scorer import AsyncLLMDecisionScorer
+from celtia.decision.llm_scorer import AsyncLLMDecisionScorer, validate_json_nesting
 from celtia.decision.policy import validate_policy_settings
 from celtia.decision.schema import DecisionQuestion, DecisionRequest, DecisionType
 
@@ -76,6 +76,7 @@ class CeltIADecisionRuntime:
         }
 
     def _request(self, context, questions) -> DecisionRequest:
+        validate_json_nesting(context)
         try:
             validate_json_depth(context)
             serialized_context = json.dumps(context, ensure_ascii=False)
