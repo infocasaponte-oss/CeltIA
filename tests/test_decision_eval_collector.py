@@ -276,3 +276,28 @@ def test_resume_rejects_tampered_completed_results(tmp_path, monkeypatch):
         assert False
     except ValueError as exc:
         assert "completed provenance manifest" in str(exc)
+
+
+def test_repeated_resume_preserves_original_collection_timestamp(tmp_path, monkeypatch):
+    dataset=tmp_path / "dataset.jsonl"
+    dataset.write_text('{"text":"one","expected":"fast","ood":false}\n',encoding="utf-8")
+    monkeypatch.setattr(collector,"build_runtime",FakeRuntime)
+    monkeypatch.setattr(collector,"route",lambda text:type("R",(),{"mode":"fast"})())
+
+    args=_args(tmp_path)
+    args.dataset=[str(dataset)]
+    asyncio.run(collector.collect(args))
+
+    manifest_path=tmp_path / "results.jsonl.manifest.json"
+    original=json.loads(manifest_path.read_text(encoding="utf-8"))
+    original_collected_at=original["collected_at"]
+
+    resume_args=_args(tmp_path,resume=True)
+    resume_args.dataset=[str(dataset)]
+    asyncio.run(collector.collect(resume_args))
+    first_resume=json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert first_resume["resumed_from_collected_at"] == original_collected_at
+
+    asyncio.run(collector.collect(resume_args))
+    second_resume=json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert second_resume["resumed_from_collected_at"] == original_collected_at
