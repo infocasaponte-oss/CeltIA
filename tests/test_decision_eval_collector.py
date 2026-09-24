@@ -340,7 +340,7 @@ def test_resume_rejects_collecting_manifest_missing_structural_provenance(tmp_pa
     )
     monkeypatch.setattr(collector,"build_runtime",FakeRuntime)
 
-    for field in ("collected_at","backend","policy","code_revision"):
+    for field in ("collected_at","backend","policy","code_revision","code_dirty"):
         manifest=collector._runtime_manifest(FakeRuntime(),[str(dataset)])
         manifest.pop(field)
         (tmp_path / "results.jsonl.manifest.json").write_text(
@@ -572,7 +572,7 @@ def test_resume_rejects_collecting_manifest_invalid_code_revision(tmp_path, monk
         asyncio.run(collector.collect(args))
         assert False
     except ValueError as exc:
-        assert "code revision provenance" in str(exc)
+        assert "code provenance" in str(exc)
 
 
 
@@ -582,11 +582,13 @@ def test_resume_allows_null_code_revision_when_current_environment_is_unresolved
     monkeypatch.setattr(collector,"build_runtime",FakeRuntime)
     monkeypatch.setattr(collector,"route",lambda text:type("R",(),{"mode":"fast"})())
     monkeypatch.setattr(collector,"_code_revision",lambda:None)
+    monkeypatch.setattr(collector,"_code_dirty",lambda:None)
 
     args=_args(tmp_path)
     args.dataset=[str(dataset)]
     first=asyncio.run(collector.collect(args))
     assert first["manifest"]["code_revision"] is None
+    assert first["manifest"]["code_dirty"] is None
 
     resume_args=_args(tmp_path,resume=True)
     resume_args.dataset=[str(dataset)]
@@ -594,3 +596,29 @@ def test_resume_allows_null_code_revision_when_current_environment_is_unresolved
     assert second["written"] == 0
     assert second["skipped"] == 1
     assert second["manifest"]["code_revision"] is None
+    assert second["manifest"]["code_dirty"] is None
+
+
+
+def test_resume_rejects_changed_tracked_worktree_state(tmp_path, monkeypatch):
+    dataset=tmp_path / "dataset.jsonl"
+    dataset.write_text('{"text":"one","expected":"fast","ood":false}\n',encoding="utf-8")
+    monkeypatch.setattr(collector,"build_runtime",FakeRuntime)
+    monkeypatch.setattr(collector,"route",lambda text:type("R",(),{"mode":"fast"})())
+    monkeypatch.setattr(collector,"_code_revision",lambda:"a" * 40)
+    monkeypatch.setattr(collector,"_code_dirty",lambda:False)
+
+    args=_args(tmp_path)
+    args.dataset=[str(dataset)]
+    first=asyncio.run(collector.collect(args))
+    assert first["manifest"]["code_revision"] == "a" * 40
+    assert first["manifest"]["code_dirty"] is False
+
+    monkeypatch.setattr(collector,"_code_dirty",lambda:True)
+    resume_args=_args(tmp_path,resume=True)
+    resume_args.dataset=[str(dataset)]
+    try:
+        asyncio.run(collector.collect(resume_args))
+        assert False
+    except ValueError as exc:
+        assert "code_dirty provenance does not match current runtime" in str(exc)
