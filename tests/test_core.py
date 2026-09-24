@@ -1,4 +1,5 @@
 import asyncio
+import sqlite3
 
 from core.memory import Memory
 from core.planner import Planner
@@ -140,3 +141,32 @@ def test_offline_fallback_response():
         assert result["session_id"] == "offline-demo"
 
     asyncio.run(run_case())
+
+
+def test_decision_shadow_telemetry_and_migration(tmp_path):
+    db_path = tmp_path / "shadow.db"
+    db = sqlite3.connect(db_path)
+    db.execute(
+        "CREATE TABLE decision_shadow(id INTEGER PRIMARY KEY,api_key_id INTEGER,"
+        "heuristic_route TEXT,cde_route TEXT,confidence REAL,abstained INTEGER,"
+        "agreed INTEGER,created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"
+    )
+    db.commit()
+    db.close()
+
+    mem = Memory(str(db_path))
+    columns = {row[1] for row in mem.db.execute("PRAGMA table_info(decision_shadow)").fetchall()}
+    assert {"abstention_reason", "normalized_entropy", "margin"} <= columns
+
+    mem.record_decision_shadow(
+        1, "fast", None, .5, True,
+        abstention_reason="suspected_ood",
+        normalized_entropy=1.0,
+        margin=0.0,
+    )
+    report = mem.decision_shadow_summary()
+    assert report["samples"] == 1
+    assert report["abstentions"] == 1
+    assert report["abstention_reasons"] == {"suspected_ood": 1}
+    assert report["avg_normalized_entropy"] == 1.0
+    assert report["avg_margin"] == 0.0
