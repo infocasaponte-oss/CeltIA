@@ -39,6 +39,14 @@ def validate_code_revision(value: object) -> bool:
     )
 
 
+def validate_code_provenance(revision: object, dirty: object) -> bool:
+    if not validate_code_revision(revision):
+        return False
+    if revision is None:
+        return dirty is None
+    return isinstance(dirty,bool)
+
+
 def declared_backend_models(value: object) -> set[str]:
     if not isinstance(value,dict):
         return set()
@@ -167,8 +175,15 @@ def validate_results_manifest(results_path: Path, datasets: list[str], *, requir
         raise ValueError("CDE results manifest has invalid backend provenance")
     if not validate_policy_provenance(manifest.get("policy")):
         raise ValueError("CDE results manifest has invalid policy provenance")
-    if "code_revision" not in manifest or not validate_code_revision(manifest.get("code_revision")):
-        raise ValueError("CDE results manifest has invalid code revision provenance")
+    if (
+        "code_revision" not in manifest
+        or "code_dirty" not in manifest
+        or not validate_code_provenance(
+            manifest.get("code_revision"),
+            manifest.get("code_dirty"),
+        )
+    ):
+        raise ValueError("CDE results manifest has invalid code provenance")
     expected_dataset_sha=manifest.get("dataset_sha256")
     if (
         not isinstance(expected_dataset_sha,str)
