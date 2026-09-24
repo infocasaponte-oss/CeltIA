@@ -20,8 +20,8 @@ from scripts.evaluate_decision_routes import (
     file_sha256,
     load_cde_results,
     load_jsonl,
+    parse_aware_timestamp,
     validate_results_manifest,
-    valid_aware_timestamp,
 )
 
 ROUTES=("fast","think","code","agent","long")
@@ -95,11 +95,16 @@ def _validate_collecting_manifest(manifest: dict, datasets: list[str], results_p
     ):
         raise ValueError("resume manifest dataset list does not match selected datasets")
     collected_at=manifest.get("collected_at")
-    if not valid_aware_timestamp(collected_at):
+    collected_at_value=parse_aware_timestamp(collected_at)
+    if collected_at_value is None:
         raise ValueError("resume manifest has invalid collected_at")
     resumed_from_collected_at=manifest.get("resumed_from_collected_at")
-    if resumed_from_collected_at is not None and not valid_aware_timestamp(resumed_from_collected_at):
-        raise ValueError("resume manifest has invalid resumed_from_collected_at")
+    if resumed_from_collected_at is not None:
+        resumed_from_value=parse_aware_timestamp(resumed_from_collected_at)
+        if resumed_from_value is None:
+            raise ValueError("resume manifest has invalid resumed_from_collected_at")
+        if resumed_from_value > collected_at_value:
+            raise ValueError("resume manifest root timestamp is after collected_at")
     if not isinstance(manifest.get("backend"),dict):
         raise ValueError("resume manifest has invalid backend provenance")
     if not isinstance(manifest.get("policy"),dict):
