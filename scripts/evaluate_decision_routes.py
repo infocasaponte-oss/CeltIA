@@ -31,6 +31,55 @@ def valid_aware_timestamp(value: object) -> bool:
     return parse_aware_timestamp(value) is not None
 
 
+def validate_backend_provenance(value: object) -> bool:
+    if not isinstance(value,dict):
+        return False
+    required={"client_type","model","primary_model","fallback_model"}
+    if not required.issubset(value):
+        return False
+    if not isinstance(value.get("client_type"),str) or not value["client_type"].strip():
+        return False
+    for field in ("model","primary_model","fallback_model"):
+        model=value.get(field)
+        if model is not None and (not isinstance(model,str) or not model.strip()):
+            return False
+    return True
+
+
+def validate_policy_provenance(value: object) -> bool:
+    if not isinstance(value,dict):
+        return False
+    required={
+        "abstain_below",
+        "temperature",
+        "reject_suspected_ood",
+        "ood_entropy_threshold",
+        "ood_margin_threshold",
+    }
+    if not required.issubset(value):
+        return False
+    if not isinstance(value.get("reject_suspected_ood"),bool):
+        return False
+    for field in ("abstain_below","ood_entropy_threshold","ood_margin_threshold"):
+        raw=value.get(field)
+        if isinstance(raw,bool):
+            return False
+        try:
+            number=float(raw)
+        except (TypeError,ValueError,OverflowError):
+            return False
+        if not math.isfinite(number) or not 0 <= number <= 1:
+            return False
+    temperature=value.get("temperature")
+    if isinstance(temperature,bool):
+        return False
+    try:
+        temperature_value=float(temperature)
+    except (TypeError,ValueError,OverflowError):
+        return False
+    return math.isfinite(temperature_value) and temperature_value > 0
+
+
 def file_sha256(path: Path) -> str:
     digest=hashlib.sha256()
     with path.open("rb") as handle:
@@ -78,9 +127,9 @@ def validate_results_manifest(results_path: Path, datasets: list[str]) -> dict:
             raise ValueError("CDE results manifest has invalid resumed_from_collected_at")
         if resumed_from_value > collected_at_value:
             raise ValueError("CDE results manifest resume timestamp is after collected_at")
-    if not isinstance(manifest.get("backend"),dict):
+    if not validate_backend_provenance(manifest.get("backend")):
         raise ValueError("CDE results manifest has invalid backend provenance")
-    if not isinstance(manifest.get("policy"),dict):
+    if not validate_policy_provenance(manifest.get("policy")):
         raise ValueError("CDE results manifest has invalid policy provenance")
     expected_dataset_sha=manifest.get("dataset_sha256")
     if (
