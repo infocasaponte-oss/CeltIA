@@ -21,6 +21,7 @@ A request contains shared context plus questions. Each question exposes a finite
 - the LLM scorer serializes context/question/candidates as untrusted JSON data and rejects non-serializable context instead of coercing it;
 - low confidence can abstain;
 - sync and async engines share the same optional OOD rejection semantics (entropy/margin thresholds);
+- policy thresholds are bounded to [0,1] and scorer logits must be finite numeric values (booleans are rejected);
 - deterministic tests need no GPU/model downloads.
 
 ## Next milestones
