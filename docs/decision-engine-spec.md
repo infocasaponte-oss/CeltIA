@@ -13,6 +13,7 @@ A request contains shared context plus questions. Each question exposes a finite
 - no generative parsing required by the core;
 - model/backbone stays behind CandidateScorer;
 - full probability distribution returned;
+- results expose observable abstention diagnostics (`low_confidence` / `suspected_ood`), normalized entropy and decision margin without exposing hidden reasoning;
 - `/v1/decide` uses the same gateway concurrency/rate-limit slot as other model-backed requests;
 - model usage from decision scoring is aggregated per request and fed into CeltIA usage/quota/billing accounting;
 - invalid definitions/output fail closed;
