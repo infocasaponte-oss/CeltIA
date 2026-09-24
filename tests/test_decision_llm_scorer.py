@@ -109,3 +109,25 @@ def test_llm_scorer_rejects_duplicate_candidate_key():
         assert False
     except ValueError as exc:
         assert "duplicate JSON key" in str(exc)
+
+
+def test_llm_scorer_rejects_pathologically_deep_context_before_model_call():
+    calls = []
+    async def chat(messages):
+        calls.append(messages)
+        return '{"scores":{"c0":0.0,"c1":1.0}}'
+
+    context = []
+    cursor = context
+    for _ in range(2000):
+        child = []
+        cursor.append(child)
+        cursor = child
+
+    q = DecisionQuestion("safe", "safe?", DecisionType.BOOLEAN)
+    try:
+        asyncio.run(AsyncLLMDecisionScorer(chat).score(context, q, q.candidates()))
+        assert False
+    except ValueError as exc:
+        assert "JSON serializable" in str(exc)
+    assert calls == []
