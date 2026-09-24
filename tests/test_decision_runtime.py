@@ -119,3 +119,44 @@ def test_runtime_reserves_output_budget_for_indexed_scores():
         "id":"route","prompt":"route","type":"choice","options":["fast","think"]
     }]))
     assert llm.kwargs["max_tokens"] == 1024
+
+
+def test_runtime_supports_lower_configured_question_limit():
+    runtime = CeltIADecisionRuntime(FakeLLM(), max_questions=1)
+    questions = [
+        {"id":"q1","prompt":"x","type":"boolean"},
+        {"id":"q2","prompt":"x","type":"boolean"},
+    ]
+    try:
+        asyncio.run(runtime.decide({}, questions))
+        assert False
+    except ValueError as exc:
+        assert "between 1 and 1" in str(exc)
+
+
+def test_runtime_supports_configurable_output_token_cap():
+    llm = CaptureBudgetLLM()
+    runtime = CeltIADecisionRuntime(
+        llm,
+        abstain_below=0.0,
+        reject_suspected_ood=False,
+        max_output_tokens=256,
+    )
+    asyncio.run(runtime.decide({}, [{
+        "id":"route","prompt":"route","type":"choice","options":["fast","think"]
+    }]))
+    assert llm.kwargs["max_tokens"] == 256
+
+
+def test_runtime_rejects_invalid_cost_bounds():
+    for kwargs in (
+        {"max_questions": 0},
+        {"max_questions": 33},
+        {"max_output_tokens": 63},
+        {"max_output_tokens": 2049},
+    ):
+        try:
+            CeltIADecisionRuntime(FakeLLM(), **kwargs)
+            assert False
+        except ValueError:
+            pass
