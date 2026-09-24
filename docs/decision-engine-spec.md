@@ -48,7 +48,7 @@ Backend results are environment-specific and are not a CI performance gate. Alte
 
 ## Next milestones
 1. Collect backend token/latency/memory evidence with the new harness before enabling caching in the runtime.
-2. Expand the new labeled routing/OOD evaluation set toward promotion-scale coverage (the current OOD suite is intentionally small and adversarial).
+2. Collect real CDE outputs for the current 100-case labeled routing/OOD suite, then expand toward the 200+ promotion floor with broader natural OOD and domain coverage.
 3. Evaluate LoRA/trained decision heads against the current LLM-scorer baseline.
 4. Add controlled-routing rollout only after promotion-gate evidence is sufficient.
 
