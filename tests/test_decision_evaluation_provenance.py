@@ -359,7 +359,9 @@ def test_results_manifest_rejects_invalid_policy_provenance(tmp_path):
     invalid_policies=(
         {"abstain_below":0.55},
         {**_policy_provenance(),"reject_suspected_ood":"yes"},
+        {**_policy_provenance(),"abstain_below":"0.55"},
         {**_policy_provenance(),"ood_entropy_threshold":1.1},
+        {**_policy_provenance(),"temperature":"1.0"},
         {**_policy_provenance(),"temperature":0},
     )
     for policy in invalid_policies:
