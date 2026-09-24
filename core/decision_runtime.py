@@ -73,12 +73,29 @@ class CeltIADecisionRuntime:
                 raise RuntimeError("decision backend returned empty content")
 
             raw_usage = response.get("usage") or {}
-            prompt_tokens = int(raw_usage.get("prompt_tokens") or max(1, len(json.dumps(messages, ensure_ascii=False)) // 3))
-            completion_tokens = int(raw_usage.get("completion_tokens") or max(1, len(content) // 3))
-            total_tokens = int(raw_usage.get("total_tokens") or (prompt_tokens + completion_tokens))
-            usage["prompt_tokens"] += max(0, prompt_tokens)
-            usage["completion_tokens"] += max(0, completion_tokens)
-            usage["total_tokens"] += max(0, total_tokens)
+
+            def token_count(name: str, fallback: int) -> int:
+                raw = raw_usage.get(name)
+                if raw is None or isinstance(raw, bool):
+                    return fallback
+                try:
+                    value = int(raw)
+                except (TypeError, ValueError, OverflowError):
+                    return fallback
+                return value if value >= 0 else fallback
+
+            prompt_tokens = token_count(
+                "prompt_tokens",
+                max(1, len(json.dumps(messages, ensure_ascii=False)) // 3),
+            )
+            completion_tokens = token_count(
+                "completion_tokens",
+                max(1, len(content) // 3),
+            )
+            total_tokens = prompt_tokens + completion_tokens
+            usage["prompt_tokens"] += prompt_tokens
+            usage["completion_tokens"] += completion_tokens
+            usage["total_tokens"] += total_tokens
             return content.strip()
 
         engine = AsyncDecisionEngine(AsyncLLMDecisionScorer(chat), **self.engine_options)
