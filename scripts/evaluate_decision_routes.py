@@ -5,7 +5,6 @@ import json
 import math
 from pathlib import Path
 
-from core.router import route
 from celtia.decision.evaluation import ShadowSample, evaluate_shadow, promotion_gate
 
 ROUTES={"fast","think","code","agent","long"}
@@ -69,6 +68,10 @@ def load_cde_results(path: Path) -> dict[str, dict]:
 
 
 def main():
+    # Keep the reusable JSONL validation helpers dependency-free. Routing needs
+    # application settings, so import it only when the CLI actually runs.
+    from core.router import route
+
     p=argparse.ArgumentParser()
     p.add_argument(
         "--dataset",
