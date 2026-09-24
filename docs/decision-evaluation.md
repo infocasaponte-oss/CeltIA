@@ -12,17 +12,20 @@ Default CLI gate:
 - at least 50 labeled routing samples;
 - at least 80% coverage on labeled routing samples;
 - CDE labeled routing accuracy at least 2 percentage points above the heuristic;
+- at least 10 labeled samples for every individual route;
+- at least 70% CDE decision coverage on every individual route;
+- at least 60% total accuracy on every individual route (abstentions count against this value);
 - at least 20 OOD-labeled samples spanning in-domain negatives and OOD positives;
 - at least 80% OOD-signal coverage;
 - at least 80% OOD recall;
 - at most 20% OOD false-positive rate.
 
-The reusable `promotion_gate()` function keeps OOD thresholds optional for backwards-compatible programmatic use. The evaluation CLI supplies the OOD thresholds above by default so a controlled-routing eligibility check cannot pass using routing accuracy alone.
+The reusable `promotion_gate()` function keeps per-route and OOD thresholds optional for backwards-compatible programmatic use. The evaluation CLI supplies both sets of thresholds above by default. Aggregate accuracy therefore cannot hide a collapsed or heavily abstaining route, and a controlled-routing eligibility check cannot pass using routing accuracy alone.
 
 Passing the gate means eligible for a controlled experiment, not automatic activation. Tool authorization and security policy remain independent of routing.
 
 
-Evaluation also reports selective accuracy: accuracy only on labeled samples where CDE actually returns a decision. This is reported alongside total labeled accuracy and labeled coverage so abstention cannot hide errors or inflate the promotion result.
+Evaluation also reports selective accuracy: accuracy only on labeled samples where CDE actually returns a decision. This is reported alongside total labeled accuracy and labeled coverage so abstention cannot hide errors or inflate the promotion result. The same distinction is now reported per route, together with route-specific labeled count and coverage; promotion uses the non-selective per-route accuracy floor.
 
 
 ## Option-order evaluation harness
