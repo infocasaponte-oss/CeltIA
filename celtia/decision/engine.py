@@ -32,4 +32,9 @@ class DecisionEngine:
             ood_entropy_threshold=self.ood_entropy_threshold,
             ood_margin_threshold=self.ood_margin_threshold,
         )
-        return DecisionResult(q.id, pairs, **outcome)
+        expected_score = (
+            sum(float(candidate) * probability for candidate, probability in pairs.items())
+            if q.type.value == "score"
+            else None
+        )
+        return DecisionResult(q.id, pairs, expected_score=expected_score, **outcome)
