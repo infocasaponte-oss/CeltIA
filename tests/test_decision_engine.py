@@ -142,3 +142,36 @@ def test_score_requires_at_least_two_candidate_values():
         assert False
     except ValueError as exc:
         assert "at least two ordered values" in str(exc)
+
+
+def test_question_rejects_blank_or_wrongly_typed_text_fields():
+    invalid = (
+        DecisionQuestion("   ", "prompt", DecisionType.BOOLEAN),
+        DecisionQuestion("id", "   ", DecisionType.BOOLEAN),
+        DecisionQuestion(123, "prompt", DecisionType.BOOLEAN),
+        DecisionQuestion("id", 123, DecisionType.BOOLEAN),
+        DecisionQuestion("id", "prompt", "boolean"),
+        DecisionQuestion("id", "prompt", DecisionType.CHOICE, ("ok", "   ")),
+        DecisionQuestion("id", "prompt", DecisionType.CHOICE, ("ok", 123)),
+    )
+    for question in invalid:
+        try:
+            question.candidates()
+            assert False, question
+        except ValueError:
+            pass
+
+
+def test_score_bounds_reject_booleans_and_non_integers():
+    invalid = (
+        DecisionQuestion("score", "score", DecisionType.SCORE, minimum=True, maximum=5),
+        DecisionQuestion("score", "score", DecisionType.SCORE, minimum=1, maximum=False),
+        DecisionQuestion("score", "score", DecisionType.SCORE, minimum=1.0, maximum=5),
+        DecisionQuestion("score", "score", DecisionType.SCORE, minimum=1, maximum=5.0),
+    )
+    for question in invalid:
+        try:
+            question.candidates()
+            assert False, question
+        except ValueError as exc:
+            assert "score bounds must be integers" in str(exc)
