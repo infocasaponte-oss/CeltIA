@@ -160,6 +160,7 @@ def test_decision_api_schema_rejects_invalid_choice_and_score_semantics():
         {"id":"c","prompt":"choice?","type":"choice","options":["x","x"]},
         {"id":"s","prompt":"score?","type":"score"},
         {"id":"s","prompt":"score?","type":"score","minimum":5,"maximum":4},
+        {"id":"s","prompt":"score?","type":"score","minimum":5,"maximum":5},
         {"id":"s","prompt":"score?","type":"score","minimum":0,"maximum":101},
     ]
     for question in invalid_questions:
