@@ -61,6 +61,7 @@ def test_collect_checkpoints_and_resumes_without_duplicate_calls(tmp_path, monke
     manifest=json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["format_version"] == collector.RESULT_FORMAT_VERSION
     assert manifest["status"] == "complete"
+    assert manifest["selection"] == {"dataset_rows":3,"selected_rows":2,"limit":2}
     assert manifest["result_rows"] == 2
     assert manifest["results_sha256"] == collector.file_sha256(path)
     assert first["manifest_output"] == str(manifest_path)
