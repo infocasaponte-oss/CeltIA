@@ -131,26 +131,37 @@ class CeltIADecisionRuntime:
             for minimum in minimum_output_tokens
         ]
         total_prompt_chars = 0
-        for question in request.questions:
+        output_budget_by_messages = {}
+        for question, output_budget in zip(request.questions, output_budgets):
             messages = AsyncLLMDecisionScorer.messages_for(
                 request.context,
                 question,
                 question.candidates(),
             )
-            total_prompt_chars += len(json.dumps(
+            message_key = json.dumps(
                 messages,
                 ensure_ascii=False,
                 separators=(",", ":"),
-            ))
+            )
+            total_prompt_chars += len(message_key)
+            previous_budget = output_budget_by_messages.setdefault(message_key, output_budget)
+            if previous_budget != output_budget:
+                raise RuntimeError("ambiguous decision output budget")
         if total_prompt_chars > self.max_total_prompt_chars:
             raise ValueError(
                 f"decision prompt budget exceeded: {total_prompt_chars} > {self.max_total_prompt_chars} characters"
             )
 
-        output_budget_iter=iter(output_budgets)
-
         async def chat(messages: list[dict]) -> str:
-            per_call_output_tokens=next(output_budget_iter)
+            message_key = json.dumps(
+                messages,
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+            try:
+                per_call_output_tokens = output_budget_by_messages[message_key]
+            except KeyError as exc:
+                raise RuntimeError("unexpected decision scorer request") from exc
             try:
                 response = await asyncio.wait_for(
                     self.llm.chat(
