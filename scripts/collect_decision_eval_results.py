@@ -96,6 +96,20 @@ def _code_revision() -> str | None:
     return value if SHA256_RE.fullmatch(value) or re.fullmatch(r"^[0-9a-f]{40}$",value) else None
 
 
+def _code_dirty() -> bool | None:
+    try:
+        completed=subprocess.run(
+            ["git","status","--porcelain","--untracked-files=no"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError,subprocess.SubprocessError):
+        return None
+    return bool(completed.stdout.strip())
+
+
 def _load_manifest(path: Path) -> dict:
     try:
         value=json.loads(path.read_text(encoding="utf-8"))
@@ -133,6 +147,13 @@ def _validate_collecting_manifest(manifest: dict, datasets: list[str], results_p
         raise ValueError("resume manifest has invalid policy provenance")
     if "code_revision" not in manifest or not validate_code_revision(manifest.get("code_revision")):
         raise ValueError("resume manifest has invalid code revision provenance")
+    code_revision=manifest.get("code_revision")
+    code_dirty=manifest.get("code_dirty")
+    if code_revision is None:
+        if code_dirty is not None:
+            raise ValueError("resume manifest has invalid code dirty provenance")
+    elif not isinstance(code_dirty,bool):
+        raise ValueError("resume manifest has invalid code dirty provenance")
     selected_rows=validate_selection_provenance(
         manifest.get("selection"),
         dataset_rows=dataset_rows,
@@ -180,6 +201,7 @@ def _runtime_manifest(runtime: CeltIADecisionRuntime, datasets: list[str], *, da
         "collected_at":datetime.now(timezone.utc).isoformat(),
         "dataset_sha256":dataset_sha256(datasets),
         "code_revision":_code_revision(),
+        "code_dirty":_code_dirty(),
         "datasets":datasets,
         "selection":{
             "dataset_rows":dataset_rows,
@@ -321,7 +343,7 @@ async def collect(args) -> dict:
     if resume_manifest is not None:
         if resume_manifest.get("dataset_sha256") != manifest["dataset_sha256"]:
             raise ValueError("resume dataset provenance does not match current datasets")
-        for field in ("backend","policy","code_revision"):
+        for field in ("backend","policy","code_revision","code_dirty"):
             if resume_manifest.get(field) != manifest[field]:
                 raise ValueError(f"resume {field} provenance does not match current runtime")
         manifest["resumed_from_collected_at"]=(
