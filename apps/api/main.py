@@ -156,18 +156,25 @@ class ChatRequest(BaseModel):
     max_tokens:int|None=None
     timezone:str|None=None
 
-DecisionOptionInput = Annotated[str, Field(min_length=1, max_length=1000)]
+DecisionOptionInput = Annotated[str, Field(min_length=1, max_length=1000, strict=True)]
+DecisionScoreBound = Annotated[int, Field(strict=True)]
 
 class DecisionQuestionInput(BaseModel):
-    id: str = Field(min_length=1, max_length=128)
-    prompt: str = Field(min_length=1, max_length=8000)
+    id: str = Field(min_length=1, max_length=128, strict=True)
+    prompt: str = Field(min_length=1, max_length=8000, strict=True)
     type: Literal["boolean", "choice", "score"]
     options: list[DecisionOptionInput] = Field(default_factory=list, max_length=64)
-    minimum: int | None = None
-    maximum: int | None = None
+    minimum: DecisionScoreBound | None = None
+    maximum: DecisionScoreBound | None = None
 
     @model_validator(mode="after")
     def validate_type_fields(self):
+        if not self.id.strip():
+            raise ValueError("question id must not be blank")
+        if not self.prompt.strip():
+            raise ValueError("question prompt must not be blank")
+        if any(not option.strip() for option in self.options):
+            raise ValueError("choice options must not be blank")
         if self.type == "boolean":
             if self.options or self.minimum is not None or self.maximum is not None:
                 raise ValueError("boolean questions do not accept options or score bounds")
