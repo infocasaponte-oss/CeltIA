@@ -26,6 +26,7 @@ class CeltIADecisionRuntime:
         max_questions: int = 32,
         max_output_tokens: int = 1024,
         max_total_output_tokens: int = 8192,
+        max_total_prompt_chars: int = 250000,
     ):
         if not 1 <= max_questions <= self.HARD_MAX_QUESTIONS:
             raise ValueError("max_questions must be between 1 and 32")
@@ -35,10 +36,13 @@ class CeltIADecisionRuntime:
             raise ValueError("max_total_output_tokens must be between 64 and 65536")
         if max_total_output_tokens < max_questions * 64:
             raise ValueError("max_total_output_tokens is too small for max_questions")
+        if not 10000 <= max_total_prompt_chars <= 2000000:
+            raise ValueError("max_total_prompt_chars must be between 10000 and 2000000")
         self.llm = llm
         self.max_questions = max_questions
         self.max_output_tokens = max_output_tokens
         self.max_total_output_tokens = max_total_output_tokens
+        self.max_total_prompt_chars = max_total_prompt_chars
         self.engine_options = {
             "abstain_below": abstain_below,
             "temperature": temperature,
@@ -81,6 +85,22 @@ class CeltIADecisionRuntime:
             self.max_output_tokens,
             self.max_total_output_tokens // len(request.questions),
         )
+        total_prompt_chars = 0
+        for question in request.questions:
+            messages = AsyncLLMDecisionScorer.messages_for(
+                request.context,
+                question,
+                question.candidates(),
+            )
+            total_prompt_chars += len(json.dumps(
+                messages,
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ))
+        if total_prompt_chars > self.max_total_prompt_chars:
+            raise ValueError(
+                f"decision prompt budget exceeded: {total_prompt_chars} > {self.max_total_prompt_chars} characters"
+            )
 
         async def chat(messages: list[dict]) -> str:
             response = await self.llm.chat(
