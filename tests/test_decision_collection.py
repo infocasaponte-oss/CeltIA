@@ -8,7 +8,7 @@ class FakeRuntime:
     def __init__(self):
         self.calls=[]
 
-    async def decide(self, context, questions):
+    async def decide_with_usage(self, context, questions):
         self.calls.append((context, questions))
         return [SimpleNamespace(
             decision="think",
@@ -18,7 +18,7 @@ class FakeRuntime:
             abstention_reason=None,
             normalized_entropy=.3,
             margin=.5,
-        )]
+        )], {"prompt_tokens":1,"completion_tokens":1,"total_tokens":2,"models":["test-model"]}
 
 
 def test_collect_one_matches_shadow_routing_shape():
@@ -33,6 +33,7 @@ def test_collect_one_matches_shadow_routing_shape():
     assert item["suspected_ood"] is False
     assert item["expected"] == "think"
     assert item["expected_ood"] is False
+    assert item["models_used"] == ["test-model"]
     context,questions=runtime.calls[0]
     assert context["user_message"] == row["text"]
     assert context["heuristic_route"] in {"fast","think","code","agent","long"}
