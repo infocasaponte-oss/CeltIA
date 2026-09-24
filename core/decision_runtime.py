@@ -10,12 +10,29 @@ from celtia.decision.schema import DecisionQuestion, DecisionRequest, DecisionTy
 
 class CeltIADecisionRuntime:
     MAX_CONTEXT_CHARS = 50000
-    MAX_QUESTIONS = 32
+    HARD_MAX_QUESTIONS = 32
 
     """Bridge between the independent CDE core and CeltIA's existing local LLM client."""
 
-    def __init__(self, llm, *, abstain_below: float = 0.55, temperature: float = 1.0, reject_suspected_ood: bool = True, ood_entropy_threshold: float = 0.90, ood_margin_threshold: float = 0.10):
+    def __init__(
+        self,
+        llm,
+        *,
+        abstain_below: float = 0.55,
+        temperature: float = 1.0,
+        reject_suspected_ood: bool = True,
+        ood_entropy_threshold: float = 0.90,
+        ood_margin_threshold: float = 0.10,
+        max_questions: int = 32,
+        max_output_tokens: int = 1024,
+    ):
+        if not 1 <= max_questions <= self.HARD_MAX_QUESTIONS:
+            raise ValueError("max_questions must be between 1 and 32")
+        if not 64 <= max_output_tokens <= 2048:
+            raise ValueError("max_output_tokens must be between 64 and 2048")
         self.llm = llm
+        self.max_questions = max_questions
+        self.max_output_tokens = max_output_tokens
         self.engine_options = {
             "abstain_below": abstain_below,
             "temperature": temperature,
@@ -31,8 +48,8 @@ class CeltIADecisionRuntime:
             raise ValueError("context must be JSON-serializable") from exc
         if len(serialized_context) > self.MAX_CONTEXT_CHARS:
             raise ValueError("decision context exceeds 50000 serialized characters")
-        if not questions or len(questions) > self.MAX_QUESTIONS:
-            raise ValueError("questions must contain between 1 and 32 items")
+        if not questions or len(questions) > self.max_questions:
+            raise ValueError(f"questions must contain between 1 and {self.max_questions} items")
         ids = [q.get("id") for q in questions]
         if len(ids) != len(set(ids)):
             raise ValueError("question ids must be unique")
@@ -59,7 +76,7 @@ class CeltIADecisionRuntime:
             response = await self.llm.chat(
                 messages,
                 thinking=False,
-                max_tokens=1024,
+                max_tokens=self.max_output_tokens,
                 temperature=0.0,
             )
             meta = response.get("meta") or {}
