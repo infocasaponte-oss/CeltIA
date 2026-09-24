@@ -25,14 +25,20 @@ class CeltIADecisionRuntime:
         ood_margin_threshold: float = 0.10,
         max_questions: int = 32,
         max_output_tokens: int = 1024,
+        max_total_output_tokens: int = 8192,
     ):
         if not 1 <= max_questions <= self.HARD_MAX_QUESTIONS:
             raise ValueError("max_questions must be between 1 and 32")
         if not 64 <= max_output_tokens <= 2048:
             raise ValueError("max_output_tokens must be between 64 and 2048")
+        if not 64 <= max_total_output_tokens <= 65536:
+            raise ValueError("max_total_output_tokens must be between 64 and 65536")
+        if max_total_output_tokens < max_questions * 64:
+            raise ValueError("max_total_output_tokens is too small for max_questions")
         self.llm = llm
         self.max_questions = max_questions
         self.max_output_tokens = max_output_tokens
+        self.max_total_output_tokens = max_total_output_tokens
         self.engine_options = {
             "abstain_below": abstain_below,
             "temperature": temperature,
@@ -71,12 +77,16 @@ class CeltIADecisionRuntime:
     async def decide_with_usage(self, context, questions):
         request = self._request(context, questions)
         usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        per_call_output_tokens = min(
+            self.max_output_tokens,
+            self.max_total_output_tokens // len(request.questions),
+        )
 
         async def chat(messages: list[dict]) -> str:
             response = await self.llm.chat(
                 messages,
                 thinking=False,
-                max_tokens=self.max_output_tokens,
+                max_tokens=per_call_output_tokens,
                 temperature=0.0,
             )
             meta = response.get("meta") or {}
