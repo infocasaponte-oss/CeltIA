@@ -635,6 +635,13 @@ async def create_api_key(req: ApiKeyCreateRequest, _=Depends(require_admin)):
 async def list_api_keys(_=Depends(require_admin)):
     return {"keys": memory.list_api_keys()}
 
+def _assert_not_last_admin(target: dict) -> None:
+    """Refuse to demote/deactivate the only active admin (it would lock everyone out of the admin panel)."""
+    if target["role"] == "admin" and target["active"]:
+        active_admins = [k for k in memory.list_api_keys() if k["role"] == "admin" and k["active"]]
+        if len(active_admins) <= 1:
+            raise HTTPException(400, "No puedes quitar el rol ni desactivar al único administrador activo")
+
 @app.patch("/admin/api-keys/{key_id}")
 async def update_api_key(key_id: int, req: ApiKeyUpdateRequest, _=Depends(require_admin)):
     target = memory.get_api_key(key_id)
@@ -642,10 +649,8 @@ async def update_api_key(key_id: int, req: ApiKeyUpdateRequest, _=Depends(requir
         raise HTTPException(404, "API key not found")
     demoting = req.role is not None and req.role != "admin"
     deactivating = req.active is False
-    if target["role"] == "admin" and target["active"] and (demoting or deactivating):
-        active_admins = [k for k in memory.list_api_keys() if k["role"] == "admin" and k["active"]]
-        if len(active_admins) <= 1:
-            raise HTTPException(400, "No puedes quitar el rol ni desactivar al único administrador activo")
+    if demoting or deactivating:
+        _assert_not_last_admin(target)
     if req.role is not None:
         if req.role not in ROLES:
             raise HTTPException(400, f"role must be one of {sorted(ROLES)}")
@@ -843,6 +848,10 @@ async def delete_my_data(key=Depends(require_api_key)):
 
 @app.delete("/admin/api-keys/{key_id}")
 async def revoke_api_key(key_id: int, _=Depends(require_admin)):
+    target = memory.get_api_key(key_id)
+    if not target:
+        raise HTTPException(404, "API key not found")
+    _assert_not_last_admin(target)
     if not memory.revoke_api_key(key_id):
         raise HTTPException(404, "API key not found")
     return {"revoked": key_id}
