@@ -41,8 +41,15 @@ NO_REASONING_LEAK = (
 )
 
 STYLE = (
-    "No uses emoticonos de forma decorativa ni repetitiva. Inclúyelos únicamente si aportan una "
-    "emoción genuina y relevante al mensaje, como mucho uno por respuesta."
+    "Estilo profesional: tono cordial, claro y directo, sin muletillas ni relleno. No uses emoticonos salvo que el "
+    "usuario los use primero. Da primero la respuesta o el resultado y después, si hace falta, el detalle. Usa "
+    "Markdown con moderación: listas y negrita para estructurar, tablas solo para comparar datos, y bloques de "
+    "código con el lenguaje indicado. Cuando uses información de la web, cita la fuente con un enlace. Si no "
+    "sabes algo o no pudiste comprobarlo, dilo con claridad en vez de inventarlo. Si falta información "
+    "imprescindible, haz como mucho una o dos preguntas concretas. Cuando te pidan un informe, entrégalo ya "
+    "redactado (título, resumen, secciones y conclusión) con lo que tengas del contexto de la conversación. "
+    "Si el usuario menciona un enlace o una página, léela con la herramienta fetch_url antes de responder; nunca "
+    "digas que no puedes acceder a enlaces si esa herramienta está disponible."
 )
 
 PRIVACY = (
@@ -129,8 +136,49 @@ def enforce_identity(text: str) -> str:
     return text
 
 
+from contextvars import ContextVar
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+_DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+_MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre",
+          "noviembre", "diciembre"]
+
+
+_request_tz: ContextVar[str | None] = ContextVar("celtia_request_tz", default=None)
+DEFAULT_TZ = "Europe/Madrid"
+
+
+def set_timezone(name: str | None) -> None:
+    """Timezone (IANA name, e.g. sent by the browser) used for the current request's date/time line."""
+    if name:
+        try:
+            ZoneInfo(name)
+        except (ZoneInfoNotFoundError, ValueError):
+            name = None
+    _request_tz.set(name)
+
+
+def current_date_line() -> str:
+    tz_name = _request_tz.get() or DEFAULT_TZ
+    try:
+        now = datetime.now(ZoneInfo(tz_name))
+    except ZoneInfoNotFoundError:
+        now = datetime.now().astimezone()
+        tz_name = str(now.tzinfo)
+    def fmt(dt):
+        return f"{_DIAS[dt.weekday()]} {dt.day} de {_MESES[dt.month - 1]} de {dt.year}"
+
+    relative = "; ".join(f"{label}: {fmt(now + timedelta(days=delta))}" for label, delta in
+                         (("ayer", -1), ("mañana", 1), ("pasado mañana", 2), ("dentro de una semana", 7)))
+    return (f"Fecha y hora actuales: {fmt(now)}, {now:%H:%M} (zona horaria {tz_name}). Fechas relativas ya calculadas: "
+            f"{relative}. Conoces siempre la fecha y la hora actuales gracias a este dato: úsalo para «hoy», «mañana», "
+            f"«ayer» o «esta semana», calcula cualquier otra fecha a partir de él (comprobando el día de la semana) y "
+            f"nunca digas que no puedes saber la fecha ni inventes otra.")
+
+
 def system_prompt(role: str, extra: str = "") -> str:
-    lines = [LANGUAGE, IDENTITY, FACT_CHECK, NO_REASONING_LEAK, STYLE]
+    lines = [LANGUAGE, IDENTITY, FACT_CHECK, NO_REASONING_LEAK, STYLE, current_date_line()]
     if role != "admin":
         lines.append(PRIVACY)
     if extra:
@@ -167,3 +215,76 @@ class IdentityStreamFilter:
         out = filtered[self.emitted:cut]
         self.emitted = cut
         return out
+
+
+
+_LANG_MARKERS = {
+    "gallego": {"unha", "unhas", "tamén", "mañá", "máis", "hoxe", "grazas", "quero", "podes", "non", "cousa", "cousas",
+                "axúdame", "estou", "teño", "dunha", "nunha", "facer", "onde", "ola", "bo", "ben", "pero", "moi"},
+    "español": {"una", "unas", "también", "mañana", "más", "hoy", "gracias", "quiero", "puedes", "cosa", "cosas",
+                "ayúdame", "estoy", "tengo", "del", "los", "las", "hacer", "donde", "cuando", "hola", "cómo", "está",
+                "qué", "sobre", "informe", "enlace", "tiempo"},
+    "inglés": {"the", "and", "is", "are", "what", "how", "please", "you", "with", "for", "can", "this", "that", "hello"},
+}
+_GALICIAN_ONLY = {"unha", "unhas", "tamén", "mañá", "máis", "hoxe", "grazas", "quero", "podes", "non", "cousa", "cousas",
+                  "axúdame", "estou", "teño", "dunha", "nunha", "facer", "onde", "ola", "moi"}
+_SPANISH_ONLY = {"una", "unas", "también", "mañana", "más", "hoy", "gracias", "quiero", "puedes", "cosa", "cosas",
+                 "ayúdame", "estoy", "tengo", "del", "los", "las", "hacer", "donde", "cuando", "hola", "cómo", "está",
+                 "qué", "informe", "enlace", "tiempo"}
+
+
+def detect_language(text: str) -> str | None:
+    words = re.findall(r"[a-záéíóúüñ]+", (text or "").lower())
+    if not words:
+        return None
+    gl = sum(w in _GALICIAN_ONLY for w in words)
+    es = sum(w in _SPANISH_ONLY for w in words)
+    en = sum(w in _LANG_MARKERS["inglés"] for w in words)
+    best = max((gl, "gallego"), (es, "español"), (en, "inglés"))
+    if best[0] == 0:
+        return None
+    # ties between gallego and español favour español (more common); gallego must clearly win
+    if best[1] == "gallego" and gl <= es:
+        return "español" if es else None
+    return best[1]
+
+
+def language_hint(text: str) -> str:
+    lang = detect_language(text)
+    if not lang:
+        return ""
+    return f"El último mensaje del usuario está en {lang}: responde íntegramente en {lang}, aunque las fuentes o herramientas estén en otro idioma."
+
+
+_REL_DATE = re.compile(r"(dentro\s+de|en|hace|hai|dentro\s+d[eo])\s+(\d{1,4})\s+(d[ií]as?|semanas?|meses|mes)", re.I)
+
+
+def _add_months(dt, months):
+    import calendar
+    total = dt.month - 1 + months
+    year, month = dt.year + total // 12, total % 12 + 1
+    return dt.replace(year=year, month=month, day=min(dt.day, calendar.monthrange(year, month)[1]))
+
+
+def relative_date_hint(text: str) -> str:
+    """Verified date arithmetic for requests like "dentro de 10 días" (small models get weekdays wrong)."""
+    lines = []
+    tz_name = _request_tz.get() or DEFAULT_TZ
+    try:
+        now = datetime.now(ZoneInfo(tz_name))
+    except ZoneInfoNotFoundError:
+        now = datetime.now().astimezone()
+    for m in _REL_DATE.finditer(text or ""):
+        past = m.group(1).lower() in ("hace", "hai")
+        n = int(m.group(2)) * (-1 if past else 1)
+        unit = m.group(3).lower()
+        if unit.startswith("d"):
+            target = now + timedelta(days=n)
+        elif unit.startswith("s"):
+            target = now + timedelta(weeks=n)
+        else:
+            target = _add_months(now, n)
+        lines.append(f"«{m.group(0)}» = {_DIAS[target.weekday()]} {target.day} de {_MESES[target.month - 1]} de {target.year}")
+    if not lines:
+        return ""
+    return "Cálculo de fechas ya verificado (úsalo tal cual, sin recalcular): " + "; ".join(lines) + "."

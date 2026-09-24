@@ -13,7 +13,7 @@ AGENT_INSTRUCTIONS = """Tienes capacidad de usar herramientas, incluida web_sear
 Si el usuario te pide buscar, investigar, encontrar información, noticias, o cualquier dato actual/verificable,
 DEBES llamar a web_search antes de responder. Nunca digas que no tienes acceso a internet o a información en
 tiempo real: sí lo tienes, a través de la herramienta web_search, y negarte a usarla cuando corresponde es un error.
-Usa el resto de herramientas solo cuando sea necesario. Nunca afirmes que una herramienta se ejecutó sin su resultado.
+Si el usuario menciona un enlace/URL, o necesitas el contenido completo de una página que devolvió web_search, usa fetch_url para leerla. Usa el resto de herramientas solo cuando sea necesario. Nunca afirmes que una herramienta se ejecutó sin su resultado.
 Después de cada resultado, verifica la salida y solo entonces entrega una respuesta final breve.
 Si un resultado de la herramienta indica un error, corrige el plan antes de finalizar."""
 
