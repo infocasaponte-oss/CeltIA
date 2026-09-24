@@ -74,3 +74,16 @@ def test_llm_scorer_rejects_non_json_context_before_model_call():
     except ValueError as exc:
         assert "JSON serializable" in str(exc)
     assert calls == []
+
+
+def test_llm_scorer_uses_compact_ids_for_long_candidate_text():
+    seen = {}
+    async def chat(messages):
+        seen["payload"] = messages[1]["content"]
+        return '{"scores":{"c0":0.25,"c1":0.75}}'
+    long_candidate = "x" * 1000
+    q = DecisionQuestion("route", "route", DecisionType.CHOICE, (long_candidate, "short"))
+    values = asyncio.run(AsyncLLMDecisionScorer(chat).score({}, q, q.candidates()))
+    assert values == [0.25, 0.75]
+    assert '"id":"c0"' in seen["payload"]
+    assert '"id":"c1"' in seen["payload"]
