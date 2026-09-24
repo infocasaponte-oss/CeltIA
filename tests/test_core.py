@@ -134,7 +134,7 @@ def test_offline_fallback_response():
             session_id="offline-demo",
             mode="fast",
         )
-        result = await api_main._build_response(req, "offline-demo")
+        result = await api_main._build_response(req, "offline-demo", {"id": None, "role": "user"})
         assert result["choices"][0]["message"]["content"]
         assert result["metadata"]["route"] == "fast"
         assert result["session_id"] == "offline-demo"
