@@ -455,8 +455,9 @@ async def decide(req: DecisionApiRequest, key: dict = Depends(require_api_key)):
     return {"object": "decision.list", "usage": usage, "data": [
         {"id": r.id, "probabilities": r.probabilities, "decision": r.decision,
          "confidence": r.confidence, "abstained": r.abstained,
-         "abstention_reason": r.abstention_reason, "normalized_entropy": r.normalized_entropy,
-         "margin": r.margin, "expected_score": r.expected_score}
+         "abstention_reason": r.abstention_reason, "suspected_ood": r.suspected_ood,
+         "normalized_entropy": r.normalized_entropy, "margin": r.margin,
+         "expected_score": r.expected_score}
         for r in results
     ]}
 
@@ -549,7 +550,8 @@ async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, 
             logger.info("CDE shadow route: %s", shadow)
             memory.record_decision_shadow(
                 key.get("id"), shadow["heuristic"], shadow["cde"], shadow["confidence"], shadow["abstained"],
-                shadow.get("abstention_reason"), shadow.get("normalized_entropy"), shadow.get("margin"),
+                shadow.get("abstention_reason"), shadow.get("suspected_ood"),
+                shadow.get("normalized_entropy"), shadow.get("margin"),
             )
             emit({"type": "decision_shadow", **shadow})
     auto_agent = r.mode == "agent"
