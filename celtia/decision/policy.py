@@ -16,7 +16,12 @@ def probability_distribution(
         raise ValueError("temperature must be positive")
     if len(logits) != len(candidates) or not logits:
         raise ValueError("scorer returned invalid logits")
-    values = [float(value) for value in logits]
+    if any(isinstance(value, bool) for value in logits):
+        raise ValueError("scorer returned invalid logits")
+    try:
+        values = [float(value) for value in logits]
+    except (TypeError, ValueError) as exc:
+        raise ValueError("scorer returned invalid logits") from exc
     if not all(math.isfinite(value) for value in values):
         raise ValueError("scorer returned invalid logits")
 
@@ -38,6 +43,10 @@ def decision_policy(
 ) -> dict:
     if not 0 <= abstain_below <= 1:
         raise ValueError("abstain_below must be between 0 and 1")
+    if not 0 <= ood_entropy_threshold <= 1:
+        raise ValueError("ood_entropy_threshold must be between 0 and 1")
+    if not 0 <= ood_margin_threshold <= 1:
+        raise ValueError("ood_margin_threshold must be between 0 and 1")
 
     candidates = tuple(probabilities)
     if not candidates:
