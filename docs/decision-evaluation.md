@@ -82,3 +82,5 @@ PYTHONPATH=. python scripts/evaluate_decision_routes.py \
 ```
 
 Use `--resume` to continue an interrupted collection without re-running already valid rows, or `--limit N` for a deterministic small pilot. Existing resume files are validated before reuse so malformed or out-of-dataset rows are not silently carried forward. Collection now checkpoints atomically: by default every 10 newly collected rows it writes and fsyncs a complete uniquely named temporary JSONL, atomically replaces the destination, and fsyncs the parent directory where the platform supports directory descriptors. A failed replacement preserves the previous result file and cleans the temporary checkpoint. Unique temporary names also avoid accidental temp-file collisions between overlapping processes; this is crash-safety hardening, not a multi-writer locking protocol. `--checkpoint-every N` can tune the durability/cost trade-off from 1 to 100 rows.
+
+Route summaries are complete: if any route has no labels, `min_route_coverage` and `min_route_accuracy` are `null`, with `routes_with_labels` and `routes_without_labels` exposing the missing evidence.
