@@ -768,7 +768,7 @@
     </div>
 
     <script>
-      const apiBase = location.port === '4173' ? 'http://localhost:8080' : location.origin;
+      const apiBase = location.port === '4173' ? 'http://localhost:8081' : location.origin;
 
       // ---------- API key / admin token helpers ----------
       function getApiKey() {
@@ -1409,7 +1409,7 @@
             document.getElementById('verifyMetric').textContent = data?.metadata?.verified ? 'verificado' : 'no ejecutado';
           } catch (err) {
             const lastAssistant = messagesEl.querySelector('.bubble.assistant:last-of-type');
-            let message = 'La solicitud falló. Comprueba que la API local esté activa en el puerto 8080.';
+            let message = 'La solicitud falló. Comprueba que la API local esté activa en el puerto 8081.';
             if (err?.message === 'unauthorized') {
               message = 'A sesión caducou ou a clave foi revogada. Inicia sesión de novo.';
             } else if (err?.message === 'no-prompt-support') {

@@ -12,4 +12,4 @@ if (-not (Test-Path $activateScript)) {
 
 $env:PYTHONPATH = $projectRoot
 Write-Host "Activada la venv de Mini-Council. Iniciando API..."
-uvicorn apps.api.main:app --host 0.0.0.0 --port 8080 --reload
+uvicorn apps.api.main:app --host 127.0.0.1 --port 8081 --reload
