@@ -53,3 +53,6 @@ class DecisionResult:
     decision: str | None
     confidence: float
     abstained: bool
+    abstention_reason: str | None = None
+    normalized_entropy: float | None = None
+    margin: float | None = None
