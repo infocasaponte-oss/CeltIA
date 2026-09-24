@@ -87,6 +87,9 @@ def main():
     p.add_argument("--min-labeled",type=int,default=50)
     p.add_argument("--min-accuracy-delta",type=float,default=.02)
     p.add_argument("--min-labeled-coverage",type=float,default=.80)
+    p.add_argument("--min-route-labeled",type=int,default=10)
+    p.add_argument("--min-route-coverage",type=float,default=.70)
+    p.add_argument("--min-route-accuracy",type=float,default=.60)
     p.add_argument("--min-ood-labeled",type=int,default=20)
     p.add_argument("--min-ood-coverage",type=float,default=.80)
     p.add_argument("--min-ood-recall",type=float,default=.80)
@@ -128,6 +131,9 @@ def main():
         min_labeled=args.min_labeled,
         min_accuracy_delta=args.min_accuracy_delta,
         min_labeled_coverage=args.min_labeled_coverage,
+        min_route_labeled=args.min_route_labeled,
+        min_route_coverage=args.min_route_coverage,
+        min_route_accuracy=args.min_route_accuracy,
         min_ood_labeled=args.min_ood_labeled,
         min_ood_coverage=args.min_ood_coverage,
         min_ood_recall=args.min_ood_recall,
