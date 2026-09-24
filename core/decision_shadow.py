@@ -8,11 +8,12 @@ ROUTES = ("fast", "think", "code", "agent", "long")
 async def evaluate_route_shadow(runtime, text: str, heuristic_route: str) -> dict | None:
     """Evaluate CDE routing without changing the route selected by the production router."""
     try:
-        result = (await runtime.decide(
+        results, usage = await runtime.decide_with_usage(
             {"user_message": text[-12000:], "heuristic_route": heuristic_route},
             [{"id":"route","prompt":"Select the most appropriate CeltIA execution route.",
               "type":"choice","options":list(ROUTES)}],
-        ))[0]
+        )
+        result = results[0]
         return {
             "heuristic": heuristic_route,
             "cde": result.decision,
@@ -22,6 +23,7 @@ async def evaluate_route_shadow(runtime, text: str, heuristic_route: str) -> dic
             "suspected_ood": result.suspected_ood,
             "normalized_entropy": result.normalized_entropy,
             "margin": result.margin,
+            "usage": usage,
         }
     except Exception as exc:
         logger.warning("CDE shadow routing failed: %s", exc)
