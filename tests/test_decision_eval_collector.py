@@ -24,6 +24,9 @@ class FakeRuntime:
     async def decide(self, context, questions):
         return [FakeResult()]
 
+    async def decide_with_usage(self, context, questions):
+        return [FakeResult()], {"prompt_tokens":1,"completion_tokens":1,"total_tokens":2,"models":["fake-model"]}
+
 
 def _args(tmp_path, *, resume=False, limit=0, checkpoint_every=2):
     return Namespace(
@@ -52,6 +55,7 @@ def test_collect_checkpoints_and_resumes_without_duplicate_calls(tmp_path, monke
     path=tmp_path / "results.jsonl"
     saved=[json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
     assert [item["text"] for item in saved] == ["one","two"]
+    assert all(item["models_used"] == ["fake-model"] for item in saved)
     assert not list(tmp_path.glob("results.jsonl.*.tmp"))
     manifest_path=tmp_path / "results.jsonl.manifest.json"
     manifest=json.loads(manifest_path.read_text(encoding="utf-8"))
