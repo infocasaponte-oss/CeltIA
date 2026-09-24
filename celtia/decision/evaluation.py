@@ -9,6 +9,8 @@ class ShadowSample:
     confidence: float
     abstained: bool
     expected: str | None = None
+    suspected_ood: bool | None = None
+    expected_ood: bool | None = None
 
 def evaluate_shadow(samples: Iterable[ShadowSample]) -> dict:
     rows=list(samples)
@@ -20,6 +22,17 @@ def evaluate_shadow(samples: Iterable[ShadowSample]) -> dict:
     labeled_decided=[s for s in labeled if not s.abstained and s.cde is not None]
     cde_correct_when_decided=sum(s.cde == s.expected for s in labeled_decided)
     labeled_abstentions=len(labeled)-len(labeled_decided)
+
+    ood_labeled=[s for s in rows if s.expected_ood is not None]
+    ood_evaluated=[s for s in ood_labeled if s.suspected_ood is not None]
+    true_positive=sum(bool(s.suspected_ood) and bool(s.expected_ood) for s in ood_evaluated)
+    false_positive=sum(bool(s.suspected_ood) and not bool(s.expected_ood) for s in ood_evaluated)
+    true_negative=sum(not bool(s.suspected_ood) and not bool(s.expected_ood) for s in ood_evaluated)
+    false_negative=sum(not bool(s.suspected_ood) and bool(s.expected_ood) for s in ood_evaluated)
+    predicted_positive=true_positive+false_positive
+    actual_positive=true_positive+false_negative
+    actual_negative=true_negative+false_positive
+
     return {
         "samples": len(rows),
         "decided": len(decided),
@@ -31,6 +44,18 @@ def evaluate_shadow(samples: Iterable[ShadowSample]) -> dict:
         "cde_selective_accuracy": cde_correct_when_decided/len(labeled_decided) if labeled_decided else None,
         "labeled_coverage": len(labeled_decided)/len(labeled) if labeled else None,
         "labeled_abstentions": labeled_abstentions,
+        "ood_labeled": len(ood_labeled),
+        "ood_evaluated": len(ood_evaluated),
+        "ood_coverage": len(ood_evaluated)/len(ood_labeled) if ood_labeled else None,
+        "ood_true_positive": true_positive,
+        "ood_false_positive": false_positive,
+        "ood_true_negative": true_negative,
+        "ood_false_negative": false_negative,
+        "ood_precision": true_positive/predicted_positive if predicted_positive else None,
+        "ood_recall": true_positive/actual_positive if actual_positive else None,
+        "ood_specificity": true_negative/actual_negative if actual_negative else None,
+        "ood_false_positive_rate": false_positive/actual_negative if actual_negative else None,
+        "ood_accuracy": (true_positive+true_negative)/len(ood_evaluated) if ood_evaluated else None,
     }
 
 def promotion_gate(metrics: dict, *, min_samples: int = 200, min_coverage: float = 0.80,
