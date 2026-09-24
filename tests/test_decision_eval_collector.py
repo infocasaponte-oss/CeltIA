@@ -622,3 +622,36 @@ def test_resume_rejects_changed_tracked_worktree_state(tmp_path, monkeypatch):
         assert False
     except ValueError as exc:
         assert "code_dirty provenance does not match current runtime" in str(exc)
+
+
+
+def test_collection_rejects_undeclared_model_before_result_checkpoint(tmp_path, monkeypatch):
+    rows=[{"text":"one","expected":"fast","ood":False}]
+    monkeypatch.setattr(collector,"load_datasets",lambda paths: rows)
+    monkeypatch.setattr(collector,"build_runtime",FakeRuntime)
+    monkeypatch.setattr(collector,"route",lambda text:type("R",(),{"mode":"fast"})())
+
+    async def undeclared_model(runtime,row):
+        item=await collector.collect_one.__wrapped__(runtime,row) if hasattr(collector.collect_one,"__wrapped__") else {
+            "text":row["text"],
+            "cde":"fast",
+            "confidence":0.9,
+            "abstained":False,
+            "suspected_ood":False,
+            "models_used":["other-model"],
+        }
+        item["models_used"]=["other-model"]
+        return item
+
+    monkeypatch.setattr(collector,"collect_one",undeclared_model)
+    try:
+        asyncio.run(collector.collect(_args(tmp_path,checkpoint_every=1)))
+        assert False
+    except ValueError as exc:
+        assert "not declared by provenance manifest" in str(exc)
+
+    assert not (tmp_path / "results.jsonl").exists()
+    manifest_path=tmp_path / "results.jsonl.manifest.json"
+    assert manifest_path.exists()
+    manifest=json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["status"] == "collecting"
