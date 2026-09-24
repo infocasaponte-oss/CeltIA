@@ -5,6 +5,7 @@ import json
 import math
 import hashlib
 import re
+from datetime import datetime
 from pathlib import Path
 
 from celtia.decision.evaluation import ShadowSample, evaluate_shadow, promotion_gate
@@ -12,6 +13,16 @@ from celtia.decision.evaluation import ShadowSample, evaluate_shadow, promotion_
 ROUTES={"fast","think","code","agent","long"}
 RESULT_FORMAT_VERSION=3
 SHA256_RE=re.compile(r"^[0-9a-f]{64}$")
+
+
+def valid_aware_timestamp(value: object) -> bool:
+    if not isinstance(value,str) or not value.strip():
+        return False
+    try:
+        parsed=datetime.fromisoformat(value)
+    except ValueError:
+        return False
+    return parsed.tzinfo is not None and parsed.utcoffset() is not None
 
 
 def file_sha256(path: Path) -> str:
@@ -51,7 +62,7 @@ def validate_results_manifest(results_path: Path, datasets: list[str]) -> dict:
     ):
         raise ValueError("CDE results manifest dataset list does not match selected datasets")
     collected_at=manifest.get("collected_at")
-    if not isinstance(collected_at,str) or not collected_at.strip():
+    if not valid_aware_timestamp(collected_at):
         raise ValueError("CDE results manifest has invalid collected_at")
     if not isinstance(manifest.get("backend"),dict):
         raise ValueError("CDE results manifest has invalid backend provenance")
