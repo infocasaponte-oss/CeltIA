@@ -114,7 +114,7 @@ class CeltIADecisionRuntime:
 
     async def decide_with_usage(self, context, questions):
         request = self._request(context, questions)
-        usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0, "models": []}
         minimum_output_tokens=[
             max(64, 16 + 12 * len(question.candidates()))
             for question in request.questions
@@ -166,6 +166,9 @@ class CeltIADecisionRuntime:
             meta = response.get("meta") or {}
             if meta.get("offline_fallback"):
                 raise RuntimeError("decision backend unavailable")
+            model=meta.get("model")
+            if isinstance(model,str) and model and model not in usage["models"]:
+                usage["models"].append(model)
             choices = response.get("choices") or []
             if not choices:
                 raise RuntimeError("decision backend returned no choices")
