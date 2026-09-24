@@ -353,3 +353,48 @@ def test_resume_rejects_collecting_manifest_missing_structural_provenance(tmp_pa
             assert False,field
         except ValueError:
             pass
+
+
+
+def test_resume_rejects_tampered_collecting_checkpoint(tmp_path, monkeypatch):
+    rows=[
+        {"text":"one","expected":"fast","ood":False},
+        {"text":"two","expected":"fast","ood":False},
+    ]
+    monkeypatch.setattr(collector,"load_datasets",lambda paths: rows)
+    monkeypatch.setattr(collector,"build_runtime",FakeRuntime)
+    monkeypatch.setattr(collector,"route",lambda text:type("R",(),{"mode":"fast"})())
+
+    calls={"count":0}
+    original=collector.collect_one
+
+    async def fail_after_first(runtime,row):
+        calls["count"]+=1
+        if calls["count"] > 1:
+            raise RuntimeError("simulated interruption")
+        return await original(runtime,row)
+
+    monkeypatch.setattr(collector,"collect_one",fail_after_first)
+    try:
+        asyncio.run(collector.collect(_args(tmp_path,checkpoint_every=1)))
+        assert False
+    except RuntimeError:
+        pass
+
+    path=tmp_path / "results.jsonl"
+    manifest_path=tmp_path / "results.jsonl.manifest.json"
+    manifest=json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["status"] == "collecting"
+    assert manifest["results_sha256"] == collector.file_sha256(path)
+    assert manifest["result_rows"] == 1
+
+    path.write_text(
+        '{"text":"one","cde":"fast","confidence":0.1,"abstained":false,"models_used":["fake-model"]}\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(collector,"collect_one",original)
+    try:
+        asyncio.run(collector.collect(_args(tmp_path,resume=True,checkpoint_every=1)))
+        assert False
+    except ValueError as exc:
+        assert "collecting checkpoint results" in str(exc)
