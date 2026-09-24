@@ -91,7 +91,7 @@ class CeltIADecisionRuntime:
     def _request(self, context, questions) -> DecisionRequest:
         try:
             serialized_context = json.dumps(context, ensure_ascii=False)
-        except (TypeError, ValueError, OverflowError) as exc:
+        except (TypeError, ValueError, OverflowError, RecursionError) as exc:
             raise ValueError("context must be JSON-serializable") from exc
         if len(serialized_context) > self.MAX_CONTEXT_CHARS:
             raise ValueError("decision context exceeds 50000 serialized characters")
