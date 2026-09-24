@@ -238,3 +238,18 @@ def test_decide_maps_request_timeout_to_503(monkeypatch):
         assert exc.status_code == 503
         assert "request timed out" in str(exc.detail)
     assert gateway.keys == [key]
+
+
+def test_decision_api_schema_rejects_duplicate_question_ids():
+    payload = {
+        "context": {},
+        "questions": [
+            {"id":"same","prompt":"first","type":"boolean"},
+            {"id":"same","prompt":"second","type":"boolean"},
+        ],
+    }
+    try:
+        api_main.DecisionApiRequest.model_validate(payload)
+        assert False
+    except ValueError as exc:
+        assert "question ids must be unique" in str(exc)
