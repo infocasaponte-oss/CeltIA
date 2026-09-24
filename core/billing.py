@@ -10,11 +10,24 @@ logger = logging.getLogger(__name__)
 
 
 def is_configured() -> bool:
-    return bool(settings.stripe_secret_key and settings.stripe_price_id)
+    return any(plan_configured(p) for p in ("basic", "pro", "ultra"))
 
 
 def _client() -> "stripe.StripeClient":
     return stripe.StripeClient(settings.stripe_secret_key)
+
+
+def price_for(plan: str) -> str:
+    return {
+        "basic": settings.stripe_price_basic,
+        "pro": settings.stripe_price_pro or settings.stripe_price_id,
+        "ultra": settings.stripe_price_ultra,
+        "payg": settings.stripe_metered_price_id,
+    }.get(plan, "")
+
+
+def plan_configured(plan: str) -> bool:
+    return bool(settings.stripe_secret_key and price_for(plan))
 
 
 def metered_configured() -> bool:
@@ -22,7 +35,7 @@ def metered_configured() -> bool:
 
 
 async def create_checkout_session(email: str, key_id: int | None = None, plan: str = "pro") -> str:
-    price_id = settings.stripe_metered_price_id if plan == "payg" else settings.stripe_price_id
+    price_id = price_for(plan)
     if not settings.stripe_secret_key or not price_id:
         raise RuntimeError("Stripe is not configured yet")
 

@@ -39,6 +39,7 @@ class Memory:
         for column in ("rpm", "tpm", "monthly_tokens"):
             if column not in existing_ck:
                 self.db.execute(f"ALTER TABLE client_keys ADD COLUMN {column} INTEGER")
+        self.db.execute("CREATE TABLE IF NOT EXISTS processed_stripe(id TEXT PRIMARY KEY, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)")
         self._migrate_usage_events()
         self._migrate_api_keys()
         self._migrate_messages()
@@ -122,6 +123,16 @@ class Memory:
             (rpm, tpm, monthly, key_id, owner_id))
         self.db.commit()
         return cur.rowcount > 0
+
+    def claim_stripe_event(self, event_id: str) -> bool:
+        """True the first time an id (checkout session / invoice) is seen; False on replays, so credits are granted once."""
+        cur = self.db.execute("INSERT OR IGNORE INTO processed_stripe(id) VALUES(?)", (event_id,))
+        self.db.commit()
+        return cur.rowcount > 0
+
+    def get_plan(self, api_key_id):
+        row = self.db.execute("SELECT plan FROM api_keys WHERE id=?", (api_key_id,)).fetchone()
+        return row[0] if row else None
 
     def month_tokens(self, api_key_id):
         row = self.db.execute(
