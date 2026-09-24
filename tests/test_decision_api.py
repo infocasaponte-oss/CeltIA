@@ -190,3 +190,26 @@ def test_decision_api_schema_rejects_cross_type_fields():
             assert False
         except ValueError:
             pass
+
+
+class TimeoutDecisionRuntime:
+    async def decide_with_usage(self, context, questions):
+        raise RuntimeError("decision backend timed out")
+
+
+def test_decide_maps_backend_timeout_to_503(monkeypatch):
+    gateway = FakeGateway()
+    monkeypatch.setattr(api_main, "gateway", gateway)
+    monkeypatch.setattr(api_main, "decision_runtime", TimeoutDecisionRuntime())
+    req = api_main.DecisionApiRequest(
+        context={},
+        questions=[api_main.DecisionQuestionInput(id="q", prompt="safe?", type="boolean")],
+    )
+    key = {"id": None, "role": "user"}
+    try:
+        asyncio.run(api_main.decide(req, key))
+        assert False
+    except api_main.HTTPException as exc:
+        assert exc.status_code == 503
+        assert "timed out" in str(exc.detail)
+    assert gateway.keys == [key]
