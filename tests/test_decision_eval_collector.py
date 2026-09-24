@@ -780,7 +780,12 @@ def test_endpoint_identity_redacts_credentials_query_and_fragment():
         (),
         {"base_url":"https://user:secret@example.com:8443/v1/?token=abc#frag"},
     )()
-    assert collector._endpoint_identity(client) == "https://example.com:8443/v1"
+    endpoint=collector._endpoint_identity(client)
+    assert endpoint is not None
+    assert endpoint.startswith("https://example.com:8443/#path-sha256=")
+    assert "secret" not in endpoint
+    assert "token" not in endpoint
+    assert "/v1" not in endpoint
 
 
 def test_resume_rejects_changed_backend_endpoint(tmp_path, monkeypatch):
