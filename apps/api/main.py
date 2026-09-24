@@ -27,6 +27,7 @@ from core.creator.projects import project_manager
 from core.creator.sandbox import sandbox_configured, sandbox_for
 from core.creator.tools import CREATOR_TOOL_NAMES, build_creator_registry
 from core.inference import VLLMClient
+from core.decision_runtime import CeltIADecisionRuntime
 from core.memory import Memory
 from core.planner import Planner
 from core.policy import ToolPolicy
@@ -59,6 +60,7 @@ if web_dir.exists():
 memory = Memory(settings.sqlite_path)
 registry = builtins(policy=ToolPolicy())
 llm = VLLMClient(settings.vllm_base_url, settings.model_serve_name)
+decision_runtime = CeltIADecisionRuntime(llm, abstain_below=settings.decision_abstain_below, temperature=settings.decision_temperature)
 agent = Agent(llm, registry, policy=ToolPolicy(), planner=Planner())
 gateway = Gateway(settings.gateway_max_concurrency, settings.gateway_queue_wait_seconds,
                   month_usage=lambda key_id: memory.month_tokens(key_id),
@@ -128,6 +130,18 @@ class ChatRequest(BaseModel):
     mode:str|None=None
     temperature:float|None=None
     max_tokens:int|None=None
+
+class DecisionQuestionInput(BaseModel):
+    id: str
+    prompt: str
+    type: str
+    options: list[str] = []
+    minimum: int | None = None
+    maximum: int | None = None
+
+class DecisionApiRequest(BaseModel):
+    context: object
+    questions: list[DecisionQuestionInput]
 
 class ApiKeyCreateRequest(BaseModel):
     name: str
@@ -330,6 +344,25 @@ async def gateway_rejection_handler(request: Request, exc: GatewayRejection):
 
 @app.get("/health")
 async def health(): return {"status":"ok","model":settings.model_serve_name}
+
+@app.post("/v1/decide")
+async def decide(req: DecisionApiRequest, key: dict = Depends(require_api_key)):
+    """Structured decision endpoint. Results are advisory; this endpoint executes no tools."""
+    if not req.questions or len(req.questions) > 32:
+        raise HTTPException(400, "questions must contain between 1 and 32 items")
+    payload = [q.model_dump() for q in req.questions]
+    try:
+        results = await decision_runtime.decide(req.context, payload)
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(400, str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc))
+    return {"object": "decision.list", "data": [
+        {"id": r.id, "probabilities": r.probabilities, "decision": r.decision,
+         "confidence": r.confidence, "abstained": r.abstained}
+        for r in results
+    ]}
+
 
 @app.get("/metrics")
 async def metrics():
