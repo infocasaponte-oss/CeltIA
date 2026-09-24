@@ -31,6 +31,16 @@ def valid_aware_timestamp(value: object) -> bool:
     return parse_aware_timestamp(value) is not None
 
 
+def declared_backend_models(value: object) -> set[str]:
+    if not isinstance(value,dict):
+        return set()
+    return {
+        model
+        for field in ("model","primary_model","fallback_model")
+        if isinstance((model:=value.get(field)),str) and model.strip()
+    }
+
+
 def validate_backend_provenance(value: object) -> bool:
     if not isinstance(value,dict):
         return False
@@ -43,7 +53,7 @@ def validate_backend_provenance(value: object) -> bool:
         model=value.get(field)
         if model is not None and (not isinstance(model,str) or not model.strip()):
             return False
-    return True
+    return bool(declared_backend_models(value))
 
 
 def validate_policy_provenance(value: object) -> bool:
@@ -210,7 +220,7 @@ def load_jsonl(path: Path):
         rows.append(row)
     return rows
 
-def load_cde_results(path: Path, *, require_models_used: bool = False) -> dict[str, dict]:
+def load_cde_results(path: Path, *, require_models_used: bool = False, allowed_models: set[str] | None = None) -> dict[str, dict]:
     by_text={}
     for n,line in enumerate(path.read_text(encoding="utf-8").splitlines(),1):
         if not line.strip():
@@ -228,8 +238,11 @@ def load_cde_results(path: Path, *, require_models_used: bool = False) -> dict[s
                 not isinstance(models_used,list)
                 or any(not isinstance(model,str) or not model.strip() for model in models_used)
                 or len(models_used) != len(set(models_used))
+                or (require_models_used and not models_used)
             ):
                 raise ValueError(f"invalid CDE result models_used {path}:{n}")
+            if allowed_models is not None and any(model not in allowed_models for model in models_used):
+                raise ValueError(f"CDE result model not declared by provenance manifest {path}:{n}")
 
         if not isinstance(text,str) or not text.strip():
             raise ValueError(f"invalid CDE result row {path}:{n}")
@@ -300,8 +313,12 @@ def main():
             rows.append(row)
     if args.cde_results:
         results_path=Path(args.cde_results)
-        validate_results_manifest(results_path,datasets,dataset_rows=len(rows))
-        by_text=load_cde_results(results_path,require_models_used=True)
+        manifest=validate_results_manifest(results_path,datasets,dataset_rows=len(rows))
+        by_text=load_cde_results(
+            results_path,
+            require_models_used=True,
+            allowed_models=declared_backend_models(manifest["backend"]),
+        )
     else:
         by_text={}
     unknown_results=set(by_text)-seen_text
