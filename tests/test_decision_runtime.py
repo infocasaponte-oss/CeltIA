@@ -98,3 +98,24 @@ def test_runtime_ignores_malformed_or_inconsistent_usage_totals():
     assert usage["completion_tokens"] > 0
     assert usage["total_tokens"] == usage["prompt_tokens"] + usage["completion_tokens"]
     assert usage["total_tokens"] != 999999
+
+
+class CaptureBudgetLLM:
+    def __init__(self):
+        self.kwargs = None
+
+    async def chat(self, messages, **kwargs):
+        self.kwargs = kwargs
+        return {
+            "choices":[{"message":{"content":'{"scores":{"c0":0.0,"c1":1.0}}'}}],
+            "usage":{"prompt_tokens":1,"completion_tokens":1},
+        }
+
+
+def test_runtime_reserves_output_budget_for_indexed_scores():
+    llm = CaptureBudgetLLM()
+    runtime = CeltIADecisionRuntime(llm, abstain_below=0.0, reject_suspected_ood=False)
+    asyncio.run(runtime.decide({}, [{
+        "id":"route","prompt":"route","type":"choice","options":["fast","think"]
+    }]))
+    assert llm.kwargs["max_tokens"] == 1024
