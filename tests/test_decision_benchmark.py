@@ -23,3 +23,19 @@ def test_route_ood_benchmark_schema():
     assert all(r.get("expected") is None for r in rows)
     assert all(r.get("ood") is True for r in rows)
     assert len({r["text"] for r in rows}) == len(rows)
+
+
+
+def test_combined_decision_benchmark_has_200_unique_texts():
+    paths=(
+        Path("benchmarks/decision_routes.jsonl"),
+        Path("benchmarks/decision_routes_ood.jsonl"),
+    )
+    rows=[
+        json.loads(line)
+        for path in paths
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert len(rows) == 200
+    assert len({row["text"] for row in rows}) == 200
