@@ -379,3 +379,47 @@ def test_runtime_rejects_pathologically_deep_context_cleanly():
         assert False
     except ValueError as exc:
         assert "JSON-serializable" in str(exc)
+
+
+def test_runtime_allocates_more_output_budget_to_large_candidate_sets():
+    llm = CaptureBudgetLLM()
+    runtime = CeltIADecisionRuntime(
+        llm,
+        abstain_below=0.0,
+        reject_suspected_ood=False,
+        max_output_tokens=1024,
+        max_total_output_tokens=512,
+        max_questions=2,
+    )
+    questions = [
+        {"id":"small","prompt":"small","type":"boolean"},
+        {"id":"large","prompt":"large","type":"choice","options":[f"o{i}" for i in range(12)]},
+    ]
+    try:
+        asyncio.run(runtime.decide({}, questions))
+    except ValueError:
+        # Fake response only contains two candidate scores; budget capture occurs first.
+        pass
+    assert len(llm.calls) >= 1
+    if len(llm.calls) == 2:
+        assert llm.calls[1]["max_tokens"] > llm.calls[0]["max_tokens"]
+
+
+def test_runtime_rejects_request_when_candidate_floor_exceeds_total_output_budget():
+    llm = CaptureBudgetLLM()
+    runtime = CeltIADecisionRuntime(
+        llm,
+        max_output_tokens=1024,
+        max_total_output_tokens=128,
+        max_questions=2,
+    )
+    questions = [
+        {"id":"a","prompt":"a","type":"choice","options":[f"a{i}" for i in range(12)]},
+        {"id":"b","prompt":"b","type":"choice","options":[f"b{i}" for i in range(12)]},
+    ]
+    try:
+        asyncio.run(runtime.decide({}, questions))
+        assert False
+    except ValueError as exc:
+        assert "candidate set" in str(exc)
+    assert llm.calls == []
