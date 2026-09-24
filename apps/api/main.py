@@ -38,7 +38,7 @@ from core.tools import PUBLIC_SAFE_TOOLS, Tool, builtins
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="CeltIA", version="1.0.0")
-app.state.metrics = {"requests": 0, "agent_runs": 0, "tool_calls": 0, "stream_requests": 0}
+app.state.metrics = {"requests": 0, "agent_runs": 0, "tool_calls": 0, "stream_requests": 0, "decision_requests": 0}
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -360,11 +360,13 @@ async def decide(req: DecisionApiRequest, key: dict = Depends(require_api_key)):
         raise HTTPException(400, "questions must contain between 1 and 32 items")
     payload = [q.model_dump() for q in req.questions]
     try:
-        results = await decision_runtime.decide(req.context, payload)
+        async with gateway.slot(key):
+            results = await decision_runtime.decide(req.context, payload)
     except (ValueError, TypeError) as exc:
         raise HTTPException(400, str(exc))
     except RuntimeError as exc:
         raise HTTPException(503, str(exc))
+    app.state.metrics["decision_requests"] += 1
     return {"object": "decision.list", "data": [
         {"id": r.id, "probabilities": r.probabilities, "decision": r.decision,
          "confidence": r.confidence, "abstained": r.abstained}
