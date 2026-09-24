@@ -46,6 +46,8 @@ def evaluate_shadow(samples: Iterable[ShadowSample]) -> dict:
         "labeled_abstentions": labeled_abstentions,
         "ood_labeled": len(ood_labeled),
         "ood_evaluated": len(ood_evaluated),
+        "ood_positive_labels": actual_positive,
+        "ood_negative_labels": actual_negative,
         "ood_coverage": len(ood_evaluated)/len(ood_labeled) if ood_labeled else None,
         "ood_true_positive": true_positive,
         "ood_false_positive": false_positive,
@@ -60,7 +62,11 @@ def evaluate_shadow(samples: Iterable[ShadowSample]) -> dict:
 
 def promotion_gate(metrics: dict, *, min_samples: int = 200, min_coverage: float = 0.80,
                    min_labeled: int = 50, min_accuracy_delta: float = 0.02,
-                   min_labeled_coverage: float = 0.80) -> dict:
+                   min_labeled_coverage: float = 0.80,
+                   min_ood_labeled: int | None = None,
+                   min_ood_coverage: float | None = None,
+                   min_ood_recall: float | None = None,
+                   max_ood_false_positive_rate: float | None = None) -> dict:
     reasons=[]
     if metrics.get("samples",0) < min_samples: reasons.append("insufficient_samples")
     if (metrics.get("coverage") or 0) < min_coverage: reasons.append("insufficient_coverage")
@@ -70,4 +76,25 @@ def promotion_gate(metrics: dict, *, min_samples: int = 200, min_coverage: float
         reasons.append("insufficient_labeled_coverage")
     h=metrics.get("heuristic_accuracy"); c=metrics.get("cde_accuracy")
     if h is None or c is None or c-h < min_accuracy_delta: reasons.append("accuracy_delta_below_gate")
+
+    if min_ood_labeled is not None and metrics.get("ood_labeled", 0) < min_ood_labeled:
+        reasons.append("insufficient_ood_labeled_samples")
+    if min_ood_coverage is not None:
+        ood_coverage=metrics.get("ood_coverage")
+        if ood_coverage is None or ood_coverage < min_ood_coverage:
+            reasons.append("insufficient_ood_coverage")
+    if min_ood_recall is not None:
+        if metrics.get("ood_positive_labels", 0) == 0:
+            reasons.append("insufficient_ood_positive_samples")
+        else:
+            recall=metrics.get("ood_recall")
+            if recall is None or recall < min_ood_recall:
+                reasons.append("ood_recall_below_gate")
+    if max_ood_false_positive_rate is not None:
+        if metrics.get("ood_negative_labels", 0) == 0:
+            reasons.append("insufficient_ood_negative_samples")
+        else:
+            false_positive_rate=metrics.get("ood_false_positive_rate")
+            if false_positive_rate is None or false_positive_rate > max_ood_false_positive_rate:
+                reasons.append("ood_false_positive_rate_above_gate")
     return {"eligible": not reasons, "reasons": reasons}
