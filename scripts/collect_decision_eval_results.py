@@ -27,6 +27,7 @@ from scripts.evaluate_decision_routes import (
     validate_backend_provenance,
     validate_code_provenance,
     validate_policy_provenance,
+    validate_result_models,
     validate_results_manifest,
     validate_selection_provenance,
 )
@@ -365,6 +366,11 @@ async def collect(args) -> dict:
             skipped+=1
             continue
         item=await collect_one(runtime,row)
+        validate_result_models(
+            item.get("models_used"),
+            require_models_used=True,
+            allowed_models=declared_backend_models(manifest["backend"]),
+        )
         collected.append(item)
         written+=1
         pending_since_checkpoint+=1
