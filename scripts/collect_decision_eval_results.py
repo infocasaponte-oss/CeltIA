@@ -83,7 +83,7 @@ def _load_manifest(path: Path) -> dict:
     return value
 
 
-def _validate_collecting_manifest(manifest: dict, datasets: list[str]) -> None:
+def _validate_collecting_manifest(manifest: dict, datasets: list[str], results_path: Path) -> None:
     if manifest.get("status") != "collecting":
         raise ValueError("resume manifest has invalid collection status")
     manifest_datasets=manifest.get("datasets")
@@ -107,6 +107,23 @@ def _validate_collecting_manifest(manifest: dict, datasets: list[str]) -> None:
         or expected_dataset_sha != dataset_sha256(datasets)
     ):
         raise ValueError("resume dataset provenance does not match current datasets")
+    expected_results_sha=manifest.get("results_sha256")
+    if (
+        not isinstance(expected_results_sha,str)
+        or not SHA256_RE.fullmatch(expected_results_sha)
+        or expected_results_sha != file_sha256(results_path)
+    ):
+        raise ValueError("resume collecting checkpoint results do not match provenance manifest")
+    expected_rows=manifest.get("result_rows")
+    if isinstance(expected_rows,bool) or not isinstance(expected_rows,int) or expected_rows < 0:
+        raise ValueError("resume collecting checkpoint has invalid result_rows")
+    actual_rows=sum(
+        1
+        for line in results_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    )
+    if expected_rows != actual_rows:
+        raise ValueError("resume collecting checkpoint row count does not match provenance manifest")
 
 
 def _runtime_manifest(runtime: CeltIADecisionRuntime, datasets: list[str]) -> dict:
@@ -228,7 +245,7 @@ async def collect(args) -> dict:
             except ValueError as exc:
                 raise ValueError(f"resume completed provenance manifest is invalid: {exc}") from exc
         else:
-            _validate_collecting_manifest(resume_manifest,datasets)
+            _validate_collecting_manifest(resume_manifest,datasets,output)
         existing=load_cde_results(output,require_models_used=True)
         unknown=set(existing)-{row["text"] for row in rows}
         if unknown:
@@ -267,6 +284,9 @@ async def collect(args) -> dict:
         pending_since_checkpoint+=1
         if pending_since_checkpoint >= args.checkpoint_every:
             _write_atomic_jsonl(output,collected)
+            manifest["results_sha256"]=file_sha256(output)
+            manifest["result_rows"]=len(collected)
+            _write_atomic_json(manifest_output,manifest)
             pending_since_checkpoint=0
         if args.sleep_seconds:
             await asyncio.sleep(args.sleep_seconds)
