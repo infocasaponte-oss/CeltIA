@@ -50,3 +50,25 @@ def test_question_text_limits():
         assert False
     except ValueError:
         pass
+
+
+def test_sync_engine_abstains_on_ambiguous_distribution_via_ood():
+    q = DecisionQuestion("safe", "Safe?", DecisionType.BOOLEAN)
+    result = DecisionEngine(
+        FixedScorer([0.0, 0.0]),
+        abstain_below=0.0,
+        reject_suspected_ood=True,
+    ).decide(DecisionRequest({}, (q,)))[0]
+    assert result.abstained
+    assert result.decision is None
+
+
+def test_sync_engine_can_disable_ood_rejection():
+    q = DecisionQuestion("safe", "Safe?", DecisionType.BOOLEAN)
+    result = DecisionEngine(
+        FixedScorer([0.0, 0.0]),
+        abstain_below=0.0,
+        reject_suspected_ood=False,
+    ).decide(DecisionRequest({}, (q,)))[0]
+    assert not result.abstained
+    assert result.decision == "false"
