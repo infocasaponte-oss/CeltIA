@@ -58,3 +58,63 @@
 {"text":"Le un informe anual completo e relaciona riscos, cifras e notas ao pé sen perder contexto.","expected":"long","ood":false}
 {"text":"Traballa sobre unha especificación moi longa e xera unha matriz completa de requisitos e dependencias.","expected":"long","ood":false}
 {"text":"Resume unha colección extensa de incidencias e detecta patróns recorrentes mantendo os detalles de cada caso.","expected":"long","ood":false}
+{"text":"Reduce esta lista a unha frase curta: servidor activo, base de datos conectada, cola baleira.","expected":"fast","ood":false}
+{"text":"Corrixe a puntuación desta frase: Ola como estás espero que ben.","expected":"fast","ood":false}
+{"text":"Converte 2500 milisegundos a segundos.","expected":"fast","ood":false}
+{"text":"Indica cal é maior: 3/4 ou 2/3.","expected":"fast","ood":false}
+{"text":"Extrae o dominio deste correo: persoa@example.org.","expected":"fast","ood":false}
+{"text":"Dá unha definición dunha frase de idempotencia.","expected":"fast","ood":false}
+{"text":"Transforma a maiúsculas: celtia decision engine.","expected":"fast","ood":false}
+{"text":"Conta cantas palabras hai nesta frase: hoxe o sistema funciona ben.","expected":"fast","ood":false}
+{"text":"Substitúe 'rápido' por un sinónimo nesta frase: É un proceso rápido.","expected":"fast","ood":false}
+{"text":"Responde cun número: cantos bytes hai nun kilobyte binario?","expected":"fast","ood":false}
+{"text":"Identifica a extensión do ficheiro informe.final.pdf.","expected":"fast","ood":false}
+{"text":"Ordena de menor a maior: 9, 2, 14, 7.","expected":"fast","ood":false}
+{"text":"Razoando paso a paso, compara optimistic locking e pessimistic locking nun sistema con moita contención.","expected":"think","ood":false}
+{"text":"Analiza as causas posibles de picos de latencia cada cinco minutos e propón unha orde de experimentos para illalas.","expected":"think","ood":false}
+{"text":"Deseña unha estratexia para particionar unha táboa de mil millóns de filas e explica os trade-offs operativos.","expected":"think","ood":false}
+{"text":"Explica como escoller entre consistencia forte e eventual nun produto colaborativo con edición concorrente.","expected":"think","ood":false}
+{"text":"Compara colas exactly-once aparentes con at-least-once máis idempotencia e razoa os modos de fallo.","expected":"think","ood":false}
+{"text":"Propón unha metodoloxía para demostrar se un incremento de CPU procede de GC, serialización ou consultas lentas.","expected":"think","ood":false}
+{"text":"Avalía os riscos de facer dual-write entre dúas bases de datos durante unha migración e como mitigalos.","expected":"think","ood":false}
+{"text":"Deriva cando compensa precomputar resultados fronte a calculalos baixo demanda con caché.","expected":"think","ood":false}
+{"text":"Analiza un deseño multi-rexión activo-activo e explica como tratar conflitos, reloxo e failover.","expected":"think","ood":false}
+{"text":"Compara índices B-tree e LSM para unha carga con moitas escrituras e lecturas por rango.","expected":"think","ood":false}
+{"text":"Deseña un experimento para medir se o batching mellora throughput sen empeorar demasiado a latencia p99.","expected":"think","ood":false}
+{"text":"Razoando sobre fallos parciais, explica como facer segura unha operación distribuída que non pode usar transaccións globais.","expected":"think","ood":false}
+{"text":"Implementa unha función Python que faga exponential backoff con jitter e tests deterministas.","expected":"code","ood":false}
+{"text":"Escribe unha función TypeScript que valide un UUID v4 e engade casos de proba válidos e inválidos.","expected":"code","ood":false}
+{"text":"Crea un endpoint FastAPI paginado que valide limit e offset e inclúe tests de resposta.","expected":"code","ood":false}
+{"text":"Implementa en Go un worker pool cancelable con context e probas para evitar goroutine leaks.","expected":"code","ood":false}
+{"text":"Escribe unha consulta PostgreSQL que seleccione a última fila por usuario usando window functions e engade un índice axeitado.","expected":"code","ood":false}
+{"text":"Corrixe este patrón de N+1 queries nun servizo Python e propón unha proba que detecte regresións.","expected":"code","ood":false}
+{"text":"Implementa un pequeno parser CSV robusto en Rust usando a libraría csv e engade tests de campos con comas.","expected":"code","ood":false}
+{"text":"Crea unha función JavaScript que limite concorrencia a cinco promesas activas e escribe tests.","expected":"code","ood":false}
+{"text":"Escribe unha migración PostgreSQL para crear un índice CONCURRENTLY e un rollback seguro.","expected":"code","ood":false}
+{"text":"Implementa unha clase Python LRU cache thread-safe cunha capacidade fixa e probas concorrentes.","expected":"code","ood":false}
+{"text":"Crea un GitHub Actions job que execute pytest en Python 3.11 e 3.12 con cache de pip.","expected":"code","ood":false}
+{"text":"Escribe unha función SQL que normalice teléfonos e unha batería de tests para formatos de entrada distintos.","expected":"code","ood":false}
+{"text":"Busca na documentación oficial cal é a versión LTS actual de Node.js e cita a fonte.","expected":"agent","ood":false}
+{"text":"Comproba en fontes oficiais o prezo actual dunha instancia pequena en dous provedores cloud e resume a diferenza.","expected":"agent","ood":false}
+{"text":"Consulta se hai avisos de seguridade publicados esta semana para unha dependencia concreta e enlaza os advisories.","expected":"agent","ood":false}
+{"text":"Busca a documentación máis recente dun SDK e verifica se unha función marcada deprecated segue dispoñible.","expected":"agent","ood":false}
+{"text":"Comproba o estado operativo actual dun servizo SaaS en dúas fontes e indica incidentes activos.","expected":"agent","ood":false}
+{"text":"Investiga a data e notas da última release estable dun proxecto open source e cita a release oficial.","expected":"agent","ood":false}
+{"text":"Busca en documentación oficial os límites de rate actualizados dunha API e compáraos coa versión anterior se está documentada.","expected":"agent","ood":false}
+{"text":"Verifica en fontes primarias se unha característica anunciada recentemente xa está dispoñible de forma xeral.","expected":"agent","ood":false}
+{"text":"Consulta os requisitos actuais de compatibilidade dun paquete con Python e trae a referencia oficial.","expected":"agent","ood":false}
+{"text":"Busca cambios recentes nun estándar técnico e resume só os puntos confirmados pola fonte oficial.","expected":"agent","ood":false}
+{"text":"Investiga se unha CVE concreta ten parche oficial dispoñible e cita vendor advisory e base de datos pública.","expected":"agent","ood":false}
+{"text":"Comproba a documentación actual de dúas APIs para saber cal soporta streaming e enlaza as seccións relevantes.","expected":"agent","ood":false}
+{"text":"Analiza unha exportación completa de tickets de soporte dun ano e crea unha taxonomía mantendo exemplos e referencias a cada ticket.","expected":"long","ood":false}
+{"text":"Le tres especificacións extensas relacionadas e constrúe unha matriz de compatibilidade con referencias cruzadas precisas.","expected":"long","ood":false}
+{"text":"Resume un libro técnico completo por capítulos e mantén unha lista consistente de conceptos que evolucionan ao longo do texto.","expected":"long","ood":false}
+{"text":"Procesa un historial de chat de centos de páxinas e extrae decisións, responsables e cambios de criterio ao longo do tempo.","expected":"long","ood":false}
+{"text":"Analiza un dossier legal extenso e conecta cada conclusión coas cláusulas e anexos correspondentes.","expected":"long","ood":false}
+{"text":"Compara dúas versións completas dunha especificación e produce un changelog semántico con referencias de sección.","expected":"long","ood":false}
+{"text":"Sintetiza varios informes anuais dunha empresa mantendo tendencias plurianuais, cifras e notas explicativas.","expected":"long","ood":false}
+{"text":"Le unha base documental extensa dun proxecto e crea unha arquitectura conceptual que conserve dependencias entre módulos.","expected":"long","ood":false}
+{"text":"Analiza unha transcrición longa de investigación e agrupa evidencias por hipótese sen perder quen dixo cada cousa nin cando.","expected":"long","ood":false}
+{"text":"Resume un manual operativo de centos de páxinas e produce runbooks por incidente mantendo referencias ás seccións fonte.","expected":"long","ood":false}
+{"text":"Procesa un conxunto moi grande de RFCs e identifica decisións incompatibles ou superseded mantendo trazabilidade.","expected":"long","ood":false}
+{"text":"Analiza unha documentación técnica que supera amplamente o contexto curto e constrúe un índice xerárquico con síntese por sección.","expected":"long","ood":false}
