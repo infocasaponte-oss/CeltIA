@@ -39,7 +39,7 @@ def test_results_manifest_matches_exact_dataset_evidence(tmp_path):
     dataset.write_text('{"text":"one","expected":"fast","ood":false}\\n',encoding="utf-8")
     results=tmp_path / "results.jsonl"
     results.write_text('{"text":"one"}\n',encoding="utf-8")
-    manifest={"format_version":RESULT_FORMAT_VERSION,"code_revision":None,"code_dirty":None,"status":"complete","collected_at":"2026-01-01T00:00:00+00:00","datasets":[str(dataset)],"selection":_selection(),"backend":_backend_provenance(),"policy":_policy_provenance(),"dataset_sha256":dataset_sha256([str(dataset)]),"results_sha256":file_sha256(results),"result_rows":1}
+    manifest={"format_version":RESULT_FORMAT_VERSION,"code_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","code_dirty":False,"status":"complete","collected_at":"2026-01-01T00:00:00+00:00","datasets":[str(dataset)],"selection":_selection(),"backend":_backend_provenance(),"policy":_policy_provenance(),"dataset_sha256":dataset_sha256([str(dataset)]),"results_sha256":file_sha256(results),"result_rows":1}
     Path(str(results)+".manifest.json").write_text(json.dumps(manifest),encoding="utf-8")
     loaded=validate_results_manifest(results,[str(dataset)])
     assert loaded["dataset_sha256"] == manifest["dataset_sha256"]
@@ -50,7 +50,7 @@ def test_results_manifest_rejects_changed_dataset(tmp_path):
     dataset.write_text("first\\n",encoding="utf-8")
     results=tmp_path / "results.jsonl"
     results.write_text("",encoding="utf-8")
-    manifest={"format_version":RESULT_FORMAT_VERSION,"code_revision":None,"code_dirty":None,"status":"complete","collected_at":"2026-01-01T00:00:00+00:00","datasets":[str(dataset)],"selection":_selection(),"backend":_backend_provenance(),"policy":_policy_provenance(),"dataset_sha256":dataset_sha256([str(dataset)]),"results_sha256":file_sha256(results),"result_rows":0}
+    manifest={"format_version":RESULT_FORMAT_VERSION,"code_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","code_dirty":False,"status":"complete","collected_at":"2026-01-01T00:00:00+00:00","datasets":[str(dataset)],"selection":_selection(),"backend":_backend_provenance(),"policy":_policy_provenance(),"dataset_sha256":dataset_sha256([str(dataset)]),"results_sha256":file_sha256(results),"result_rows":0}
     Path(str(results)+".manifest.json").write_text(json.dumps(manifest),encoding="utf-8")
     dataset.write_text("changed\\n",encoding="utf-8")
     try:
@@ -76,7 +76,7 @@ def test_results_manifest_rejects_tampered_results(tmp_path):
     results=tmp_path / "results.jsonl"
     results.write_text('{"text":"one"}\n',encoding="utf-8")
     manifest={
-        "format_version":RESULT_FORMAT_VERSION,"code_revision":None,"code_dirty":None,
+        "format_version":RESULT_FORMAT_VERSION,"code_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","code_dirty":False,
         "collected_at":"2026-01-01T00:00:00+00:00",
         "datasets":[str(dataset)],"selection":_selection(),
         "backend":_backend_provenance(),
@@ -101,7 +101,7 @@ def test_results_manifest_rejects_incomplete_collection(tmp_path):
     results=tmp_path / "results.jsonl"
     results.write_text("",encoding="utf-8")
     manifest={
-        "format_version":RESULT_FORMAT_VERSION,"code_revision":None,"code_dirty":None,
+        "format_version":RESULT_FORMAT_VERSION,"code_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","code_dirty":False,
         "collected_at":"2026-01-01T00:00:00+00:00",
         "datasets":[str(dataset)],"selection":_selection(),
         "backend":_backend_provenance(),
@@ -137,7 +137,7 @@ def test_results_manifest_rejects_wrong_result_row_count(tmp_path):
     results=tmp_path / "results.jsonl"
     results.write_text('{"text":"one"}\n',encoding="utf-8")
     manifest={
-        "format_version":RESULT_FORMAT_VERSION,"code_revision":None,"code_dirty":None,
+        "format_version":RESULT_FORMAT_VERSION,"code_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","code_dirty":False,
         "collected_at":"2026-01-01T00:00:00+00:00",
         "datasets":[str(dataset)],"selection":_selection(),
         "backend":_backend_provenance(),
@@ -161,7 +161,7 @@ def test_results_manifest_rejects_invalid_result_row_count_type(tmp_path):
     results=tmp_path / "results.jsonl"
     results.write_text("",encoding="utf-8")
     manifest={
-        "format_version":RESULT_FORMAT_VERSION,"code_revision":None,"code_dirty":None,
+        "format_version":RESULT_FORMAT_VERSION,"code_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","code_dirty":False,
         "collected_at":"2026-01-01T00:00:00+00:00",
         "datasets":[str(dataset)],"selection":_selection(),
         "backend":_backend_provenance(),
@@ -203,7 +203,7 @@ def test_results_manifest_rejects_dataset_list_mismatch(tmp_path):
     results=tmp_path / "results.jsonl"
     results.write_text("",encoding="utf-8")
     manifest={
-        "format_version":RESULT_FORMAT_VERSION,"code_revision":None,"code_dirty":None,
+        "format_version":RESULT_FORMAT_VERSION,"code_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","code_dirty":False,
         "collected_at":"2026-01-01T00:00:00+00:00",
         "datasets":["different.jsonl"],
         "backend":_backend_provenance(),
@@ -227,7 +227,7 @@ def test_results_manifest_rejects_missing_structural_provenance(tmp_path):
     results=tmp_path / "results.jsonl"
     results.write_text("",encoding="utf-8")
     base={
-        "format_version":RESULT_FORMAT_VERSION,"code_revision":None,"code_dirty":None,
+        "format_version":RESULT_FORMAT_VERSION,"code_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","code_dirty":False,
         "collected_at":"2026-01-01T00:00:00+00:00",
         "datasets":[str(dataset)],"selection":_selection(),
         "backend":_backend_provenance(),
@@ -255,7 +255,7 @@ def test_results_manifest_rejects_naive_or_malformed_collection_timestamp(tmp_pa
     results=tmp_path / "results.jsonl"
     results.write_text("",encoding="utf-8")
     base={
-        "format_version":RESULT_FORMAT_VERSION,"code_revision":None,"code_dirty":None,
+        "format_version":RESULT_FORMAT_VERSION,"code_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","code_dirty":False,
         "datasets":[str(dataset)],"selection":_selection(),
         "backend":_backend_provenance(),
         "policy":_policy_provenance(),
@@ -281,7 +281,7 @@ def test_results_manifest_rejects_invalid_resumed_from_collection_timestamp(tmp_
     results=tmp_path / "results.jsonl"
     results.write_text("",encoding="utf-8")
     manifest={
-        "format_version":RESULT_FORMAT_VERSION,"code_revision":None,"code_dirty":None,
+        "format_version":RESULT_FORMAT_VERSION,"code_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","code_dirty":False,
         "collected_at":"2026-01-01T00:00:00+00:00",
         "resumed_from_collected_at":"2025-12-31T23:00:00",
         "datasets":[str(dataset)],"selection":_selection(),
@@ -307,7 +307,7 @@ def test_results_manifest_rejects_resume_timestamp_after_collection(tmp_path):
     results=tmp_path / "results.jsonl"
     results.write_text("",encoding="utf-8")
     manifest={
-        "format_version":RESULT_FORMAT_VERSION,"code_revision":None,"code_dirty":None,
+        "format_version":RESULT_FORMAT_VERSION,"code_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","code_dirty":False,
         "collected_at":"2026-01-01T00:00:00+00:00",
         "resumed_from_collected_at":"2026-01-01T00:00:01+00:00",
         "datasets":[str(dataset)],"selection":_selection(),
@@ -333,7 +333,7 @@ def test_results_manifest_rejects_incomplete_backend_provenance(tmp_path):
     results=tmp_path / "results.jsonl"
     results.write_text("",encoding="utf-8")
     manifest={
-        "format_version":RESULT_FORMAT_VERSION,"code_revision":None,"code_dirty":None,
+        "format_version":RESULT_FORMAT_VERSION,"code_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","code_dirty":False,
         "collected_at":"2026-01-01T00:00:00+00:00",
         "datasets":[str(dataset)],"selection":_selection(),
         "backend":{"client_type":"FakeLLM"},
@@ -366,7 +366,7 @@ def test_results_manifest_rejects_invalid_policy_provenance(tmp_path):
     )
     for policy in invalid_policies:
         manifest={
-            "format_version":RESULT_FORMAT_VERSION,"code_revision":None,"code_dirty":None,
+            "format_version":RESULT_FORMAT_VERSION,"code_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","code_dirty":False,
             "collected_at":"2026-01-01T00:00:00+00:00",
             "datasets":[str(dataset)],"selection":_selection(),
             "backend":_backend_provenance(),
@@ -395,7 +395,7 @@ def test_results_manifest_rejects_partial_selection_for_promotion(tmp_path):
     results=tmp_path / "results.jsonl"
     results.write_text('{"text":"one"}\n',encoding="utf-8")
     manifest={
-        "format_version":RESULT_FORMAT_VERSION,"code_revision":None,"code_dirty":None,
+        "format_version":RESULT_FORMAT_VERSION,"code_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","code_dirty":False,
         "collected_at":"2026-01-01T00:00:00+00:00",
         "datasets":[str(dataset)],
         "selection":_selection(dataset_rows=2,selected_rows=1,limit=1),
@@ -431,7 +431,7 @@ def test_results_manifest_rejects_selection_count_inconsistent_with_limit(tmp_pa
     results=tmp_path / "results.jsonl"
     results.write_text('{"text":"one"}\n',encoding="utf-8")
     manifest={
-        "format_version":RESULT_FORMAT_VERSION,"code_revision":None,"code_dirty":None,
+        "format_version":RESULT_FORMAT_VERSION,"code_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","code_dirty":False,
         "collected_at":"2026-01-01T00:00:00+00:00",
         "datasets":[str(dataset)],
         "selection":_selection(dataset_rows=2,selected_rows=1,limit=0),
@@ -458,7 +458,7 @@ def test_results_manifest_rejects_missing_or_invalid_code_revision(tmp_path):
     results.write_text('{"text":"one"}\n',encoding="utf-8")
     base={
         "format_version":RESULT_FORMAT_VERSION,
-        "code_revision":None,"code_dirty":None,
+        "code_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","code_dirty":False,
         "collected_at":"2026-01-01T00:00:00+00:00",
         "datasets":[str(dataset)],
         "selection":_selection(),
@@ -492,3 +492,39 @@ def test_results_manifest_rejects_missing_or_invalid_code_revision(tmp_path):
             assert False,mode
         except ValueError as exc:
             assert "code provenance" in str(exc)
+
+
+
+def test_results_manifest_blocks_dirty_code_from_promotion_but_allows_nonpromotion_validation(tmp_path):
+    dataset=tmp_path / "dataset.jsonl"
+    dataset.write_text('{"text":"one","expected":"fast","ood":false}\n',encoding="utf-8")
+    results=tmp_path / "results.jsonl"
+    results.write_text('{"text":"one"}\n',encoding="utf-8")
+    manifest={
+        "format_version":RESULT_FORMAT_VERSION,
+        "code_revision":"a" * 40,
+        "code_dirty":True,
+        "collected_at":"2026-01-01T00:00:00+00:00",
+        "datasets":[str(dataset)],
+        "selection":_selection(),
+        "backend":_backend_provenance(),
+        "policy":_policy_provenance(),
+        "status":"complete",
+        "dataset_sha256":dataset_sha256([str(dataset)]),
+        "results_sha256":file_sha256(results),
+        "result_rows":1,
+    }
+    Path(str(results)+".manifest.json").write_text(json.dumps(manifest),encoding="utf-8")
+
+    try:
+        validate_results_manifest(results,[str(dataset)])
+        assert False
+    except ValueError as exc:
+        assert "clean code provenance" in str(exc)
+
+    loaded=validate_results_manifest(
+        results,
+        [str(dataset)],
+        require_clean_code=False,
+    )
+    assert loaded["code_dirty"] is True
