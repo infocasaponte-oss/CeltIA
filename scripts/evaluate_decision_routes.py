@@ -26,7 +26,9 @@ def dataset_sha256(paths: list[str]) -> str:
         path=Path(raw_path)
         digest.update(str(path).encode("utf-8"))
         digest.update(b"\0")
-        digest.update(path.read_bytes())
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
         digest.update(b"\0")
     return digest.hexdigest()
 
