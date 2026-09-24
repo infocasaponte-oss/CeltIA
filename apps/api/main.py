@@ -154,12 +154,26 @@ class DecisionQuestionInput(BaseModel):
 
     @model_validator(mode="after")
     def validate_type_fields(self):
-        if self.type == "boolean" and (self.options or self.minimum is not None or self.maximum is not None):
-            raise ValueError("boolean questions do not accept options or score bounds")
-        if self.type == "choice" and (self.minimum is not None or self.maximum is not None):
-            raise ValueError("choice questions do not accept score bounds")
-        if self.type == "score" and self.options:
+        if self.type == "boolean":
+            if self.options or self.minimum is not None or self.maximum is not None:
+                raise ValueError("boolean questions do not accept options or score bounds")
+            return self
+
+        if self.type == "choice":
+            if self.minimum is not None or self.maximum is not None:
+                raise ValueError("choice questions do not accept score bounds")
+            if len(self.options) < 2:
+                raise ValueError("choice questions require at least two options")
+            if len(set(self.options)) != len(self.options):
+                raise ValueError("choice options must be unique")
+            return self
+
+        if self.options:
             raise ValueError("score questions do not accept choice options")
+        if self.minimum is None or self.maximum is None or self.minimum > self.maximum:
+            raise ValueError("score questions require a valid minimum/maximum")
+        if self.maximum - self.minimum + 1 > 101:
+            raise ValueError("score questions support at most 101 candidate values")
         return self
 
 class DecisionApiRequest(BaseModel):
