@@ -61,6 +61,7 @@ class DecisionResult:
     confidence: float
     abstained: bool
     abstention_reason: str | None = None
+    suspected_ood: bool = False
     normalized_entropy: float | None = None
     margin: float | None = None
     expected_score: float | None = None
