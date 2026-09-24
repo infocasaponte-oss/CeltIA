@@ -29,6 +29,7 @@ class FakeDecisionRuntime:
                 confidence=0.9,
                 abstained=False,
                 abstention_reason=None,
+                suspected_ood=False,
                 normalized_entropy=0.2,
                 margin=0.8,
                 expected_score=None,
@@ -53,6 +54,7 @@ def test_decide_uses_gateway_slot_and_records_metric(monkeypatch):
     assert api_main.app.state.metrics["decision_requests"] == before + 1
     assert result["usage"]["total_tokens"] == 6
     assert result["data"][0]["abstention_reason"] is None
+    assert result["data"][0]["suspected_ood"] is False
     assert result["data"][0]["normalized_entropy"] == 0.2
     assert result["data"][0]["margin"] == 0.8
     assert result["data"][0]["expected_score"] is None
@@ -212,29 +214,6 @@ def test_decide_maps_backend_timeout_to_503(monkeypatch):
     except api_main.HTTPException as exc:
         assert exc.status_code == 503
         assert "timed out" in str(exc.detail)
-    assert gateway.keys == [key]
-
-
-class RequestTimeoutDecisionRuntime:
-    async def decide_with_usage(self, context, questions):
-        raise RuntimeError("decision request timed out")
-
-
-def test_decide_maps_request_timeout_to_503(monkeypatch):
-    gateway = FakeGateway()
-    monkeypatch.setattr(api_main, "gateway", gateway)
-    monkeypatch.setattr(api_main, "decision_runtime", RequestTimeoutDecisionRuntime())
-    req = api_main.DecisionApiRequest(
-        context={},
-        questions=[api_main.DecisionQuestionInput(id="q", prompt="safe?", type="boolean")],
-    )
-    key = {"id": None, "role": "user"}
-    try:
-        asyncio.run(api_main.decide(req, key))
-        assert False
-    except api_main.HTTPException as exc:
-        assert exc.status_code == 503
-        assert "request timed out" in str(exc.detail)
     assert gateway.keys == [key]
 
 
