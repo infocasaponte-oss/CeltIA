@@ -87,7 +87,7 @@ def _load_manifest(path: Path) -> dict:
     return value
 
 
-def _validate_collecting_manifest(manifest: dict, datasets: list[str], results_path: Path) -> None:
+def _validate_collecting_manifest(manifest: dict, datasets: list[str], results_path: Path, *, dataset_rows: int) -> None:
     if manifest.get("status") != "collecting":
         raise ValueError("resume manifest has invalid collection status")
     manifest_datasets=manifest.get("datasets")
@@ -112,12 +112,6 @@ def _validate_collecting_manifest(manifest: dict, datasets: list[str], results_p
         raise ValueError("resume manifest has invalid backend provenance")
     if not validate_policy_provenance(manifest.get("policy")):
         raise ValueError("resume manifest has invalid policy provenance")
-    dataset_rows=sum(
-        1
-        for raw_path in datasets
-        for line in Path(raw_path).read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    )
     selected_rows=validate_selection_provenance(
         manifest.get("selection"),
         dataset_rows=dataset_rows,
@@ -281,7 +275,7 @@ async def collect(args) -> dict:
             except ValueError as exc:
                 raise ValueError(f"resume completed provenance manifest is invalid: {exc}") from exc
         else:
-            _validate_collecting_manifest(resume_manifest,datasets,output)
+            _validate_collecting_manifest(resume_manifest,datasets,output,dataset_rows=dataset_rows)
         existing=load_cde_results(output,require_models_used=True)
         unknown=set(existing)-{row["text"] for row in rows}
         if unknown:
