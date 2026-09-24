@@ -353,3 +353,46 @@ def test_load_cde_results_requires_valid_model_provenance_when_requested(tmp_pat
     )
     rows=load_cde_results(good,require_models_used=True)
     assert rows["a"]["models_used"] == ["primary","fallback"]
+
+
+
+def test_load_cde_results_requires_nonempty_models_when_requested(tmp_path):
+    path=tmp_path / "models-empty.jsonl"
+    path.write_text(
+        '{"text":"a","cde":"fast","confidence":0.9,"abstained":false,"models_used":[]}\n',
+        encoding="utf-8",
+    )
+    try:
+        load_cde_results(path,require_models_used=True)
+        assert False
+    except ValueError as exc:
+        assert "models_used" in str(exc)
+
+
+def test_load_cde_results_rejects_model_not_declared_by_manifest(tmp_path):
+    path=tmp_path / "models-undeclared.jsonl"
+    path.write_text(
+        '{"text":"a","cde":"fast","confidence":0.9,"abstained":false,"models_used":["other-model"]}\n',
+        encoding="utf-8",
+    )
+    try:
+        load_cde_results(
+            path,
+            require_models_used=True,
+            allowed_models={"primary-model","fallback-model"},
+        )
+        assert False
+    except ValueError as exc:
+        assert "not declared by provenance manifest" in str(exc)
+
+    good=tmp_path / "models-declared.jsonl"
+    good.write_text(
+        '{"text":"a","cde":"fast","confidence":0.9,"abstained":false,"models_used":["fallback-model"]}\n',
+        encoding="utf-8",
+    )
+    rows=load_cde_results(
+        good,
+        require_models_used=True,
+        allowed_models={"primary-model","fallback-model"},
+    )
+    assert rows["a"]["models_used"] == ["fallback-model"]
