@@ -19,6 +19,7 @@ A request contains shared context plus questions. Each question exposes a finite
 - model usage from decision scoring is aggregated per request and fed into CeltIA usage/quota/billing accounting;
 - API schema and runtime both enforce bounded request/question/option sizes; invalid definitions/output fail closed;
 - the LLM scorer serializes context/question/candidates as untrusted JSON data and rejects non-serializable context instead of coercing it;
+- model-facing score output uses opaque compact candidate IDs (`c0`, `c1`, ...) rather than echoing candidate text, keeping structured output bounded and reducing injection surface;
 - low confidence can abstain;
 - sync and async engines share the same optional OOD rejection semantics (entropy/margin thresholds);
 - policy thresholds are bounded to [0,1] and scorer logits must be finite numeric values (booleans are rejected);
