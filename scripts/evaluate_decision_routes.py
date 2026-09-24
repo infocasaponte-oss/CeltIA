@@ -239,6 +239,26 @@ def load_jsonl(path: Path):
         rows.append(row)
     return rows
 
+def validate_result_models(
+    models_used: object,
+    *,
+    require_models_used: bool,
+    allowed_models: set[str] | None = None,
+) -> list[str] | None:
+    if models_used is None and not require_models_used:
+        return None
+    if (
+        not isinstance(models_used,list)
+        or any(not isinstance(model,str) or not model.strip() for model in models_used)
+        or len(models_used) != len(set(models_used))
+        or (require_models_used and not models_used)
+    ):
+        raise ValueError("invalid CDE result models_used")
+    if allowed_models is not None and any(model not in allowed_models for model in models_used):
+        raise ValueError("CDE result model not declared by provenance manifest")
+    return models_used
+
+
 def load_cde_results(path: Path, *, require_models_used: bool = False, allowed_models: set[str] | None = None) -> dict[str, dict]:
     by_text={}
     for n,line in enumerate(path.read_text(encoding="utf-8").splitlines(),1):
@@ -252,16 +272,14 @@ def load_cde_results(path: Path, *, require_models_used: bool = False, allowed_m
         suspected_ood=item.get("suspected_ood")
         models_used=item.get("models_used")
 
-        if models_used is not None or require_models_used:
-            if (
-                not isinstance(models_used,list)
-                or any(not isinstance(model,str) or not model.strip() for model in models_used)
-                or len(models_used) != len(set(models_used))
-                or (require_models_used and not models_used)
-            ):
-                raise ValueError(f"invalid CDE result models_used {path}:{n}")
-            if allowed_models is not None and any(model not in allowed_models for model in models_used):
-                raise ValueError(f"CDE result model not declared by provenance manifest {path}:{n}")
+        try:
+            validate_result_models(
+                models_used,
+                require_models_used=require_models_used,
+                allowed_models=allowed_models,
+            )
+        except ValueError as exc:
+            raise ValueError(f"{exc} {path}:{n}") from exc
 
         if not isinstance(text,str) or not text.strip():
             raise ValueError(f"invalid CDE result row {path}:{n}")
