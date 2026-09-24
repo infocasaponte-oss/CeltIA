@@ -225,13 +225,19 @@ def test_decision_shadow_telemetry_and_migration(tmp_path):
     db.close()
     mem = Memory(str(db_path))
     columns = {row[1] for row in mem.db.execute("PRAGMA table_info(decision_shadow)").fetchall()}
-    assert {"abstention_reason", "suspected_ood", "normalized_entropy", "margin"} <= columns
+    assert {
+        "abstention_reason", "suspected_ood", "normalized_entropy", "margin",
+        "prompt_tokens", "completion_tokens", "total_tokens",
+    } <= columns
     mem.record_decision_shadow(
         1, "fast", None, .5, True,
         abstention_reason="suspected_ood",
         suspected_ood=True,
         normalized_entropy=1.0,
         margin=0.0,
+        prompt_tokens=12,
+        completion_tokens=3,
+        total_tokens=15,
     )
     report = mem.decision_shadow_summary()
     assert report["samples"] == 1
@@ -241,3 +247,7 @@ def test_decision_shadow_telemetry_and_migration(tmp_path):
     assert report["abstention_reasons"] == {"suspected_ood": 1}
     assert report["avg_normalized_entropy"] == 1.0
     assert report["avg_margin"] == 0.0
+    assert report["prompt_tokens"] == 12
+    assert report["completion_tokens"] == 3
+    assert report["total_tokens"] == 15
+    assert report["avg_tokens_per_sample"] == 15.0
