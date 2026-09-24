@@ -134,3 +134,62 @@ def test_atomic_json_writer_preserves_destination_on_replace_failure(tmp_path, m
         pass
     assert json.loads(path.read_text(encoding="utf-8")) == {"old":True}
     assert not list(tmp_path.glob("manifest.json.*.tmp"))
+
+
+def test_resume_rejects_missing_provenance_manifest(tmp_path, monkeypatch):
+    rows=[{"text":"one","expected":"fast","ood":False}]
+    monkeypatch.setattr(collector,"load_datasets",lambda paths: rows)
+    path=tmp_path / "results.jsonl"
+    path.write_text('{"text":"one","cde":"fast","confidence":0.9,"abstained":false}\n',encoding="utf-8")
+    try:
+        asyncio.run(collector.collect(_args(tmp_path,resume=True)))
+        assert False
+    except ValueError as exc:
+        assert "provenance manifest" in str(exc)
+
+
+def test_resume_rejects_changed_dataset_provenance(tmp_path, monkeypatch):
+    dataset=tmp_path / "dataset.jsonl"
+    dataset.write_text('{"text":"one","expected":"fast","ood":false}\n',encoding="utf-8")
+    args=_args(tmp_path)
+    args.dataset=[str(dataset)]
+    monkeypatch.setattr(collector,"build_runtime",FakeRuntime)
+    monkeypatch.setattr(collector,"route",lambda text: type("R",(),{"mode":"fast"})())
+    asyncio.run(collector.collect(args))
+
+    dataset.write_text(
+        '{"text":"one","expected":"fast","ood":false}\n'
+        '{"text":"two","expected":"fast","ood":false}\n',
+        encoding="utf-8",
+    )
+    resume_args=_args(tmp_path,resume=True)
+    resume_args.dataset=[str(dataset)]
+    try:
+        asyncio.run(collector.collect(resume_args))
+        assert False
+    except ValueError as exc:
+        assert "dataset provenance" in str(exc)
+
+
+def test_resume_rejects_changed_runtime_policy(tmp_path, monkeypatch):
+    dataset=tmp_path / "dataset.jsonl"
+    dataset.write_text('{"text":"one","expected":"fast","ood":false}\n',encoding="utf-8")
+    args=_args(tmp_path)
+    args.dataset=[str(dataset)]
+    monkeypatch.setattr(collector,"build_runtime",FakeRuntime)
+    monkeypatch.setattr(collector,"route",lambda text: type("R",(),{"mode":"fast"})())
+    asyncio.run(collector.collect(args))
+
+    class ChangedRuntime(FakeRuntime):
+        def __init__(self):
+            super().__init__()
+            self.engine_options={"abstain_below":.75,"temperature":1.0}
+
+    monkeypatch.setattr(collector,"build_runtime",ChangedRuntime)
+    resume_args=_args(tmp_path,resume=True)
+    resume_args.dataset=[str(dataset)]
+    try:
+        asyncio.run(collector.collect(resume_args))
+        assert False
+    except ValueError as exc:
+        assert "policy provenance" in str(exc)
