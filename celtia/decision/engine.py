@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
 from typing import Protocol, Sequence
 from .schema import DecisionQuestion, DecisionRequest, DecisionResult
-from .robustness import ood_signal
+from .policy import decision_policy, probability_distribution
 
 class CandidateScorer(Protocol):
     def score(self, context: object, question: DecisionQuestion, candidates: Sequence[str]) -> Sequence[float]: ...
@@ -25,33 +24,12 @@ class DecisionEngine:
     def _decide_one(self, context: object, q: DecisionQuestion) -> DecisionResult:
         candidates = q.candidates()
         logits = list(self.scorer.score(context, q, candidates))
-        if len(logits) != len(candidates) or not logits: raise ValueError("scorer returned an invalid number of logits")
-        probs = self._softmax([float(x) / self.temperature for x in logits])
-        pairs = dict(zip(candidates, probs, strict=True))
-        best = max(range(len(probs)), key=probs.__getitem__)
-        confidence = probs[best]
-        risk = ood_signal(
+        pairs = probability_distribution(candidates, logits, temperature=self.temperature)
+        outcome = decision_policy(
             pairs,
-            entropy_threshold=self.ood_entropy_threshold,
-            margin_threshold=self.ood_margin_threshold,
+            abstain_below=self.abstain_below,
+            reject_suspected_ood=self.reject_suspected_ood,
+            ood_entropy_threshold=self.ood_entropy_threshold,
+            ood_margin_threshold=self.ood_margin_threshold,
         )
-        low_confidence = confidence < self.abstain_below
-        rejected_ood = self.reject_suspected_ood and risk["suspected_ood"]
-        abstained = low_confidence or rejected_ood
-        reason = "low_confidence" if low_confidence else ("suspected_ood" if rejected_ood else None)
-        return DecisionResult(
-            q.id,
-            pairs,
-            None if abstained else candidates[best],
-            confidence,
-            abstained,
-            reason,
-            risk["normalized_entropy"],
-            risk["margin"],
-        )
-
-    @staticmethod
-    def _softmax(values: Sequence[float]) -> list[float]:
-        if not all(math.isfinite(v) for v in values): raise ValueError("logits must be finite")
-        m = max(values); exps = [math.exp(v - m) for v in values]; z = sum(exps)
-        return [v / z for v in exps]
+        return DecisionResult(q.id, pairs, **outcome)
