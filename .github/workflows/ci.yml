@@ -104,6 +104,8 @@ jobs:
         run: |
           python scripts/evaluate_decision_routes.py \
             --dataset benchmarks/decision_routes.jsonl
+          python scripts/evaluate_decision_routes.py \
+            --dataset benchmarks/decision_routes_ood.jsonl
           if python scripts/evaluate_decision_routes.py \
             --dataset benchmarks/decision_routes.jsonl \
             --require-eligible; then
