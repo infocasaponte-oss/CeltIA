@@ -33,3 +33,35 @@ def test_runtime_rejects_oversized_context():
         assert False
     except ValueError as exc:
         assert "context" in str(exc)
+
+
+def test_runtime_rejects_non_json_context():
+    runtime = CeltIADecisionRuntime(FakeLLM())
+    try:
+        asyncio.run(runtime.decide({"bad": object()}, [{"id":"x","prompt":"x","type":"boolean"}]))
+        assert False
+    except ValueError as exc:
+        assert "JSON-serializable" in str(exc)
+
+def test_runtime_rejects_duplicate_question_ids():
+    runtime = CeltIADecisionRuntime(FakeLLM())
+    questions = [
+        {"id":"same","prompt":"one","type":"boolean"},
+        {"id":"same","prompt":"two","type":"boolean"},
+    ]
+    try:
+        asyncio.run(runtime.decide({}, questions))
+        assert False
+    except ValueError as exc:
+        assert "unique" in str(exc)
+
+def test_runtime_rejects_empty_or_excessive_questions():
+    runtime = CeltIADecisionRuntime(FakeLLM())
+    for questions in ([], [
+        {"id":f"q{i}","prompt":"x","type":"boolean"} for i in range(33)
+    ]):
+        try:
+            asyncio.run(runtime.decide({}, questions))
+            assert False
+        except ValueError as exc:
+            assert "between 1 and 32" in str(exc)
