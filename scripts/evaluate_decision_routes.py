@@ -15,14 +15,20 @@ RESULT_FORMAT_VERSION=3
 SHA256_RE=re.compile(r"^[0-9a-f]{64}$")
 
 
-def valid_aware_timestamp(value: object) -> bool:
+def parse_aware_timestamp(value: object) -> datetime | None:
     if not isinstance(value,str) or not value.strip():
-        return False
+        return None
     try:
         parsed=datetime.fromisoformat(value)
     except ValueError:
-        return False
-    return parsed.tzinfo is not None and parsed.utcoffset() is not None
+        return None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+    return parsed
+
+
+def valid_aware_timestamp(value: object) -> bool:
+    return parse_aware_timestamp(value) is not None
 
 
 def file_sha256(path: Path) -> str:
@@ -62,11 +68,16 @@ def validate_results_manifest(results_path: Path, datasets: list[str]) -> dict:
     ):
         raise ValueError("CDE results manifest dataset list does not match selected datasets")
     collected_at=manifest.get("collected_at")
-    if not valid_aware_timestamp(collected_at):
+    collected_at_value=parse_aware_timestamp(collected_at)
+    if collected_at_value is None:
         raise ValueError("CDE results manifest has invalid collected_at")
     resumed_from_collected_at=manifest.get("resumed_from_collected_at")
-    if resumed_from_collected_at is not None and not valid_aware_timestamp(resumed_from_collected_at):
-        raise ValueError("CDE results manifest has invalid resumed_from_collected_at")
+    if resumed_from_collected_at is not None:
+        resumed_from_value=parse_aware_timestamp(resumed_from_collected_at)
+        if resumed_from_value is None:
+            raise ValueError("CDE results manifest has invalid resumed_from_collected_at")
+        if resumed_from_value > collected_at_value:
+            raise ValueError("CDE results manifest resume timestamp is after collected_at")
     if not isinstance(manifest.get("backend"),dict):
         raise ValueError("CDE results manifest has invalid backend provenance")
     if not isinstance(manifest.get("policy"),dict):
