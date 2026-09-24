@@ -57,7 +57,8 @@ jobs:
             tests/test_decision_order_eval.py \
             tests/test_decision_policy_parity.py \
             tests/test_decision_prefix_eval.py \
-            tests/test_decision_backend_prefix_eval.py
+            tests/test_decision_backend_prefix_eval.py \
+            tests/test_decision_shadow.py
 
   app:
     name: App Python ${{ matrix.python-version }}
