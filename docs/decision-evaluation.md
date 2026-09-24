@@ -57,3 +57,25 @@ PYTHONPATH=. python scripts/evaluate_decision_routes.py \
 ## Promotion-result integrity
 
 Promotion-result ingestion is strict. Each result row must have a unique non-empty benchmark text, a finite confidence in `[0,1]`, a real boolean `abstained`, an optional boolean `suspected_ood`, and a route consistent with abstention state: decided rows require one of `fast/think/code/agent/long`, while abstained rows require `cde: null`. Duplicate result texts, NaN/infinite confidence, string booleans, unknown routes and results for texts outside the selected benchmark datasets are rejected instead of being coerced or silently ignored.
+
+
+## Collecting real CDE results
+
+`scripts/collect_decision_eval_results.py` runs the same route-decision shape used by shadow routing against the configured CeltIA LLM stack and writes strict JSONL suitable for the offline evaluator. By default it combines the 60 in-domain routing cases and 40 OOD cases. It records the CDE route, confidence, abstention, explicit `suspected_ood`, uncertainty diagnostics, heuristic route and benchmark labels.
+
+Because the collector uses `build_llm()`, it follows the active CeltIA provider configuration: when the hosted primary is enabled and credentialed, running the collector can send benchmark prompts to that provider and consume billable model usage. CI only smoke-tests `--help`; it never executes live model calls.
+
+Example:
+
+```bash
+PYTHONPATH=. python scripts/collect_decision_eval_results.py \
+  --output results/cde_routes.jsonl \
+  --sleep-seconds 0.25
+
+PYTHONPATH=. python scripts/evaluate_decision_routes.py \
+  --dataset benchmarks/decision_routes.jsonl \
+  --dataset benchmarks/decision_routes_ood.jsonl \
+  --cde-results results/cde_routes.jsonl
+```
+
+Use `--resume` to continue an interrupted collection without re-running already valid rows, or `--limit N` for a deterministic small pilot. Existing resume files are validated before reuse so malformed or out-of-dataset rows are not silently carried forward.
