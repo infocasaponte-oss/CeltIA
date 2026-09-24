@@ -514,3 +514,37 @@ def test_partial_pilot_can_resume_into_full_collection(tmp_path, monkeypatch):
         for line in (tmp_path / "results.jsonl").read_text(encoding="utf-8").splitlines()
     ]
     assert [item["text"] for item in saved] == ["one","two","three"]
+
+
+
+def test_resume_rejects_rows_outside_prior_deterministic_selection(tmp_path, monkeypatch):
+    rows=[
+        {"text":"one","expected":"fast","ood":False},
+        {"text":"two","expected":"fast","ood":False},
+        {"text":"three","expected":"fast","ood":False},
+    ]
+    monkeypatch.setattr(collector,"load_datasets",lambda paths: rows)
+    monkeypatch.setattr(collector,"build_runtime",FakeRuntime)
+    monkeypatch.setattr(collector,"route",lambda text:type("R",(),{"mode":"fast"})())
+
+    pilot=asyncio.run(collector.collect(_args(tmp_path,limit=2,checkpoint_every=1)))
+    path=tmp_path / "results.jsonl"
+    manifest_path=tmp_path / "results.jsonl.manifest.json"
+
+    saved=[
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+    ]
+    saved[1]["text"]="three"
+    collector._write_atomic_jsonl(path,saved)
+
+    manifest=json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["results_sha256"]=collector.file_sha256(path)
+    manifest["result_rows"]=2
+    collector._write_atomic_json(manifest_path,manifest)
+
+    try:
+        asyncio.run(collector.collect(_args(tmp_path,resume=True,limit=0,checkpoint_every=1)))
+        assert False
+    except ValueError as exc:
+        assert "prior deterministic selection" in str(exc)
