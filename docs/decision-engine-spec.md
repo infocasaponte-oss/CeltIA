@@ -18,7 +18,7 @@ A request contains shared context plus questions. Each question exposes a finite
 - `/v1/decide` uses the same gateway concurrency/rate-limit slot as other model-backed requests;
 - request-cost bounds are operator-configurable: maximum questions per request (hard-capped at 32) and model output tokens per scoring call (64..2048);
 - model usage from decision scoring is aggregated per request and fed into CeltIA usage/quota/billing accounting;
-- API schema and runtime both enforce bounded request/question/option sizes; invalid definitions/output fail closed;
+- API schema and runtime both enforce bounded request/question/option sizes plus full per-type semantics (choice cardinality/uniqueness and valid score ranges); invalid definitions/output fail closed;
 - type-specific fields are mutually exclusive: boolean rejects options/bounds, choice rejects score bounds, and score rejects choice options;
 - the LLM scorer serializes context/question/candidates as untrusted JSON data and rejects non-serializable context instead of coercing it;
 - model-facing score output uses opaque compact candidate IDs (`c0`, `c1`, ...) rather than echoing candidate text, keeping structured output bounded and reducing injection surface;
