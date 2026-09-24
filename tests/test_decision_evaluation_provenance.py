@@ -248,7 +248,7 @@ def test_results_manifest_rejects_missing_structural_provenance(tmp_path):
         "results_sha256":file_sha256(results),
         "result_rows":0,
     }
-    for field in ("collected_at","backend","policy"):
+    for field in ("collected_at","backend","policy","runtime"):
         manifest=dict(base)
         manifest.pop(field)
         Path(str(results)+".manifest.json").write_text(json.dumps(manifest),encoding="utf-8")
