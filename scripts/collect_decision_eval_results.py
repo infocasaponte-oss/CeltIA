@@ -206,7 +206,10 @@ async def collect(args) -> dict:
         for field in ("backend","policy"):
             if resume_manifest.get(field) != manifest[field]:
                 raise ValueError(f"resume {field} provenance does not match current runtime")
-        manifest["resumed_from_collected_at"]=resume_manifest.get("collected_at")
+        manifest["resumed_from_collected_at"]=(
+            resume_manifest.get("resumed_from_collected_at")
+            or resume_manifest.get("collected_at")
+        )
     written=0
     skipped=0
     output.parent.mkdir(parents=True,exist_ok=True)
