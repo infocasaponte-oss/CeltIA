@@ -104,6 +104,7 @@ jobs:
           PYTHONPATH: .
         run: |
           python scripts/collect_decision_eval_results.py --help >/dev/null
+          pytest -q tests/test_decision_eval_collector.py
           python scripts/evaluate_decision_routes.py \
             --dataset benchmarks/decision_routes.jsonl
           python scripts/evaluate_decision_routes.py \
