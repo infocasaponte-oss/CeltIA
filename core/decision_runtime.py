@@ -9,7 +9,7 @@ from celtia.decision.schema import DecisionQuestion, DecisionRequest, DecisionTy
 class CeltIADecisionRuntime:
     """Bridge between the independent CDE core and CeltIA's existing local LLM client."""
 
-    def __init__(self, llm, *, abstain_below: float = 0.55, temperature: float = 1.0):
+    def __init__(self, llm, *, abstain_below: float = 0.55, temperature: float = 1.0, reject_suspected_ood: bool = True, ood_entropy_threshold: float = 0.90, ood_margin_threshold: float = 0.10):
         async def chat(messages: list[dict]) -> str:
             response = await llm.chat(
                 messages,
@@ -32,6 +32,9 @@ class CeltIADecisionRuntime:
             AsyncLLMDecisionScorer(chat),
             abstain_below=abstain_below,
             temperature=temperature,
+            reject_suspected_ood=reject_suspected_ood,
+            ood_entropy_threshold=ood_entropy_threshold,
+            ood_margin_threshold=ood_margin_threshold,
         )
 
     async def decide(self, context, questions):
