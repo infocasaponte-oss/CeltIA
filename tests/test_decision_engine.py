@@ -133,3 +133,12 @@ def test_score_rejects_choice_options():
         assert False
     except ValueError:
         pass
+
+
+def test_score_requires_at_least_two_candidate_values():
+    q = DecisionQuestion("score", "Score", DecisionType.SCORE, minimum=5, maximum=5)
+    try:
+        q.candidates()
+        assert False
+    except ValueError as exc:
+        assert "at least two ordered values" in str(exc)
