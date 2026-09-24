@@ -1,0 +1,9 @@
+.env
+.env.local
+.venv
+.git
+__pycache__
+*.pyc
+mini_council.db
+.pytest_cache
+node_modules

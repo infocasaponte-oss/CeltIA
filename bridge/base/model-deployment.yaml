@@ -1,0 +1,58 @@
+#! model-deployment.yaml
+# Generated code, do not edit
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: model
+    namespace: mini-council
+    labels:
+        com.docker.compose.project: mini-council
+        com.docker.compose.service: model
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            com.docker.compose.project: mini-council
+            com.docker.compose.service: model
+    strategy:
+        type: Recreate
+    template:
+        metadata:
+            labels:
+                com.docker.compose.project: mini-council
+                com.docker.compose.service: model
+                com.docker.compose.network.default: "true"
+        spec:
+            restartPolicy: unless-stopped
+            containers:
+                - name: model
+                  image: vllm/vllm-openai:latest
+                  imagePullPolicy: IfNotPresent
+                  args:
+                    - --model
+                    - openbmb/MiniCPM5-2B
+                    - --served-model-name
+                    - MiniCPM5-2B
+                    - --dtype
+                    - bfloat16
+                    - --max-model-len
+                    - 32768
+                    - --gpu-memory-utilization
+                    - 0.82
+                    - --port
+                    - 8000
+                  env:
+                    - name: HUGGING_FACE_HUB_TOKEN
+                      value: ""
+                    - name: VLLM_WORKER_MULTIPROC_METHOD
+                      value: "spawn"
+                  ports:
+                    - name: model-8000
+                      containerPort: 8000
+                  volumeMounts:
+                    - name: root--cache-huggingface
+                      mountPath: /root/.cache/huggingface
+            volumes:
+                - name: root--cache-huggingface
+                  persistentVolumeClaim:
+                    claimName: model-hf-cache

@@ -1,0 +1,15 @@
+#! kustomization.yaml
+# Generated code, do not edit
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+    - 0-mini-council-namespace.yaml
+    - api-app-data-persistentVolumeClaim.yaml
+    - api-deployment.yaml
+    - api-expose.yaml
+    - api-service.yaml
+    - default-network-policy.yaml
+    - model-deployment.yaml
+    - model-expose.yaml
+    - model-hf-cache-persistentVolumeClaim.yaml
+    - model-service.yaml

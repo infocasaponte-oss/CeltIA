@@ -1,0 +1,12 @@
+.env
+.env.local
+__pycache__/
+.pytest_cache/
+*.py[cod]
+*.db
+.venv/
+cloudflared/
+
+# datos locales y temporales
+data/
+.scratch_*.json
