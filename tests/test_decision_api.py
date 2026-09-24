@@ -149,3 +149,38 @@ def test_decide_honors_configured_question_limit(monkeypatch):
         assert exc.status_code == 400
         assert "between 1 and 1" in str(exc.detail)
     assert gateway.keys == []
+
+
+def test_decision_api_rejects_cross_type_fields_at_runtime(monkeypatch):
+    gateway = FakeGateway()
+    memory = FakeMemory()
+    monkeypatch.setattr(api_main, "gateway", gateway)
+    monkeypatch.setattr(api_main, "memory", memory)
+
+    class RejectingRuntime:
+        async def decide_with_usage(self, context, questions):
+            from core.decision_runtime import CeltIADecisionRuntime
+            return await CeltIADecisionRuntime(FakeDecisionRuntime()).decide_with_usage(context, questions)
+
+    # Use the real request construction path with a harmless fake backend only after validation.
+    class NoCallLLM:
+        async def chat(self, messages, **kwargs):
+            assert False, "backend must not be called for an invalid question"
+
+    monkeypatch.setattr(api_main, "decision_runtime", __import__(
+        "core.decision_runtime", fromlist=["CeltIADecisionRuntime"]
+    ).CeltIADecisionRuntime(NoCallLLM()))
+
+    req = api_main.DecisionApiRequest(
+        context={},
+        questions=[api_main.DecisionQuestionInput(
+            id="b", prompt="bool?", type="boolean", options=["x", "y"]
+        )],
+    )
+    key = {"id": None, "role": "user"}
+    try:
+        asyncio.run(api_main.decide(req, key))
+        assert False
+    except api_main.HTTPException as exc:
+        assert exc.status_code == 400
+        assert "boolean questions do not accept" in str(exc.detail)
