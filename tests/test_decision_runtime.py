@@ -364,3 +364,18 @@ def test_runtime_rejects_malformed_question_containers_cleanly():
             assert False, questions
         except ValueError:
             pass
+
+
+def test_runtime_rejects_pathologically_deep_context_cleanly():
+    runtime = CeltIADecisionRuntime(FakeLLM())
+    context = []
+    cursor = context
+    for _ in range(2000):
+        child = []
+        cursor.append(child)
+        cursor = child
+    try:
+        asyncio.run(runtime.decide(context, [{"id":"x","prompt":"x","type":"boolean"}]))
+        assert False
+    except ValueError as exc:
+        assert "JSON-serializable" in str(exc)
