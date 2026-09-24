@@ -226,7 +226,7 @@ async def collect(args) -> dict:
             try:
                 resume_manifest=validate_results_manifest(output,datasets)
             except ValueError as exc:
-                raise ValueError("resume result file does not match completed provenance manifest") from exc
+                raise ValueError(f"resume completed provenance manifest is invalid: {exc}") from exc
         else:
             _validate_collecting_manifest(resume_manifest,datasets)
         existing=load_cde_results(output,require_models_used=True)
