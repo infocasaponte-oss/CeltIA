@@ -59,7 +59,7 @@ class CeltIADecisionRuntime:
             response = await self.llm.chat(
                 messages,
                 thinking=False,
-                max_tokens=384,
+                max_tokens=1024,
                 temperature=0.0,
             )
             meta = response.get("meta") or {}
