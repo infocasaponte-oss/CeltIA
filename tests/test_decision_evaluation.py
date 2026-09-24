@@ -328,3 +328,28 @@ def test_promotion_gate_rejects_invalid_threshold_configuration():
             assert False, kwargs
         except ValueError:
             pass
+
+
+def test_load_cde_results_requires_valid_model_provenance_when_requested(tmp_path):
+    invalid_rows=(
+        '{"text":"a","cde":"fast","confidence":0.9,"abstained":false}',
+        '{"text":"a","cde":"fast","confidence":0.9,"abstained":false,"models_used":"model"}',
+        '{"text":"a","cde":"fast","confidence":0.9,"abstained":false,"models_used":[""]}',
+        '{"text":"a","cde":"fast","confidence":0.9,"abstained":false,"models_used":["m","m"]}',
+    )
+    for index,line in enumerate(invalid_rows):
+        path=tmp_path / f"models-{index}.jsonl"
+        path.write_text(line+"\n",encoding="utf-8")
+        try:
+            load_cde_results(path,require_models_used=True)
+            assert False,line
+        except ValueError as exc:
+            assert "models_used" in str(exc)
+
+    good=tmp_path / "models-good.jsonl"
+    good.write_text(
+        '{"text":"a","cde":"fast","confidence":0.9,"abstained":false,"models_used":["primary","fallback"]}\n',
+        encoding="utf-8",
+    )
+    rows=load_cde_results(good,require_models_used=True)
+    assert rows["a"]["models_used"] == ["primary","fallback"]
