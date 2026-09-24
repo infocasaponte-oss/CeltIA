@@ -145,7 +145,7 @@ def dataset_sha256(paths: list[str]) -> str:
     return digest.hexdigest()
 
 
-def validate_results_manifest(results_path: Path, datasets: list[str], *, require_full_selection: bool = True, dataset_rows: int | None = None) -> dict:
+def validate_results_manifest(results_path: Path, datasets: list[str], *, require_full_selection: bool = True, require_clean_code: bool = True, dataset_rows: int | None = None) -> dict:
     manifest_path=Path(str(results_path) + ".manifest.json")
     try:
         manifest=json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -184,6 +184,8 @@ def validate_results_manifest(results_path: Path, datasets: list[str], *, requir
         )
     ):
         raise ValueError("CDE results manifest has invalid code provenance")
+    if require_clean_code and manifest.get("code_dirty") is not False:
+        raise ValueError("CDE promotion requires clean code provenance")
     expected_dataset_sha=manifest.get("dataset_sha256")
     if (
         not isinstance(expected_dataset_sha,str)
