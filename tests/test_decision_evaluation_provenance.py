@@ -24,6 +24,17 @@ def _policy_provenance():
     }
 
 
+def _runtime_provenance():
+    return {
+        "max_questions":32,
+        "max_output_tokens":1024,
+        "max_total_output_tokens":8192,
+        "max_total_prompt_chars":250000,
+        "call_timeout_seconds":30.0,
+        "request_timeout_seconds":120.0,
+    }
+
+
 def _selection(dataset_rows=1, selected_rows=None, limit=0):
     if selected_rows is None:
         selected_rows=dataset_rows if limit == 0 else min(limit,dataset_rows)
@@ -39,7 +50,7 @@ def test_results_manifest_matches_exact_dataset_evidence(tmp_path):
     dataset.write_text('{"text":"one","expected":"fast","ood":false}\\n',encoding="utf-8")
     results=tmp_path / "results.jsonl"
     results.write_text('{"text":"one"}\n',encoding="utf-8")
-    manifest={"format_version":RESULT_FORMAT_VERSION,"code_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","code_dirty":False,"status":"complete","collected_at":"2026-01-01T00:00:00+00:00","datasets":[str(dataset)],"selection":_selection(),"backend":_backend_provenance(),"policy":_policy_provenance(),"dataset_sha256":dataset_sha256([str(dataset)]),"results_sha256":file_sha256(results),"result_rows":1}
+    manifest={"format_version":RESULT_FORMAT_VERSION,"code_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","code_dirty":False,"status":"complete","collected_at":"2026-01-01T00:00:00+00:00","datasets":[str(dataset)],"selection":_selection(),"backend":_backend_provenance(),"policy":_policy_provenance(),"runtime":_runtime_provenance(),"dataset_sha256":dataset_sha256([str(dataset)]),"results_sha256":file_sha256(results),"result_rows":1}
     Path(str(results)+".manifest.json").write_text(json.dumps(manifest),encoding="utf-8")
     loaded=validate_results_manifest(results,[str(dataset)])
     assert loaded["dataset_sha256"] == manifest["dataset_sha256"]
@@ -50,7 +61,7 @@ def test_results_manifest_rejects_changed_dataset(tmp_path):
     dataset.write_text("first\\n",encoding="utf-8")
     results=tmp_path / "results.jsonl"
     results.write_text("",encoding="utf-8")
-    manifest={"format_version":RESULT_FORMAT_VERSION,"code_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","code_dirty":False,"status":"complete","collected_at":"2026-01-01T00:00:00+00:00","datasets":[str(dataset)],"selection":_selection(),"backend":_backend_provenance(),"policy":_policy_provenance(),"dataset_sha256":dataset_sha256([str(dataset)]),"results_sha256":file_sha256(results),"result_rows":0}
+    manifest={"format_version":RESULT_FORMAT_VERSION,"code_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","code_dirty":False,"status":"complete","collected_at":"2026-01-01T00:00:00+00:00","datasets":[str(dataset)],"selection":_selection(),"backend":_backend_provenance(),"policy":_policy_provenance(),"runtime":_runtime_provenance(),"dataset_sha256":dataset_sha256([str(dataset)]),"results_sha256":file_sha256(results),"result_rows":0}
     Path(str(results)+".manifest.json").write_text(json.dumps(manifest),encoding="utf-8")
     dataset.write_text("changed\\n",encoding="utf-8")
     try:
@@ -80,7 +91,7 @@ def test_results_manifest_rejects_tampered_results(tmp_path):
         "collected_at":"2026-01-01T00:00:00+00:00",
         "datasets":[str(dataset)],"selection":_selection(),
         "backend":_backend_provenance(),
-        "policy":_policy_provenance(),
+        "policy":_policy_provenance(),"runtime":_runtime_provenance(),
         "status":"complete",
         "dataset_sha256":dataset_sha256([str(dataset)]),
         "results_sha256":file_sha256(results),
@@ -105,7 +116,7 @@ def test_results_manifest_rejects_incomplete_collection(tmp_path):
         "collected_at":"2026-01-01T00:00:00+00:00",
         "datasets":[str(dataset)],"selection":_selection(),
         "backend":_backend_provenance(),
-        "policy":_policy_provenance(),
+        "policy":_policy_provenance(),"runtime":_runtime_provenance(),
         "status":"collecting",
         "dataset_sha256":dataset_sha256([str(dataset)]),
     }
@@ -141,7 +152,7 @@ def test_results_manifest_rejects_wrong_result_row_count(tmp_path):
         "collected_at":"2026-01-01T00:00:00+00:00",
         "datasets":[str(dataset)],"selection":_selection(),
         "backend":_backend_provenance(),
-        "policy":_policy_provenance(),
+        "policy":_policy_provenance(),"runtime":_runtime_provenance(),
         "status":"complete",
         "dataset_sha256":dataset_sha256([str(dataset)]),
         "results_sha256":file_sha256(results),
@@ -165,7 +176,7 @@ def test_results_manifest_rejects_invalid_result_row_count_type(tmp_path):
         "collected_at":"2026-01-01T00:00:00+00:00",
         "datasets":[str(dataset)],"selection":_selection(),
         "backend":_backend_provenance(),
-        "policy":_policy_provenance(),
+        "policy":_policy_provenance(),"runtime":_runtime_provenance(),
         "status":"complete",
         "dataset_sha256":dataset_sha256([str(dataset)]),
         "results_sha256":file_sha256(results),
@@ -207,7 +218,7 @@ def test_results_manifest_rejects_dataset_list_mismatch(tmp_path):
         "collected_at":"2026-01-01T00:00:00+00:00",
         "datasets":["different.jsonl"],
         "backend":_backend_provenance(),
-        "policy":_policy_provenance(),
+        "policy":_policy_provenance(),"runtime":_runtime_provenance(),
         "status":"complete",
         "dataset_sha256":dataset_sha256([str(dataset)]),
         "results_sha256":file_sha256(results),
@@ -231,7 +242,7 @@ def test_results_manifest_rejects_missing_structural_provenance(tmp_path):
         "collected_at":"2026-01-01T00:00:00+00:00",
         "datasets":[str(dataset)],"selection":_selection(),
         "backend":_backend_provenance(),
-        "policy":_policy_provenance(),
+        "policy":_policy_provenance(),"runtime":_runtime_provenance(),
         "status":"complete",
         "dataset_sha256":dataset_sha256([str(dataset)]),
         "results_sha256":file_sha256(results),
@@ -258,7 +269,7 @@ def test_results_manifest_rejects_naive_or_malformed_collection_timestamp(tmp_pa
         "format_version":RESULT_FORMAT_VERSION,"code_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","code_dirty":False,
         "datasets":[str(dataset)],"selection":_selection(),
         "backend":_backend_provenance(),
-        "policy":_policy_provenance(),
+        "policy":_policy_provenance(),"runtime":_runtime_provenance(),
         "status":"complete",
         "dataset_sha256":dataset_sha256([str(dataset)]),
         "results_sha256":file_sha256(results),
@@ -286,7 +297,7 @@ def test_results_manifest_rejects_invalid_resumed_from_collection_timestamp(tmp_
         "resumed_from_collected_at":"2025-12-31T23:00:00",
         "datasets":[str(dataset)],"selection":_selection(),
         "backend":_backend_provenance(),
-        "policy":_policy_provenance(),
+        "policy":_policy_provenance(),"runtime":_runtime_provenance(),
         "status":"complete",
         "dataset_sha256":dataset_sha256([str(dataset)]),
         "results_sha256":file_sha256(results),
@@ -312,7 +323,7 @@ def test_results_manifest_rejects_resume_timestamp_after_collection(tmp_path):
         "resumed_from_collected_at":"2026-01-01T00:00:01+00:00",
         "datasets":[str(dataset)],"selection":_selection(),
         "backend":_backend_provenance(),
-        "policy":_policy_provenance(),
+        "policy":_policy_provenance(),"runtime":_runtime_provenance(),
         "status":"complete",
         "dataset_sha256":dataset_sha256([str(dataset)]),
         "results_sha256":file_sha256(results),
@@ -337,7 +348,7 @@ def test_results_manifest_rejects_incomplete_backend_provenance(tmp_path):
         "collected_at":"2026-01-01T00:00:00+00:00",
         "datasets":[str(dataset)],"selection":_selection(),
         "backend":{"client_type":"FakeLLM"},
-        "policy":_policy_provenance(),
+        "policy":_policy_provenance(),"runtime":_runtime_provenance(),
         "status":"complete",
         "dataset_sha256":dataset_sha256([str(dataset)]),
         "results_sha256":file_sha256(results),
@@ -400,7 +411,7 @@ def test_results_manifest_rejects_partial_selection_for_promotion(tmp_path):
         "datasets":[str(dataset)],
         "selection":_selection(dataset_rows=2,selected_rows=1,limit=1),
         "backend":_backend_provenance(),
-        "policy":_policy_provenance(),
+        "policy":_policy_provenance(),"runtime":_runtime_provenance(),
         "status":"complete",
         "dataset_sha256":dataset_sha256([str(dataset)]),
         "results_sha256":file_sha256(results),
@@ -436,7 +447,7 @@ def test_results_manifest_rejects_selection_count_inconsistent_with_limit(tmp_pa
         "datasets":[str(dataset)],
         "selection":_selection(dataset_rows=2,selected_rows=1,limit=0),
         "backend":_backend_provenance(),
-        "policy":_policy_provenance(),
+        "policy":_policy_provenance(),"runtime":_runtime_provenance(),
         "status":"complete",
         "dataset_sha256":dataset_sha256([str(dataset)]),
         "results_sha256":file_sha256(results),
@@ -463,7 +474,7 @@ def test_results_manifest_rejects_missing_or_invalid_code_revision(tmp_path):
         "datasets":[str(dataset)],
         "selection":_selection(),
         "backend":_backend_provenance(),
-        "policy":_policy_provenance(),
+        "policy":_policy_provenance(),"runtime":_runtime_provenance(),
         "status":"complete",
         "dataset_sha256":dataset_sha256([str(dataset)]),
         "results_sha256":file_sha256(results),
@@ -508,7 +519,7 @@ def test_results_manifest_blocks_dirty_code_from_promotion_but_allows_nonpromoti
         "datasets":[str(dataset)],
         "selection":_selection(),
         "backend":_backend_provenance(),
-        "policy":_policy_provenance(),
+        "policy":_policy_provenance(),"runtime":_runtime_provenance(),
         "status":"complete",
         "dataset_sha256":dataset_sha256([str(dataset)]),
         "results_sha256":file_sha256(results),
@@ -528,3 +539,41 @@ def test_results_manifest_blocks_dirty_code_from_promotion_but_allows_nonpromoti
         require_clean_code=False,
     )
     assert loaded["code_dirty"] is True
+
+
+
+def test_results_manifest_rejects_invalid_runtime_provenance(tmp_path):
+    dataset=tmp_path / "dataset.jsonl"
+    dataset.write_text('{"text":"one","expected":"fast","ood":false}\n',encoding="utf-8")
+    results=tmp_path / "results.jsonl"
+    results.write_text('{"text":"one"}\n',encoding="utf-8")
+    invalid_runtimes=(
+        {"max_questions":32},
+        {**_runtime_provenance(),"max_questions":0},
+        {**_runtime_provenance(),"max_output_tokens":"1024"},
+        {**_runtime_provenance(),"max_total_output_tokens":1024},
+        {**_runtime_provenance(),"call_timeout_seconds":0},
+        {**_runtime_provenance(),"request_timeout_seconds":float("inf")},
+    )
+    for runtime in invalid_runtimes:
+        manifest={
+            "format_version":RESULT_FORMAT_VERSION,
+            "code_revision":"a" * 40,
+            "code_dirty":False,
+            "collected_at":"2026-01-01T00:00:00+00:00",
+            "datasets":[str(dataset)],
+            "selection":_selection(),
+            "backend":_backend_provenance(),
+            "policy":_policy_provenance(),
+            "runtime":runtime,
+            "status":"complete",
+            "dataset_sha256":dataset_sha256([str(dataset)]),
+            "results_sha256":file_sha256(results),
+            "result_rows":1,
+        }
+        Path(str(results)+".manifest.json").write_text(json.dumps(manifest),encoding="utf-8")
+        try:
+            validate_results_manifest(results,[str(dataset)])
+            assert False,runtime
+        except ValueError as exc:
+            assert "runtime provenance" in str(exc)
