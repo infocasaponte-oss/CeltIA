@@ -128,3 +128,24 @@ def test_decision_api_schema_accepts_maximum_supported_sizes():
         }],
     })
     assert len(req.questions[0].options) == 64
+
+
+def test_decide_honors_configured_question_limit(monkeypatch):
+    gateway = FakeGateway()
+    monkeypatch.setattr(api_main, "gateway", gateway)
+    monkeypatch.setattr(api_main.settings, "decision_max_questions", 1)
+    req = api_main.DecisionApiRequest(
+        context={},
+        questions=[
+            api_main.DecisionQuestionInput(id="q1", prompt="safe?", type="boolean"),
+            api_main.DecisionQuestionInput(id="q2", prompt="safe?", type="boolean"),
+        ],
+    )
+    key = {"id": None, "role": "user"}
+    try:
+        asyncio.run(api_main.decide(req, key))
+        assert False
+    except api_main.HTTPException as exc:
+        assert exc.status_code == 400
+        assert "between 1 and 1" in str(exc.detail)
+    assert gateway.keys == []
