@@ -123,3 +123,5 @@ Schema-v3 promotion and resume paths now require each result row to carry a vali
 
 
 Promotion now treats the full schema-v3 manifest as a contract, not only its digests: the exact ordered dataset path list must match the evaluator inputs, `collected_at` must be present, and backend/policy provenance must be structured objects. Both dataset and result digests must also be canonical lowercase 64-character SHA-256 values. Structurally incomplete v3 manifests fail closed before metrics are calculated.
+
+Resume now applies the same evidence boundary. Completed manifests are revalidated through the promotion-manifest validator before any existing row is reused, including result digest and row-count checks. Interrupted `collecting` manifests must still carry the exact ordered dataset list, `collected_at`, structured backend/policy provenance and a canonical dataset SHA-256; malformed or unknown-status sidecars fail closed instead of being treated as resumable checkpoints.
