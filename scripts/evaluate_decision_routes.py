@@ -2,10 +2,13 @@
 from __future__ import annotations
 import argparse
 import json
+import math
 from pathlib import Path
 
 from core.router import route
 from celtia.decision.evaluation import ShadowSample, evaluate_shadow, promotion_gate
+
+ROUTES={"fast","think","code","agent","long"}
 
 def load_jsonl(path: Path):
     rows=[]
@@ -18,11 +21,52 @@ def load_jsonl(path: Path):
             raise ValueError(f"invalid benchmark row {path}:{n}")
         if expected_ood is not None and not isinstance(expected_ood, bool):
             raise ValueError(f"invalid benchmark row {path}:{n}")
-        if expected not in {"fast","think","code","agent","long"}:
+        if expected not in ROUTES:
             if not (expected is None and expected_ood is True):
                 raise ValueError(f"invalid benchmark row {path}:{n}")
         rows.append(row)
     return rows
+
+def load_cde_results(path: Path) -> dict[str, dict]:
+    by_text={}
+    for n,line in enumerate(path.read_text(encoding="utf-8").splitlines(),1):
+        if not line.strip():
+            continue
+        item=json.loads(line)
+        text=item.get("text")
+        cde=item.get("cde")
+        confidence=item.get("confidence")
+        abstained=item.get("abstained")
+        suspected_ood=item.get("suspected_ood")
+
+        if not isinstance(text,str) or not text.strip():
+            raise ValueError(f"invalid CDE result row {path}:{n}")
+        if text in by_text:
+            raise ValueError(f"duplicate CDE result text {path}:{n}")
+        if not isinstance(abstained,bool):
+            raise ValueError(f"invalid CDE result row {path}:{n}")
+        if isinstance(confidence,bool):
+            raise ValueError(f"invalid CDE result row {path}:{n}")
+        try:
+            confidence_value=float(confidence)
+        except (TypeError,ValueError,OverflowError) as exc:
+            raise ValueError(f"invalid CDE result row {path}:{n}") from exc
+        if not math.isfinite(confidence_value) or not 0 <= confidence_value <= 1:
+            raise ValueError(f"invalid CDE result row {path}:{n}")
+        if suspected_ood is not None and not isinstance(suspected_ood,bool):
+            raise ValueError(f"invalid CDE result row {path}:{n}")
+        if abstained:
+            if cde is not None:
+                raise ValueError(f"invalid CDE result row {path}:{n}")
+        elif cde not in ROUTES:
+            raise ValueError(f"invalid CDE result row {path}:{n}")
+
+        by_text[text]={
+            **item,
+            "confidence":confidence_value,
+        }
+    return by_text
+
 
 def main():
     p=argparse.ArgumentParser()
@@ -52,16 +96,11 @@ def main():
                 raise ValueError(f"duplicate benchmark text across datasets: {row['text']!r}")
             seen_text.add(row["text"])
             rows.append(row)
-    by_text={}
-    if args.cde_results:
-        for line in Path(args.cde_results).read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                item=json.loads(line)
-                if not isinstance(item.get("text"), str):
-                    raise ValueError("invalid CDE result row")
-                if "suspected_ood" in item and not isinstance(item["suspected_ood"], bool):
-                    raise ValueError("invalid CDE result row")
-                by_text[item["text"]]=item
+    by_text=load_cde_results(Path(args.cde_results)) if args.cde_results else {}
+    unknown_results=set(by_text)-seen_text
+    if unknown_results:
+        first=sorted(unknown_results)[0]
+        raise ValueError(f"CDE result text not present in benchmark datasets: {first!r}")
     samples=[]
     for row in rows:
         h=route(row["text"]).mode
@@ -69,8 +108,8 @@ def main():
         samples.append(ShadowSample(
             h,
             item.get("cde") if item else None,
-            float(item.get("confidence",0.0)) if item else 0.0,
-            bool(item.get("abstained",True)) if item else True,
+            item["confidence"] if item else 0.0,
+            item["abstained"] if item else True,
             row.get("expected"),
             suspected_ood=item.get("suspected_ood") if item else None,
             expected_ood=row.get("ood"),
