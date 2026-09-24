@@ -69,6 +69,7 @@ def decision_policy(
         "confidence": confidence,
         "abstained": abstained,
         "abstention_reason": reason,
+        "suspected_ood": bool(risk["suspected_ood"]),
         "normalized_entropy": risk["normalized_entropy"],
         "margin": risk["margin"],
     }
