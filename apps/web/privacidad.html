@@ -87,10 +87,11 @@
   <h2>Con quién se comparten</h2>
   <ul>
     <li><strong>Brave Search API</strong>: cuando el asistente necesita buscar información en internet, tu consulta de búsqueda (no el resto de la conversación) se envía a este proveedor para obtener resultados.</li>
+    <li><strong>xAI (Grok)</strong>: proveedor del modelo de lenguaje principal. Para generar cada respuesta se le envía el mensaje que escribes, el contexto reciente de la conversación, el texto de los archivos que adjuntes y el de las páginas web que el asistente lea por ti; para generar imágenes, la descripción que pidas. Es un proveedor ubicado fuera de la Unión Europea, y el tratamiento se rige por sus condiciones y su política de privacidad. Si su servicio no está disponible, las respuestas se generan con un modelo local en nuestra propia infraestructura, sin salir de ella.</li>
     <li><strong>Stripe</strong>: únicamente si tienes activada la facturación por uso, para gestionar el cobro. No compartimos con Stripe el contenido de tus conversaciones.</li>
     <li>No vendemos ni cedemos tus datos a terceros con fines publicitarios.</li>
   </ul>
-  <p>El modelo de IA y la base de datos de CeltIA se ejecutan en infraestructura propia; tus conversaciones no se envían a OpenAI, Anthropic, Google ni ningún otro proveedor de modelos de terceros.</p>
+  <p>La base de datos de CeltIA (cuentas, historial y registros) se aloja en infraestructura propia. Tus conversaciones solo se envían al proveedor de modelo indicado arriba; no las enviamos a ningún otro proveedor de modelos. Evita incluir en el chat datos personales sensibles que no sean necesarios para tu consulta.</p>
 
   <h2>Cuánto tiempo conservamos tus datos</h2>
   <p>El historial de conversaciones y el registro de actividad se conservan un máximo de 365 días desde su creación, transcurridos los cuales se eliminan automáticamente. Los datos de tu cuenta se conservan mientras la clave de API permanezca activa.</p>
