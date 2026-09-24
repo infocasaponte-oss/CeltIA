@@ -4,6 +4,20 @@ import math
 from collections.abc import Awaitable, Callable, Sequence
 from .schema import DecisionQuestion
 
+
+class _DuplicateJSONKey(ValueError):
+    pass
+
+
+def _unique_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise _DuplicateJSONKey(key)
+        result[key] = value
+    return result
+
+
 class AsyncLLMDecisionScorer:
     """Model adapter using observable structured output, not hidden reasoning.
 
@@ -44,7 +58,9 @@ class AsyncLLMDecisionScorer:
     async def score(self, context: object, question: DecisionQuestion, candidates: Sequence[str]) -> list[float]:
         text = await self.chat(self.messages_for(context, question, candidates))
         try:
-            data=json.loads(text)
+            data = json.loads(text, object_pairs_hook=_unique_object)
+        except _DuplicateJSONKey as exc:
+            raise ValueError(f"model returned duplicate JSON key: {exc}") from exc
         except (json.JSONDecodeError, TypeError) as exc:
             raise ValueError("model returned invalid JSON") from exc
         if not isinstance(data, dict) or set(data) != {"scores"}:
