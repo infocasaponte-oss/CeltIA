@@ -56,3 +56,4 @@ class DecisionResult:
     abstention_reason: str | None = None
     normalized_entropy: float | None = None
     margin: float | None = None
+    expected_score: float | None = None
