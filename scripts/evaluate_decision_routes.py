@@ -21,6 +21,12 @@ def main():
     p=argparse.ArgumentParser()
     p.add_argument("--dataset",default="benchmarks/decision_routes.jsonl")
     p.add_argument("--cde-results",help="Optional JSONL with text,cde,confidence,abstained")
+    p.add_argument("--min-samples",type=int,default=200)
+    p.add_argument("--min-coverage",type=float,default=.80)
+    p.add_argument("--min-labeled",type=int,default=50)
+    p.add_argument("--min-accuracy-delta",type=float,default=.02)
+    p.add_argument("--min-labeled-coverage",type=float,default=.80)
+    p.add_argument("--require-eligible",action="store_true",help="Exit non-zero when the promotion gate fails")
     args=p.parse_args()
     rows=load_jsonl(Path(args.dataset))
     by_text={}
@@ -36,7 +42,17 @@ def main():
             float(item.get("confidence",0.0)) if item else 0.0,
             bool(item.get("abstained",True)) if item else True,row["expected"]))
     metrics=evaluate_shadow(samples)
-    print(json.dumps({"metrics":metrics,"gate":promotion_gate(metrics)},indent=2,ensure_ascii=False))
+    gate=promotion_gate(
+        metrics,
+        min_samples=args.min_samples,
+        min_coverage=args.min_coverage,
+        min_labeled=args.min_labeled,
+        min_accuracy_delta=args.min_accuracy_delta,
+        min_labeled_coverage=args.min_labeled_coverage,
+    )
+    print(json.dumps({"metrics":metrics,"gate":gate},indent=2,ensure_ascii=False))
+    if args.require_eligible and not gate["eligible"]:
+        raise SystemExit(2)
 
 if __name__=="__main__":
     main()
