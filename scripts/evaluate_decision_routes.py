@@ -3,11 +3,37 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import hashlib
 from pathlib import Path
 
 from celtia.decision.evaluation import ShadowSample, evaluate_shadow, promotion_gate
 
 ROUTES={"fast","think","code","agent","long"}
+RESULT_FORMAT_VERSION=2
+
+
+def dataset_sha256(paths: list[str]) -> str:
+    digest=hashlib.sha256()
+    for raw_path in paths:
+        path=Path(raw_path)
+        digest.update(str(path).encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def validate_results_manifest(results_path: Path, datasets: list[str]) -> dict:
+    manifest_path=Path(str(results_path) + ".manifest.json")
+    try:
+        manifest=json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError,json.JSONDecodeError) as exc:
+        raise ValueError(f"missing or invalid CDE results manifest: {manifest_path}") from exc
+    if not isinstance(manifest,dict) or manifest.get("format_version") != RESULT_FORMAT_VERSION:
+        raise ValueError(f"incompatible CDE results manifest: {manifest_path}")
+    if manifest.get("dataset_sha256") != dataset_sha256(datasets):
+        raise ValueError("CDE results manifest does not match selected datasets")
+    return manifest
 
 def load_jsonl(path: Path):
     rows=[]
@@ -105,7 +131,12 @@ def main():
                 raise ValueError(f"duplicate benchmark text across datasets: {row['text']!r}")
             seen_text.add(row["text"])
             rows.append(row)
-    by_text=load_cde_results(Path(args.cde_results)) if args.cde_results else {}
+    if args.cde_results:
+        results_path=Path(args.cde_results)
+        validate_results_manifest(results_path,datasets)
+        by_text=load_cde_results(results_path)
+    else:
+        by_text={}
     unknown_results=set(by_text)-seen_text
     if unknown_results:
         first=sorted(unknown_results)[0]
