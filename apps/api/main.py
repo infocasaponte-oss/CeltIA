@@ -394,7 +394,8 @@ async def decide(req: DecisionApiRequest, key: dict = Depends(require_api_key)):
          "confidence": r.confidence, "abstained": r.abstained,
          "abstention_reason": r.abstention_reason,
          "normalized_entropy": r.normalized_entropy,
-         "margin": r.margin}
+         "margin": r.margin,
+         "expected_score": r.expected_score}
         for r in results
     ]}
 
