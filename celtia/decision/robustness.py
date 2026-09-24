@@ -38,3 +38,19 @@ def ood_signal(probabilities: Mapping[str,float], *, entropy_threshold: float=.9
         "normalized_entropy": entropy,
         "margin": margin,
     }
+
+
+def option_order_report(distributions: Sequence[Mapping[str, float]]) -> dict:
+    """Summarize label-aligned stability across option permutations."""
+    if len(distributions) < 2:
+        raise ValueError("at least two distributions are required")
+    keys = set(distributions[0])
+    if not keys or any(set(d) != keys for d in distributions):
+        raise ValueError("all distributions must contain the same candidates")
+    winners = [max(d, key=d.get) for d in distributions]
+    return {
+        "permutations": len(distributions),
+        "max_deviation": option_order_max_deviation(distributions),
+        "winner_stable": len(set(winners)) == 1,
+        "winners": winners,
+    }
