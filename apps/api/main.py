@@ -6,6 +6,7 @@ import re
 import time
 import uuid
 from pathlib import Path
+from typing import Annotated, Literal
 
 import httpx
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
@@ -14,7 +15,7 @@ from core import webfetch
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 
 from core import billing, diagnostics, oauth, persona
 from core.agent import Agent, tool_content
@@ -28,6 +29,8 @@ from core.creator.projects import project_manager
 from core.creator.sandbox import sandbox_configured, sandbox_for
 from core.creator.tools import CREATOR_TOOL_NAMES, build_creator_registry
 from core.inference import build_llm
+from core.decision_runtime import CeltIADecisionRuntime
+from core.decision_shadow import evaluate_route_shadow
 from core.memory import Memory
 from core.planner import Planner
 from core.policy import ToolPolicy
@@ -37,7 +40,7 @@ from core.tools import PUBLIC_SAFE_TOOLS, Tool, builtins
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="CeltIA", version="1.0.0", docs_url=None, redoc_url=None, openapi_url=None)
-app.state.metrics = {"requests": 0, "agent_runs": 0, "tool_calls": 0, "stream_requests": 0}
+app.state.metrics = {"requests": 0, "agent_runs": 0, "tool_calls": 0, "stream_requests": 0, "decision_requests": 0}
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -61,6 +64,20 @@ memory = Memory(settings.sqlite_path)
 registry = builtins(policy=ToolPolicy())
 llm = build_llm()
 PUBLIC_MODEL_NAME = "CeltIA V4"
+decision_runtime = CeltIADecisionRuntime(
+    llm,
+    abstain_below=settings.decision_abstain_below,
+    temperature=settings.decision_temperature,
+    reject_suspected_ood=settings.decision_reject_ood,
+    ood_entropy_threshold=settings.decision_ood_entropy_threshold,
+    ood_margin_threshold=settings.decision_ood_margin_threshold,
+    max_questions=settings.decision_max_questions,
+    max_output_tokens=settings.decision_max_output_tokens,
+    max_total_output_tokens=settings.decision_max_total_output_tokens,
+    max_total_prompt_chars=settings.decision_max_total_prompt_chars,
+    call_timeout_seconds=settings.decision_call_timeout_seconds,
+    request_timeout_seconds=settings.decision_request_timeout_seconds,
+)
 agent = Agent(llm, registry, policy=ToolPolicy(), planner=Planner())
 gateway = Gateway(settings.gateway_max_concurrency, settings.gateway_queue_wait_seconds,
                   month_usage=lambda key_id: memory.month_tokens(key_id),
@@ -138,6 +155,56 @@ class ChatRequest(BaseModel):
     temperature:float|None=None
     max_tokens:int|None=None
     timezone:str|None=None
+
+DecisionOptionInput = Annotated[str, Field(min_length=1, max_length=1000, strict=True)]
+DecisionScoreBound = Annotated[int, Field(strict=True)]
+
+class DecisionQuestionInput(BaseModel):
+    id: str = Field(min_length=1, max_length=128, strict=True)
+    prompt: str = Field(min_length=1, max_length=8000, strict=True)
+    type: Literal["boolean", "choice", "score"]
+    options: list[DecisionOptionInput] = Field(default_factory=list, max_length=64)
+    minimum: DecisionScoreBound | None = None
+    maximum: DecisionScoreBound | None = None
+
+    @model_validator(mode="after")
+    def validate_type_fields(self):
+        if not self.id.strip():
+            raise ValueError("question id must not be blank")
+        if not self.prompt.strip():
+            raise ValueError("question prompt must not be blank")
+        if any(not option.strip() for option in self.options):
+            raise ValueError("choice options must not be blank")
+        if self.type == "boolean":
+            if self.options or self.minimum is not None or self.maximum is not None:
+                raise ValueError("boolean questions do not accept options or score bounds")
+            return self
+        if self.type == "choice":
+            if self.minimum is not None or self.maximum is not None:
+                raise ValueError("choice questions do not accept score bounds")
+            if len(self.options) < 2:
+                raise ValueError("choice questions require at least two options")
+            if len(set(self.options)) != len(self.options):
+                raise ValueError("choice options must be unique")
+            return self
+        if self.options:
+            raise ValueError("score questions do not accept choice options")
+        if self.minimum is None or self.maximum is None or self.minimum >= self.maximum:
+            raise ValueError("score questions require at least two ordered values")
+        if self.maximum - self.minimum + 1 > 101:
+            raise ValueError("score questions support at most 101 candidate values")
+        return self
+
+class DecisionApiRequest(BaseModel):
+    context: object
+    questions: list[DecisionQuestionInput] = Field(min_length=1, max_length=32)
+
+    @model_validator(mode="after")
+    def validate_unique_question_ids(self):
+        ids = [question.id for question in self.questions]
+        if len(ids) != len(set(ids)):
+            raise ValueError("question ids must be unique")
+        return self
 
 class ApiKeyCreateRequest(BaseModel):
     name: str
@@ -374,9 +441,56 @@ async def gateway_rejection_handler(request: Request, exc: GatewayRejection):
 @app.get("/health")
 async def health(): return {"status":"ok","model":PUBLIC_MODEL_NAME}
 
+@app.post("/v1/decide")
+async def decide(req: DecisionApiRequest, key: dict = Depends(require_api_key)):
+    """Structured decision endpoint. Results are advisory; this endpoint executes no tools."""
+    if not req.questions or len(req.questions) > settings.decision_max_questions:
+        raise HTTPException(400, f"questions must contain between 1 and {settings.decision_max_questions} items")
+    payload = [q.model_dump() for q in req.questions]
+    started_at = time.monotonic()
+    try:
+        async with gateway.slot(key):
+            results, usage = await decision_runtime.decide_with_usage(req.context, payload)
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(400, str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc))
+    app.state.metrics["decision_requests"] += 1
+    if key.get("id") is not None:
+        prompt_tokens = int(usage.get("prompt_tokens", 0))
+        completion_tokens = int(usage.get("completion_tokens", 0))
+        total_tokens = int(usage.get("total_tokens", prompt_tokens + completion_tokens))
+        memory.record_usage(
+            key["id"],
+            prompt_tokens,
+            completion_tokens,
+            model=PUBLIC_MODEL_NAME,
+            latency_ms=int((time.monotonic() - started_at) * 1000),
+            client_key_id=key.get("client_key_id"),
+        )
+        gateway.record_tokens(key["id"], total_tokens, key.get("client_key_id"))
+        if key.get("token_balance") is not None:
+            memory.decrement_token_balance(key["id"], total_tokens)
+        customer_id = key.get("stripe_customer_id")
+        if customer_id:
+            asyncio.create_task(billing.report_usage(customer_id, total_tokens))
+    return {"object": "decision.list", "usage": usage, "data": [
+        {"id": r.id, "probabilities": r.probabilities, "decision": r.decision,
+         "confidence": r.confidence, "abstained": r.abstained,
+         "abstention_reason": r.abstention_reason, "suspected_ood": r.suspected_ood,
+         "normalized_entropy": r.normalized_entropy, "margin": r.margin,
+         "expected_score": r.expected_score}
+        for r in results
+    ]}
+
+
 @app.get("/metrics")
 async def metrics():
     return {"status":"ok","metrics":app.state.metrics}
+
+@app.get("/admin/decision-shadow")
+async def decision_shadow_report(days: int = 30, _: bool = Depends(require_admin)):
+    return memory.decision_shadow_summary(days=min(max(days, 1), 365))
 
 @app.get("/v1/models")
 async def models():
@@ -452,6 +566,26 @@ async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, 
     user_msgs = [m.content for m in req.messages if m.role == "user"]
     text = (user_msgs[-1] if user_msgs else "")[-20000:]
     r = route(text)
+    if settings.decision_shadow_routing:
+        shadow = await evaluate_route_shadow(decision_runtime, text, r.mode)
+        if shadow:
+            logger.info("CDE shadow route: %s", shadow)
+            shadow_usage = shadow.get("usage") or {}
+            memory.record_decision_shadow(
+                key.get("id"),
+                shadow["heuristic"],
+                shadow["cde"],
+                shadow["confidence"],
+                shadow["abstained"],
+                abstention_reason=shadow.get("abstention_reason"),
+                suspected_ood=shadow.get("suspected_ood"),
+                normalized_entropy=shadow.get("normalized_entropy"),
+                margin=shadow.get("margin"),
+                prompt_tokens=shadow_usage.get("prompt_tokens"),
+                completion_tokens=shadow_usage.get("completion_tokens"),
+                total_tokens=shadow_usage.get("total_tokens"),
+            )
+            emit({"type": "decision_shadow", **shadow})
     auto_agent = r.mode == "agent"
     if not auto_agent and req.mode in {"fast", "think", "code", "long"}:
         forced_tokens = 512 if req.mode == "fast" else 1024 if req.mode == "think" else 2048

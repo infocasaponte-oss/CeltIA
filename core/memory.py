@@ -28,6 +28,13 @@ class Memory:
             "CREATE TABLE IF NOT EXISTS activity_log(id INTEGER PRIMARY KEY,api_key_id INTEGER,kind TEXT,detail TEXT,created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"
         )
         self.db.execute(
+            "CREATE TABLE IF NOT EXISTS decision_shadow(id INTEGER PRIMARY KEY,api_key_id INTEGER,"
+            "heuristic_route TEXT,cde_route TEXT,confidence REAL,abstained INTEGER,"
+            "abstention_reason TEXT,suspected_ood INTEGER,normalized_entropy REAL,margin REAL,"
+            "prompt_tokens INTEGER,completion_tokens INTEGER,total_tokens INTEGER,"
+            "agreed INTEGER,created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"
+        )
+        self.db.execute(
             "CREATE TABLE IF NOT EXISTS oauth_states(state TEXT PRIMARY KEY,provider TEXT,gdpr_accepted INTEGER,"
             "cookie_consent TEXT,created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"
         )
@@ -43,6 +50,7 @@ class Memory:
         self._migrate_usage_events()
         self._migrate_api_keys()
         self._migrate_messages()
+        self._migrate_decision_shadow()
         self.db.commit()
 
     def _migrate_usage_events(self):
@@ -50,6 +58,21 @@ class Memory:
         for column, decl in {"model": "TEXT", "latency_ms": "INTEGER", "status": "TEXT", "client_key_id": "INTEGER"}.items():
             if column not in existing:
                 self.db.execute(f"ALTER TABLE usage_events ADD COLUMN {column} {decl}")
+
+    def _migrate_decision_shadow(self):
+        existing = {row[1] for row in self.db.execute("PRAGMA table_info(decision_shadow)").fetchall()}
+        additions = {
+            "abstention_reason": "TEXT",
+            "suspected_ood": "INTEGER",
+            "normalized_entropy": "REAL",
+            "margin": "REAL",
+            "prompt_tokens": "INTEGER",
+            "completion_tokens": "INTEGER",
+            "total_tokens": "INTEGER",
+        }
+        for column, decl in additions.items():
+            if column not in existing:
+                self.db.execute(f"ALTER TABLE decision_shadow ADD COLUMN {column} {decl}")
 
     def _migrate_api_keys(self):
         existing = {row[1] for row in self.db.execute("PRAGMA table_info(api_keys)").fetchall()}
@@ -338,6 +361,69 @@ class Memory:
              client_key_id),
         )
         self.db.commit()
+
+    def record_decision_shadow(self, api_key_id, heuristic_route, cde_route, confidence, abstained,
+                               abstention_reason=None, suspected_ood=None, normalized_entropy=None, margin=None,
+                               prompt_tokens=None, completion_tokens=None, total_tokens=None):
+        agreed = bool(cde_route and cde_route == heuristic_route and not abstained)
+        self.db.execute(
+            "INSERT INTO decision_shadow(api_key_id,heuristic_route,cde_route,confidence,abstained,"
+            "abstention_reason,suspected_ood,normalized_entropy,margin,prompt_tokens,completion_tokens,total_tokens,agreed) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                api_key_id,
+                heuristic_route,
+                cde_route,
+                float(confidence),
+                int(bool(abstained)),
+                abstention_reason,
+                int(bool(suspected_ood)) if suspected_ood is not None else None,
+                float(normalized_entropy) if normalized_entropy is not None else None,
+                float(margin) if margin is not None else None,
+                int(prompt_tokens) if prompt_tokens is not None else None,
+                int(completion_tokens) if completion_tokens is not None else None,
+                int(total_tokens) if total_tokens is not None else None,
+                int(agreed),
+            ),
+        )
+        self.db.commit()
+
+    def decision_shadow_summary(self, days=30):
+        since = f"-{max(1, int(days))} days"
+        row = self.db.execute(
+            "SELECT COUNT(*),COALESCE(SUM(agreed),0),COALESCE(SUM(abstained),0),"
+            "COALESCE(SUM(suspected_ood),0),AVG(confidence),AVG(normalized_entropy),AVG(margin),"
+            "COALESCE(SUM(prompt_tokens),0),COALESCE(SUM(completion_tokens),0),COALESCE(SUM(total_tokens),0) "
+            "FROM decision_shadow WHERE created_at>=datetime('now',?)",
+            (since,),
+        ).fetchone()
+        (
+            total, agreed, abstained, suspected_ood, avg_confidence, avg_entropy, avg_margin,
+            prompt_tokens, completion_tokens, total_tokens,
+        ) = row
+        disagreements = self.db.execute(
+            "SELECT heuristic_route,cde_route,COUNT(*) FROM decision_shadow "
+            "WHERE created_at>=datetime('now',?) AND abstained=0 AND heuristic_route<>cde_route "
+            "GROUP BY heuristic_route,cde_route ORDER BY COUNT(*) DESC LIMIT 20", (since,)
+        ).fetchall()
+        abstention_reasons = self.db.execute(
+            "SELECT COALESCE(abstention_reason,'unknown'),COUNT(*) FROM decision_shadow "
+            "WHERE created_at>=datetime('now',?) AND abstained=1 GROUP BY abstention_reason ORDER BY COUNT(*) DESC", (since,)
+        ).fetchall()
+        return {
+            "days": max(1, int(days)), "samples": total, "agreements": agreed,
+            "agreement_rate": (agreed / total) if total else None,
+            "abstentions": abstained, "abstention_rate": (abstained / total) if total else None,
+            "suspected_ood": suspected_ood,
+            "suspected_ood_rate": (suspected_ood / total) if total else None,
+            "avg_confidence": avg_confidence, "avg_normalized_entropy": avg_entropy, "avg_margin": avg_margin,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": total_tokens,
+            "avg_tokens_per_sample": (total_tokens / total) if total else None,
+            "abstention_reasons": {reason: count for reason, count in abstention_reasons},
+            "top_disagreements": [{"heuristic": a, "cde": b, "count": n} for a,b,n in disagreements],
+        }
 
     def record_activity(self, api_key_id, kind, detail):
         self.db.execute(

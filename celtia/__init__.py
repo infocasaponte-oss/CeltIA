@@ -1,0 +1,1 @@
+"""CeltIA Python package."""

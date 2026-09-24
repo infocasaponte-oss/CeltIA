@@ -1,0 +1,137 @@
+name: CI
+
+"on":
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUNBUFFERED: "1"
+  CREATOR_PROJECTS_DIR: "${{ github.workspace }}/.test-data/projects"
+
+jobs:
+  cde:
+    name: CDE Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    timeout-minutes: 10
+    steps:
+      - name: Runner smoke test
+        run: |
+          echo "runner-ok"
+          pwd
+          ls -la
+      - uses: actions/checkout@v4
+      - name: Repository smoke test
+        run: |
+          test -f celtia/decision/async_engine.py
+          test -f tests/test_async_decision_engine.py
+          echo "checkout-ok"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install CDE test dependency
+        run: python -m pip install pytest
+      - name: Compile CDE
+        run: python -m compileall -q celtia core/decision_runtime.py core/decision_shadow.py
+      - name: Run dependency-free CDE tests
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m pytest -q \
+            tests/test_decision_engine.py \
+            tests/test_async_decision_engine.py \
+            tests/test_decision_metrics.py \
+            tests/test_decision_llm_scorer.py \
+            tests/test_decision_evaluation.py \
+            tests/test_decision_robustness.py \
+            tests/test_decision_calibration.py \
+            tests/test_decision_benchmark.py \
+            tests/test_decision_provenance.py \
+            tests/test_decision_order_eval.py \
+            tests/test_decision_policy_parity.py \
+            tests/test_decision_prefix_eval.py \
+            tests/test_decision_backend_prefix_eval.py \
+            tests/test_decision_shadow.py
+
+  app:
+    name: App Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            requirements-api.txt
+            requirements-mcp.txt
+            requirements-dev.txt
+      - name: Install application test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+      - name: Verify dependency environment
+        run: python -m pip check
+      - name: Validate CDE prefix-reuse benchmark
+        env:
+          PYTHONPATH: .
+        run: |
+          python scripts/benchmark_decision_prefix.py \
+            --context-chars 12000 \
+            --questions 8 \
+            --min-reuse-fraction 0.75
+          python scripts/benchmark_decision_backend_prefix.py --help >/dev/null
+      - name: Compile application
+        run: python -m compileall -q celtia core apps tests
+      - name: Run runtime bridge test
+        env:
+          PYTHONPATH: .
+        run: pytest -q tests/test_decision_runtime.py
+      - name: Validate routing benchmark and promotion gate behavior
+        env:
+          PYTHONPATH: .
+        run: |
+          python scripts/collect_decision_eval_results.py --help >/dev/null
+          pytest -q tests/test_decision_eval_collector.py
+          python scripts/evaluate_decision_routes.py \
+            --dataset benchmarks/decision_routes.jsonl
+          python scripts/evaluate_decision_routes.py \
+            --dataset benchmarks/decision_routes_ood.jsonl
+          python scripts/evaluate_decision_routes.py \
+            --dataset benchmarks/decision_routes.jsonl \
+            --dataset benchmarks/decision_routes_ood.jsonl
+          if python scripts/evaluate_decision_routes.py \
+            --dataset benchmarks/decision_routes.jsonl \
+            --require-eligible; then
+            echo "promotion gate unexpectedly passed without CDE results"
+            exit 1
+          else
+            code=$?
+            test "$code" -eq 2
+          fi
+      - name: Run remaining application tests
+        env:
+          PYTHONPATH: .
+        run: |
+          pytest -q \
+            --ignore=tests/test_decision_engine.py \
+            --ignore=tests/test_async_decision_engine.py \
+            --ignore=tests/test_decision_metrics.py \
+            --ignore=tests/test_decision_llm_scorer.py \
+            --ignore=tests/test_decision_runtime.py \
+            --ignore=tests/test_decision_evaluation.py \
+            --ignore=tests/test_decision_robustness.py \
+            --ignore=tests/test_decision_calibration.py \
+            --ignore=tests/test_decision_benchmark.py

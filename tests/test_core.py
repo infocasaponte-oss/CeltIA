@@ -1,4 +1,5 @@
 import asyncio
+import sqlite3
 
 from core.memory import Memory
 from core.planner import Planner
@@ -210,3 +211,43 @@ def test_primary_uses_reasoning_model_only_without_tools():
     asyncio.run(c.raw_chat([{"role": "user", "content": "a"}], thinking=True, max_tokens=50, tools=[{"type": "function"}], on_token=noop))
     asyncio.run(c.raw_chat([{"role": "user", "content": "a"}], thinking=False, max_tokens=50, on_token=noop))
     assert seen == ["deep", "fast", "fast"]
+
+
+def test_decision_shadow_telemetry_and_migration(tmp_path):
+    db_path = tmp_path / "shadow.db"
+    db = sqlite3.connect(db_path)
+    db.execute(
+        "CREATE TABLE decision_shadow(id INTEGER PRIMARY KEY,api_key_id INTEGER,"
+        "heuristic_route TEXT,cde_route TEXT,confidence REAL,abstained INTEGER,"
+        "agreed INTEGER,created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"
+    )
+    db.commit()
+    db.close()
+    mem = Memory(str(db_path))
+    columns = {row[1] for row in mem.db.execute("PRAGMA table_info(decision_shadow)").fetchall()}
+    assert {
+        "abstention_reason", "suspected_ood", "normalized_entropy", "margin",
+        "prompt_tokens", "completion_tokens", "total_tokens",
+    } <= columns
+    mem.record_decision_shadow(
+        1, "fast", None, .5, True,
+        abstention_reason="suspected_ood",
+        suspected_ood=True,
+        normalized_entropy=1.0,
+        margin=0.0,
+        prompt_tokens=12,
+        completion_tokens=3,
+        total_tokens=15,
+    )
+    report = mem.decision_shadow_summary()
+    assert report["samples"] == 1
+    assert report["abstentions"] == 1
+    assert report["suspected_ood"] == 1
+    assert report["suspected_ood_rate"] == 1.0
+    assert report["abstention_reasons"] == {"suspected_ood": 1}
+    assert report["avg_normalized_entropy"] == 1.0
+    assert report["avg_margin"] == 0.0
+    assert report["prompt_tokens"] == 12
+    assert report["completion_tokens"] == 3
+    assert report["total_tokens"] == 15
+    assert report["avg_tokens_per_sample"] == 15.0

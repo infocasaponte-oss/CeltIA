@@ -7,4 +7,5 @@ COPY requirements-api.txt .
 RUN pip install --no-cache-dir -r requirements-api.txt
 COPY apps ./apps
 COPY core ./core
+COPY celtia ./celtia
 CMD ["uvicorn","apps.api.main:app","--host","0.0.0.0","--port","8080"]

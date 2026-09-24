@@ -1,4 +1,5 @@
 # Copyright (c) 2026 Luis Manuel Cousido Hermida. All rights reserved.
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -49,6 +50,27 @@ class Settings(BaseSettings):
     stripe_metered_price_id: str = ""
     free_plan_token_grant: int = 20000
     pro_plan_token_grant: int = 2000000
+
+    decision_abstain_below: float = Field(default=0.55, ge=0.0, le=1.0, allow_inf_nan=False)
+    decision_temperature: float = Field(default=1.0, gt=0.0, allow_inf_nan=False)
+    decision_shadow_routing: bool = False
+    decision_reject_ood: bool = True
+    decision_ood_entropy_threshold: float = Field(default=0.90, ge=0.0, le=1.0, allow_inf_nan=False)
+    decision_ood_margin_threshold: float = Field(default=0.10, ge=0.0, le=1.0, allow_inf_nan=False)
+    decision_max_questions: int = Field(default=32, ge=1, le=32)
+    decision_max_output_tokens: int = Field(default=1024, ge=64, le=2048)
+    decision_max_total_output_tokens: int = Field(default=8192, ge=64, le=65536)
+    decision_max_total_prompt_chars: int = Field(default=250000, ge=10000, le=2000000)
+    decision_call_timeout_seconds: float = Field(default=30.0, gt=0.0, le=300.0, allow_inf_nan=False)
+    decision_request_timeout_seconds: float = Field(default=120.0, gt=0.0, le=1800.0, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def validate_decision_budget(self):
+        if self.decision_max_total_output_tokens < self.decision_max_questions * 64:
+            raise ValueError(
+                "decision_max_total_output_tokens must reserve at least 64 tokens per decision question"
+            )
+        return self
 
     # Creador Studio: proyectos aislados + sandbox Docker por proyecto
     creator_projects_dir: str = "/data/projects"

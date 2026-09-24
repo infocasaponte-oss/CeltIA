@@ -1,0 +1,60 @@
+{"text":"Resume este parágrafo en dúas frases.","expected":"fast","ood":false}
+{"text":"Explica paso a paso por que este algoritmo ten complexidade O(n log n) e compara alternativas.","expected":"think","ood":false}
+{"text":"Implementa unha función Python que valide JWT e escribe tests unitarios.","expected":"code","ood":false}
+{"text":"Busca na web as novidades publicadas hoxe sobre este proxecto e resume as fontes.","expected":"agent","ood":false}
+{"text":"Analiza este documento moi longo e mantén coherencia entre todas as súas seccións.","expected":"long","ood":false}
+{"text":"Traduceme esta frase ao galego: Good morning.","expected":"fast","ood":false}
+{"text":"Deseña unha estratexia de migración con riscos, trade-offs e plan de rollback.","expected":"think","ood":false}
+{"text":"Corrixe este bug de TypeScript e propón un patch con probas.","expected":"code","ood":false}
+{"text":"Investiga información actualizada en internet e contrasta polo menos tres fontes.","expected":"agent","ood":false}
+{"text":"Traballa sobre un contexto superior ao límite normal e sintetiza todos os apartados.","expected":"long","ood":false}
+{"text":"Dime en una frase qué significa HTTP 404.","expected":"fast","ood":false}
+{"text":"Convierte este título a minúsculas: INTRODUCCIÓN A CELTIA.","expected":"fast","ood":false}
+{"text":"Clasifica esta palabra como sustantivo o verbo: correr.","expected":"fast","ood":false}
+{"text":"Dáme tres sinónimos de rápido.","expected":"fast","ood":false}
+{"text":"Que día da semana vén despois do martes?","expected":"fast","ood":false}
+{"text":"Reescribe esta frase cun ton máis formal: mándamo xa.","expected":"fast","ood":false}
+{"text":"Extrae o nome desta cadea: Nome: Ana; Idade: 31.","expected":"fast","ood":false}
+{"text":"Responde si ou non: 17 é un número primo?","expected":"fast","ood":false}
+{"text":"Ordena alfabeticamente: pera, mazá, laranxa.","expected":"fast","ood":false}
+{"text":"Resume en cinco palabras: O servizo arrancou correctamente e acepta peticións.","expected":"fast","ood":false}
+{"text":"Compara dúas arquitecturas de colas distribuídas e razoa os trade-offs de consistencia, custo e latencia.","expected":"think","ood":false}
+{"text":"Analiza por que unha caché pode empeorar o rendemento baixo alta cardinalidade e propón como comprobalo.","expected":"think","ood":false}
+{"text":"Deriva a complexidade temporal e espacial dun algoritmo divide-and-conquer con recorrencia T(n)=2T(n/2)+n.","expected":"think","ood":false}
+{"text":"Deseña un plan de capacidade para un servizo que debe pasar de 100 a 10000 peticións por segundo.","expected":"think","ood":false}
+{"text":"Avalía tres estratexias de consistencia para unha base distribuída e explica cando escoller cada unha.","expected":"think","ood":false}
+{"text":"Investiga conceptualmente as causas posibles dunha fuga de memoria intermitente e ordena as hipóteses por probas necesarias.","expected":"think","ood":false}
+{"text":"Explica paso a paso como detectar unha condición de carreira difícil de reproducir sen escribir código aínda.","expected":"think","ood":false}
+{"text":"Propón un deseño de idempotencia para pagamentos e razoa os fallos parciais que debe tolerar.","expected":"think","ood":false}
+{"text":"Compara retry con backoff exponencial fronte a colas persistentes para recuperar dun backend inestable.","expected":"think","ood":false}
+{"text":"Analiza os riscos de cambiar un esquema SQL en produción sen downtime e propón unha secuencia segura.","expected":"think","ood":false}
+{"text":"Escribe unha función Python que valide enderezos IPv4 e inclúe probas de borde.","expected":"code","ood":false}
+{"text":"Implementa un parser TypeScript para unha resposta JSON discriminada e engade tests.","expected":"code","ood":false}
+{"text":"Corrixe unha fuga de ficheiros abertos neste snippet de Python e devolve un patch.","expected":"code","ood":false}
+{"text":"Crea unha consulta SQL parametrizada para paginación por cursor e explica os índices necesarios.","expected":"code","ood":false}
+{"text":"Implementa en Go un rate limiter token-bucket con probas concorrentes.","expected":"code","ood":false}
+{"text":"Escribe un middleware FastAPI que engada un request id e probas unitarias.","expected":"code","ood":false}
+{"text":"Refactoriza este patrón callback a async/await en JavaScript e conserva o tratamento de erros.","expected":"code","ood":false}
+{"text":"Implementa unha función Rust que deduplique elementos mantendo a orde e engade tests.","expected":"code","ood":false}
+{"text":"Crea un Dockerfile multi-stage mínimo para unha API Python e verifica que non execute como root.","expected":"code","ood":false}
+{"text":"Escribe unha migración SQLite que engada unha columna nullable de forma compatible e unha proba de migración.","expected":"code","ood":false}
+{"text":"Busca a versión estable máis recente de Python publicada oficialmente e cita a fonte.","expected":"agent","ood":false}
+{"text":"Consulta o estado actual dun servizo público e resume calquera incidencia activa con enlaces.","expected":"agent","ood":false}
+{"text":"Comproba en documentación oficial se unha API cambiou recentemente e trae a referencia exacta.","expected":"agent","ood":false}
+{"text":"Busca tres fontes actuais sobre unha vulnerabilidade recente e contrasta o impacto reportado.","expected":"agent","ood":false}
+{"text":"Consulta os prezos actuais de dous provedores cloud e compáraos con fontes.","expected":"agent","ood":false}
+{"text":"Abre a documentación oficial dun paquete e verifica a sintaxe da versión máis recente.","expected":"agent","ood":false}
+{"text":"Busca se hoxe hai unha interrupción coñecida nun provedor de DNS e cita fontes.","expected":"agent","ood":false}
+{"text":"Investiga cambios desta semana nun proxecto open source e resume commits ou releases relevantes.","expected":"agent","ood":false}
+{"text":"Verifica nunha web oficial os límites actuais dunha API e devolve os enlaces.","expected":"agent","ood":false}
+{"text":"Busca documentación e exemplos recentes para confirmar se unha opción de configuración segue soportada.","expected":"agent","ood":false}
+{"text":"Analiza este expediente de 80 páxinas, crea unha cronoloxía e mantén referencias cruzadas entre anexos.","expected":"long","ood":false}
+{"text":"Sintetiza un repositorio documental moi extenso e produce un mapa de temas sen perder contradicións entre seccións.","expected":"long","ood":false}
+{"text":"Revisa un contrato longo cláusula por cláusula e conserva unha táboa de referencias internas durante toda a análise.","expected":"long","ood":false}
+{"text":"Resume unha transcrición de varias horas mantendo participantes, decisións e asuntos pendentes ao longo de todo o texto.","expected":"long","ood":false}
+{"text":"Compara dous manuais técnicos completos e identifica cambios semánticos sección por sección.","expected":"long","ood":false}
+{"text":"Procesa un contexto de decenas de miles de caracteres e constrúe unha síntese xerárquica consistente.","expected":"long","ood":false}
+{"text":"Analiza un conxunto grande de notas de investigación e agrúpaas por hipótese mantendo as citas orixinais.","expected":"long","ood":false}
+{"text":"Le un informe anual completo e relaciona riscos, cifras e notas ao pé sen perder contexto.","expected":"long","ood":false}
+{"text":"Traballa sobre unha especificación moi longa e xera unha matriz completa de requisitos e dependencias.","expected":"long","ood":false}
+{"text":"Resume unha colección extensa de incidencias e detecta patróns recorrentes mantendo os detalles de cada caso.","expected":"long","ood":false}
