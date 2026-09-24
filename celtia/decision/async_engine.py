@@ -30,5 +30,10 @@ class AsyncDecisionEngine:
                 ood_entropy_threshold=self.ood_entropy_threshold,
                 ood_margin_threshold=self.ood_margin_threshold,
             )
-            results.append(DecisionResult(q.id, distribution, **outcome))
+            expected_score = (
+                sum(float(candidate) * probability for candidate, probability in distribution.items())
+                if q.type.value == "score"
+                else None
+            )
+            results.append(DecisionResult(q.id, distribution, expected_score=expected_score, **outcome))
         return results
