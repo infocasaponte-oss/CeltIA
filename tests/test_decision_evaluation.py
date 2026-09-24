@@ -220,3 +220,73 @@ def test_load_cde_results_rejects_duplicate_text(tmp_path):
         assert False
     except ValueError as exc:
         assert "duplicate CDE result text" in str(exc)
+
+
+def test_shadow_evaluation_reports_per_route_metrics():
+    samples = [
+        ShadowSample("fast", "fast", .9, False, "fast"),
+        ShadowSample("fast", None, .2, True, "fast"),
+        ShadowSample("think", "fast", .8, False, "think"),
+        ShadowSample("code", "code", .9, False, "code"),
+        ShadowSample("agent", "agent", .9, False, "agent"),
+        ShadowSample("long", "long", .9, False, "long"),
+    ]
+    metrics = evaluate_shadow(samples)
+    assert metrics["per_route"]["fast"] == {
+        "labeled": 2,
+        "decided": 1,
+        "coverage": .5,
+        "correct": 1,
+        "accuracy": .5,
+        "selective_accuracy": 1.0,
+    }
+    assert metrics["per_route"]["think"]["accuracy"] == 0.0
+    assert metrics["min_route_labeled"] == 1
+    assert metrics["min_route_coverage"] == .5
+    assert metrics["min_route_accuracy"] == 0.0
+
+
+def test_promotion_gate_blocks_weak_route_even_when_aggregate_is_acceptable():
+    samples = []
+    for route_name in ("fast", "think", "code", "agent"):
+        samples.extend(
+            ShadowSample(route_name, route_name, .9, False, route_name)
+            for _ in range(10)
+        )
+    samples.extend(
+        ShadowSample("long", None, .2, True, "long")
+        for _ in range(10)
+    )
+    metrics = evaluate_shadow(samples)
+    gate = promotion_gate(
+        metrics,
+        min_samples=1,
+        min_coverage=.8,
+        min_labeled=1,
+        min_accuracy_delta=-1,
+        min_labeled_coverage=.8,
+        min_route_labeled=10,
+        min_route_coverage=.7,
+        min_route_accuracy=.6,
+    )
+    assert not gate["eligible"]
+    assert "per_route_coverage_below_gate" in gate["reasons"]
+    assert "per_route_accuracy_below_gate" in gate["reasons"]
+
+
+def test_promotion_gate_requires_minimum_labels_for_every_route():
+    metrics = evaluate_shadow([
+        ShadowSample("fast", "fast", .9, False, "fast"),
+        ShadowSample("think", "think", .9, False, "think"),
+    ])
+    gate = promotion_gate(
+        metrics,
+        min_samples=1,
+        min_coverage=.5,
+        min_labeled=1,
+        min_accuracy_delta=-1,
+        min_labeled_coverage=.5,
+        min_route_labeled=1,
+    )
+    assert not gate["eligible"]
+    assert "insufficient_per_route_labeled_samples" in gate["reasons"]
