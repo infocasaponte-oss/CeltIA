@@ -39,7 +39,7 @@ class AsyncLLMDecisionScorer:
         }
         try:
             serialized = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError, RecursionError) as exc:
             raise ValueError("decision input must be JSON serializable") from exc
         return [
             {
