@@ -8,6 +8,7 @@ import os
 import re
 import subprocess
 import tempfile
+import hashlib
 from datetime import datetime, timezone
 from urllib.parse import urlsplit, urlunsplit
 from pathlib import Path
@@ -100,8 +101,12 @@ def _endpoint_identity(client) -> str | None:
     if ":" in host and not host.startswith("["):
         host=f"[{host}]"
     netloc=host + (f":{port}" if port is not None else "")
+    origin=urlunsplit((parsed.scheme.lower(),netloc,"","",""))
     path=parsed.path.rstrip("/")
-    return urlunsplit((parsed.scheme.lower(),netloc,path,"",""))
+    if not path:
+        return origin
+    path_digest=hashlib.sha256(path.encode("utf-8")).hexdigest()
+    return f"{origin}/#path-sha256={path_digest}"
 
 
 def _code_revision() -> str | None:
