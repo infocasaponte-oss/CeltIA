@@ -18,6 +18,7 @@ A request contains shared context plus questions. Each question exposes a finite
 - `/v1/decide` uses the same gateway concurrency/rate-limit slot as other model-backed requests;
 - model usage from decision scoring is aggregated per request and fed into CeltIA usage/quota/billing accounting;
 - API schema and runtime both enforce bounded request/question/option sizes; invalid definitions/output fail closed;
+- the LLM scorer serializes context/question/candidates as untrusted JSON data and rejects non-serializable context instead of coercing it;
 - low confidence can abstain;
 - sync and async engines share the same optional OOD rejection semantics (entropy/margin thresholds);
 - deterministic tests need no GPU/model downloads.
