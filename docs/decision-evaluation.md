@@ -104,3 +104,5 @@ Completed evaluation manifests are now cryptographically bound to the exact resu
 Evaluation evidence schema v3 is the first schema that consistently covers per-row `models_used`, collection status, final result-file digest and result-row count. Collector and evaluator import the same `RESULT_FORMAT_VERSION`, so provenance compatibility cannot drift through duplicated version constants. Older manifests fail closed and must be recollected or explicitly migrated rather than being silently accepted under the stronger evidence contract.
 
 CDE configuration now fails at settings load, before API/runtime initialization, when probability thresholds, token/question limits, timeouts or aggregate output-budget constraints are invalid. The same bounds remain enforced inside the runtime as defense in depth.
+
+Candidate-aware output budgets are now bound to the exact serialized scorer request instead of being consumed from a positional iterator. That preserves the intended per-question budget even if scorer call ordering changes later, and the tests require the larger candidate set to receive the larger budget.
