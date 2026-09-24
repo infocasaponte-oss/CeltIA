@@ -120,3 +120,6 @@ Repeated resume operations preserve the timestamp of the original collection in 
 
 
 Schema-v3 promotion and resume paths now require each result row to carry a valid `models_used` list. The list may be empty when a backend exposes no model identity, but every present entry must be a unique non-empty string. This prevents a v3 artifact from claiming row-level model provenance while silently omitting or corrupting that field.
+
+
+Promotion now treats the full schema-v3 manifest as a contract, not only its digests: the exact ordered dataset path list must match the evaluator inputs, `collected_at` must be present, and backend/policy provenance must be structured objects. Both dataset and result digests must also be canonical lowercase 64-character SHA-256 values. Structurally incomplete v3 manifests fail closed before metrics are calculated.
