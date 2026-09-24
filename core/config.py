@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     decision_abstain_below: float = 0.55
     decision_temperature: float = 1.0
     decision_shadow_routing: bool = False
+    decision_reject_ood: bool = True
+    decision_ood_entropy_threshold: float = 0.90
+    decision_ood_margin_threshold: float = 0.10
 
     # Creador Studio: proyectos aislados + sandbox Docker por proyecto
     creator_projects_dir: str = "/data/projects"
