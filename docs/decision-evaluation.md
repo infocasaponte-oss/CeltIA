@@ -2,7 +2,7 @@
 
 CDE routing starts in shadow mode. The production heuristic remains authoritative while CeltIA records only route names, confidence, abstention and agreement. User prompt text is not stored in the decision-shadow table.
 
-The admin report exposes sample count, agreement, abstention, mean confidence, mean normalized entropy, mean decision margin, abstention-reason counts and common disagreement pairs.
+The admin report exposes sample count, agreement, abstention, mean confidence, mean normalized entropy, mean decision margin, abstention-reason counts, common disagreement pairs, and aggregate shadow prompt/completion/total tokens plus average tokens per sample.
 
 Promotion to controlled routing must not be based on agreement alone. A labeled evaluation set is required. The offline evaluation helper compares both the existing heuristic and CDE against expected routes and applies explicit minimum sample, coverage, labeled-sample and accuracy-delta gates.
 
@@ -32,7 +32,7 @@ Evaluation also reports selective accuracy: accuracy only on labeled samples whe
 The report keeps distributions label-aligned and records maximum probability deviation plus whether the winning label changes across orders. This is an evaluation path only; production decisions are not multiplied by permutation testing.
 
 
-Shadow telemetry stores only routing metadata and uncertainty diagnostics. It does not persist the user prompt. Existing databases are migrated in place by adding nullable `abstention_reason`, `normalized_entropy`, and `margin` columns.
+Shadow telemetry stores only routing metadata, uncertainty diagnostics and aggregate token counts. It does not persist the user prompt. Shadow inference usage is recorded for operator cost visibility but is not added to end-user billing/quota accounting. Existing databases are migrated in place by adding nullable diagnostics and token-count columns.
 
 
 ## Labeled OOD evaluation
