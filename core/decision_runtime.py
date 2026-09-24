@@ -7,6 +7,8 @@ from celtia.decision.schema import DecisionQuestion, DecisionRequest, DecisionTy
 
 
 class CeltIADecisionRuntime:
+    MAX_CONTEXT_CHARS = 50000
+
     """Bridge between the independent CDE core and CeltIA's existing local LLM client."""
 
     def __init__(self, llm, *, abstain_below: float = 0.55, temperature: float = 1.0, reject_suspected_ood: bool = True, ood_entropy_threshold: float = 0.90, ood_margin_threshold: float = 0.10):
@@ -38,6 +40,13 @@ class CeltIADecisionRuntime:
         )
 
     async def decide(self, context, questions):
+        try:
+            import json
+            context_size = len(json.dumps(context, ensure_ascii=False, default=str))
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("context must be JSON-serializable") from exc
+        if context_size > self.MAX_CONTEXT_CHARS:
+            raise ValueError("decision context exceeds 50000 serialized characters")
         request = DecisionRequest(
             context=context,
             questions=tuple(
