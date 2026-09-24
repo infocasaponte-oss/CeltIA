@@ -19,6 +19,7 @@ async def evaluate_route_shadow(runtime, text: str, heuristic_route: str) -> dic
             "confidence": result.confidence,
             "abstained": result.abstained,
             "abstention_reason": result.abstention_reason,
+            "suspected_ood": result.suspected_ood,
             "normalized_entropy": result.normalized_entropy,
             "margin": result.margin,
         }
