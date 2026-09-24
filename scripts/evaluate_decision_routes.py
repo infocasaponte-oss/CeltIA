@@ -100,6 +100,50 @@ def validate_policy_provenance(value: object) -> bool:
     return math.isfinite(temperature_value) and temperature_value > 0
 
 
+def validate_runtime_provenance(value: object) -> bool:
+    if not isinstance(value,dict):
+        return False
+    required={
+        "max_questions",
+        "max_output_tokens",
+        "max_total_output_tokens",
+        "max_total_prompt_chars",
+        "call_timeout_seconds",
+        "request_timeout_seconds",
+    }
+    if not required.issubset(value):
+        return False
+    integer_fields=(
+        "max_questions",
+        "max_output_tokens",
+        "max_total_output_tokens",
+        "max_total_prompt_chars",
+    )
+    if any(
+        isinstance(value.get(field),bool) or not isinstance(value.get(field),int)
+        for field in integer_fields
+    ):
+        return False
+    if not 1 <= value["max_questions"] <= 32:
+        return False
+    if not 64 <= value["max_output_tokens"] <= 2048:
+        return False
+    if not 64 <= value["max_total_output_tokens"] <= 65536:
+        return False
+    if value["max_total_output_tokens"] < value["max_questions"] * 64:
+        return False
+    if not 10000 <= value["max_total_prompt_chars"] <= 2000000:
+        return False
+    for field,maximum in (("call_timeout_seconds",300),("request_timeout_seconds",1800)):
+        raw=value.get(field)
+        if isinstance(raw,bool) or not isinstance(raw,(int,float)):
+            return False
+        number=float(raw)
+        if not math.isfinite(number) or not 0 < number <= maximum:
+            return False
+    return True
+
+
 def validate_selection_provenance(
     value: object,
     *,
@@ -175,6 +219,8 @@ def validate_results_manifest(results_path: Path, datasets: list[str], *, requir
         raise ValueError("CDE results manifest has invalid backend provenance")
     if not validate_policy_provenance(manifest.get("policy")):
         raise ValueError("CDE results manifest has invalid policy provenance")
+    if not validate_runtime_provenance(manifest.get("runtime")):
+        raise ValueError("CDE results manifest has invalid runtime provenance")
     if (
         "code_revision" not in manifest
         or "code_dirty" not in manifest
