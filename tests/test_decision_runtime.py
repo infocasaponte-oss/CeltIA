@@ -400,9 +400,8 @@ def test_runtime_allocates_more_output_budget_to_large_candidate_sets():
     except ValueError:
         # Fake response only contains two candidate scores; budget capture occurs first.
         pass
-    assert len(llm.calls) >= 1
-    if len(llm.calls) == 2:
-        assert llm.calls[1]["max_tokens"] > llm.calls[0]["max_tokens"]
+    assert len(llm.calls) == 2
+    assert llm.calls[1]["max_tokens"] > llm.calls[0]["max_tokens"]
 
 
 def test_runtime_rejects_request_when_candidate_floor_exceeds_total_output_budget():
