@@ -97,3 +97,37 @@ def test_non_score_decision_has_no_expected_value():
         reject_suspected_ood=False,
     ).decide(DecisionRequest({}, (q,)))[0]
     assert result.expected_score is None
+
+
+def test_boolean_rejects_choice_or_score_fields():
+    for q in (
+        DecisionQuestion("b", "bool", DecisionType.BOOLEAN, ("x", "y")),
+        DecisionQuestion("b", "bool", DecisionType.BOOLEAN, minimum=0, maximum=1),
+    ):
+        try:
+            q.candidates()
+            assert False
+        except ValueError:
+            pass
+
+
+def test_choice_rejects_score_bounds():
+    q = DecisionQuestion(
+        "route", "route", DecisionType.CHOICE, ("fast", "think"), minimum=0, maximum=1
+    )
+    try:
+        q.candidates()
+        assert False
+    except ValueError:
+        pass
+
+
+def test_score_rejects_choice_options():
+    q = DecisionQuestion(
+        "score", "score", DecisionType.SCORE, ("low", "high"), minimum=1, maximum=5
+    )
+    try:
+        q.candidates()
+        assert False
+    except ValueError:
+        pass
