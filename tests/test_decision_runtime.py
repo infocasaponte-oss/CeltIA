@@ -280,3 +280,47 @@ def test_runtime_rejects_invalid_call_timeout():
             assert False
         except ValueError:
             pass
+
+
+class MultiSlowLLM:
+    def __init__(self):
+        self.calls = 0
+
+    async def chat(self, messages, **kwargs):
+        self.calls += 1
+        await asyncio.sleep(0.05)
+        return {
+            "choices":[{"message":{"content":'{"scores":{"c0":0.0,"c1":1.0}}'}}],
+            "usage":{"prompt_tokens":1,"completion_tokens":1},
+        }
+
+
+def test_runtime_times_out_entire_multi_question_request():
+    llm = MultiSlowLLM()
+    runtime = CeltIADecisionRuntime(
+        llm,
+        abstain_below=0.0,
+        reject_suspected_ood=False,
+        call_timeout_seconds=1.0,
+        request_timeout_seconds=0.07,
+        max_questions=2,
+    )
+    questions = [
+        {"id":"q1","prompt":"route","type":"choice","options":["fast","think"]},
+        {"id":"q2","prompt":"route","type":"choice","options":["fast","think"]},
+    ]
+    try:
+        asyncio.run(runtime.decide({}, questions))
+        assert False
+    except RuntimeError as exc:
+        assert "decision request timed out" in str(exc)
+    assert llm.calls >= 1
+
+
+def test_runtime_rejects_invalid_request_timeout():
+    for value in (0, -1, 1801):
+        try:
+            CeltIADecisionRuntime(FakeLLM(), request_timeout_seconds=value)
+            assert False
+        except ValueError:
+            pass
