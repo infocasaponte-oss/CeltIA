@@ -3,12 +3,11 @@ from __future__ import annotations
 
 import asyncio
 import json
-import math
-
 from collections.abc import Mapping
 
 from celtia.decision.async_engine import AsyncDecisionEngine
 from celtia.decision.llm_scorer import AsyncLLMDecisionScorer
+from celtia.decision.policy import validate_policy_settings
 from celtia.decision.schema import DecisionQuestion, DecisionRequest, DecisionType
 
 
@@ -34,31 +33,18 @@ class CeltIADecisionRuntime:
         call_timeout_seconds: float = 30.0,
         request_timeout_seconds: float = 120.0,
     ):
-        def finite_number(name, value):
-            if isinstance(value, bool):
-                raise ValueError(f"{name} must be a finite number")
-            try:
-                number = float(value)
-            except (TypeError, ValueError, OverflowError) as exc:
-                raise ValueError(f"{name} must be a finite number") from exc
-            if not math.isfinite(number):
-                raise ValueError(f"{name} must be a finite number")
-            return number
-
-        abstain_below = finite_number("abstain_below", abstain_below)
-        temperature = finite_number("temperature", temperature)
-        ood_entropy_threshold = finite_number("ood_entropy_threshold", ood_entropy_threshold)
-        ood_margin_threshold = finite_number("ood_margin_threshold", ood_margin_threshold)
-        if not 0 <= abstain_below <= 1:
-            raise ValueError("abstain_below must be between 0 and 1")
-        if temperature <= 0:
-            raise ValueError("temperature must be positive")
-        if not 0 <= ood_entropy_threshold <= 1:
-            raise ValueError("ood_entropy_threshold must be between 0 and 1")
-        if not 0 <= ood_margin_threshold <= 1:
-            raise ValueError("ood_margin_threshold must be between 0 and 1")
-        if not isinstance(reject_suspected_ood, bool):
-            raise ValueError("reject_suspected_ood must be boolean")
+        policy_settings = validate_policy_settings(
+            abstain_below=abstain_below,
+            temperature=temperature,
+            reject_suspected_ood=reject_suspected_ood,
+            ood_entropy_threshold=ood_entropy_threshold,
+            ood_margin_threshold=ood_margin_threshold,
+        )
+        abstain_below = policy_settings["abstain_below"]
+        temperature = policy_settings["temperature"]
+        reject_suspected_ood = policy_settings["reject_suspected_ood"]
+        ood_entropy_threshold = policy_settings["ood_entropy_threshold"]
+        ood_margin_threshold = policy_settings["ood_margin_threshold"]
         if not 1 <= max_questions <= self.HARD_MAX_QUESTIONS:
             raise ValueError("max_questions must be between 1 and 32")
         if not 64 <= max_output_tokens <= 2048:
