@@ -53,6 +53,16 @@ def latency_summary(samples: Sequence[Mapping]) -> dict:
     }
 
 
+def round_order_sequence(rounds: int, *, first: str = "control-first") -> tuple[str, ...]:
+    """Alternate workload order to reduce systematic warm-cache/order bias."""
+    if rounds < 1:
+        raise ValueError("rounds must be at least 1")
+    if first not in {"control-first", "shared-first"}:
+        raise ValueError("first must be control-first or shared-first")
+    other = "shared-first" if first == "control-first" else "control-first"
+    return tuple(first if index % 2 == 0 else other for index in range(rounds))
+
+
 def backend_prefix_report(
     shared_samples: Sequence[Mapping],
     control_samples: Sequence[Mapping],
@@ -68,8 +78,9 @@ def backend_prefix_report(
     control = list(control_samples)
     if len(shared) != len(control):
         raise ValueError("shared and control sample counts must match")
-    if len(shared) < 2:
-        raise ValueError("at least two samples per workload are required")
+    minimum = 2 if skip_first else 1
+    if len(shared) < minimum:
+        raise ValueError(f"at least {minimum} samples per workload are required")
 
     shared_eval = shared[1:] if skip_first else shared
     control_eval = control[1:] if skip_first else control
@@ -95,3 +106,38 @@ def backend_prefix_report(
         "shared_cached_prompt_tokens": shared_cached if cached_metadata_available else None,
         "control_cached_prompt_tokens": control_cached if cached_metadata_available else None,
     }
+
+
+
+def backend_prefix_round_report(rounds: Sequence[Mapping]) -> dict:
+    """Aggregate balanced benchmark rounds, dropping each workload's warm-up call."""
+    items = list(rounds)
+    if not items:
+        raise ValueError("at least one benchmark round is required")
+
+    shared_eval: list[Mapping] = []
+    control_eval: list[Mapping] = []
+    round_reports: list[dict] = []
+
+    for index, item in enumerate(items):
+        if not isinstance(item, Mapping):
+            raise ValueError("benchmark rounds must be mappings")
+        shared = item.get("shared_samples")
+        control = item.get("control_samples")
+        if not isinstance(shared, Sequence) or isinstance(shared, (str, bytes)):
+            raise ValueError("each round requires shared_samples")
+        if not isinstance(control, Sequence) or isinstance(control, (str, bytes)):
+            raise ValueError("each round requires control_samples")
+        shared_list = list(shared)
+        control_list = list(control)
+        report = backend_prefix_report(shared_list, control_list, skip_first=True)
+        report["round"] = index + 1
+        report["order"] = item.get("order")
+        round_reports.append(report)
+        shared_eval.extend(shared_list[1:])
+        control_eval.extend(control_list[1:])
+
+    aggregate = backend_prefix_report(shared_eval, control_eval, skip_first=False)
+    aggregate["round_count"] = len(items)
+    aggregate["round_reports"] = round_reports
+    return aggregate
