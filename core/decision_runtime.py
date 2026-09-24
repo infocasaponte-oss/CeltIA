@@ -29,6 +29,7 @@ class CeltIADecisionRuntime:
         max_total_output_tokens: int = 8192,
         max_total_prompt_chars: int = 250000,
         call_timeout_seconds: float = 30.0,
+        request_timeout_seconds: float = 120.0,
     ):
         if not 1 <= max_questions <= self.HARD_MAX_QUESTIONS:
             raise ValueError("max_questions must be between 1 and 32")
@@ -42,12 +43,15 @@ class CeltIADecisionRuntime:
             raise ValueError("max_total_prompt_chars must be between 10000 and 2000000")
         if not 0 < call_timeout_seconds <= 300:
             raise ValueError("call_timeout_seconds must be greater than 0 and at most 300")
+        if not 0 < request_timeout_seconds <= 1800:
+            raise ValueError("request_timeout_seconds must be greater than 0 and at most 1800")
         self.llm = llm
         self.max_questions = max_questions
         self.max_output_tokens = max_output_tokens
         self.max_total_output_tokens = max_total_output_tokens
         self.max_total_prompt_chars = max_total_prompt_chars
         self.call_timeout_seconds = call_timeout_seconds
+        self.request_timeout_seconds = request_timeout_seconds
         self.engine_options = {
             "abstain_below": abstain_below,
             "temperature": temperature,
@@ -157,7 +161,13 @@ class CeltIADecisionRuntime:
             return content.strip()
 
         engine = AsyncDecisionEngine(AsyncLLMDecisionScorer(chat), **self.engine_options)
-        results = await engine.decide(request)
+        try:
+            results = await asyncio.wait_for(
+                engine.decide(request),
+                timeout=self.request_timeout_seconds,
+            )
+        except asyncio.TimeoutError as exc:
+            raise RuntimeError("decision request timed out") from exc
         return results, usage
 
     async def decide(self, context, questions):
