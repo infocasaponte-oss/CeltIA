@@ -103,9 +103,11 @@ def test_runtime_ignores_malformed_or_inconsistent_usage_totals():
 class CaptureBudgetLLM:
     def __init__(self):
         self.kwargs = None
+        self.calls = []
 
     async def chat(self, messages, **kwargs):
         self.kwargs = kwargs
+        self.calls.append(kwargs)
         return {
             "choices":[{"message":{"content":'{"scores":{"c0":0.0,"c1":1.0}}'}}],
             "usage":{"prompt_tokens":1,"completion_tokens":1},
@@ -157,6 +159,46 @@ def test_runtime_rejects_invalid_cost_bounds():
     ):
         try:
             CeltIADecisionRuntime(FakeLLM(), **kwargs)
+            assert False
+        except ValueError:
+            pass
+
+
+def test_runtime_splits_total_output_budget_across_questions():
+    llm = CaptureBudgetLLM()
+    runtime = CeltIADecisionRuntime(
+        llm,
+        abstain_below=0.0,
+        reject_suspected_ood=False,
+        max_output_tokens=1024,
+        max_total_output_tokens=512,
+        max_questions=4,
+    )
+    questions = [
+        {"id":f"q{i}","prompt":"route","type":"choice","options":["fast","think"]}
+        for i in range(4)
+    ]
+    asyncio.run(runtime.decide({}, questions))
+    assert len(llm.calls) == 4
+    assert all(call["max_tokens"] == 128 for call in llm.calls)
+
+
+def test_runtime_rejects_total_budget_too_small_for_question_cap():
+    try:
+        CeltIADecisionRuntime(
+            FakeLLM(),
+            max_questions=4,
+            max_total_output_tokens=255,
+        )
+        assert False
+    except ValueError as exc:
+        assert "too small" in str(exc)
+
+
+def test_runtime_rejects_invalid_total_output_budget():
+    for value in (63, 65537):
+        try:
+            CeltIADecisionRuntime(FakeLLM(), max_total_output_tokens=value)
             assert False
         except ValueError:
             pass
