@@ -19,5 +19,6 @@ def test_async_engine_abstains_on_ambiguous_distribution():
     assert result.abstained
     assert result.decision is None
     assert result.abstention_reason == "suspected_ood"
+    assert result.suspected_ood is True
     assert result.normalized_entropy == 1.0
     assert result.margin == 0.0
