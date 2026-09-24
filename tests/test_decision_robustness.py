@@ -7,4 +7,4 @@ def test_entropy_and_margin():
 
 def test_option_order_deviation_is_label_aligned():
     d=[{"a":.8,"b":.2},{"b":.22,"a":.78}]
-    assert option_order_max_deviation(d) < .02
+    assert option_order_max_deviation(d) <= .011
