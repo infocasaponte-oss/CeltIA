@@ -6,12 +6,58 @@ from collections.abc import Mapping, Sequence
 from .robustness import ood_signal
 
 
+
+def _finite_number(name: str, value: object) -> float:
+    if isinstance(value, bool):
+        raise ValueError(f"{name} must be a finite number")
+    try:
+        number = float(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(f"{name} must be a finite number") from exc
+    if not math.isfinite(number):
+        raise ValueError(f"{name} must be a finite number")
+    return number
+
+
+def validate_policy_settings(
+    *,
+    abstain_below: object,
+    temperature: object,
+    reject_suspected_ood: object,
+    ood_entropy_threshold: object,
+    ood_margin_threshold: object,
+) -> dict:
+    abstain = _finite_number("abstain_below", abstain_below)
+    temp = _finite_number("temperature", temperature)
+    entropy = _finite_number("ood_entropy_threshold", ood_entropy_threshold)
+    margin = _finite_number("ood_margin_threshold", ood_margin_threshold)
+    if not 0 <= abstain <= 1:
+        raise ValueError("abstain_below must be between 0 and 1")
+    if temp <= 0:
+        raise ValueError("temperature must be positive")
+    if not 0 <= entropy <= 1:
+        raise ValueError("ood_entropy_threshold must be between 0 and 1")
+    if not 0 <= margin <= 1:
+        raise ValueError("ood_margin_threshold must be between 0 and 1")
+    if not isinstance(reject_suspected_ood, bool):
+        raise ValueError("reject_suspected_ood must be boolean")
+    return {
+        "abstain_below": abstain,
+        "temperature": temp,
+        "reject_suspected_ood": reject_suspected_ood,
+        "ood_entropy_threshold": entropy,
+        "ood_margin_threshold": margin,
+    }
+
+
+
 def probability_distribution(
     candidates: Sequence[str],
     logits: Sequence[float],
     *,
     temperature: float,
 ) -> dict[str, float]:
+    temperature = _finite_number("temperature", temperature)
     if temperature <= 0:
         raise ValueError("temperature must be positive")
     if len(logits) != len(candidates) or not logits:
@@ -20,7 +66,7 @@ def probability_distribution(
         raise ValueError("scorer returned invalid logits")
     try:
         values = [float(value) for value in logits]
-    except (TypeError, ValueError) as exc:
+    except (TypeError, ValueError, OverflowError) as exc:
         raise ValueError("scorer returned invalid logits") from exc
     if not all(math.isfinite(value) for value in values):
         raise ValueError("scorer returned invalid logits")
@@ -41,12 +87,17 @@ def decision_policy(
     ood_entropy_threshold: float,
     ood_margin_threshold: float,
 ) -> dict:
-    if not 0 <= abstain_below <= 1:
-        raise ValueError("abstain_below must be between 0 and 1")
-    if not 0 <= ood_entropy_threshold <= 1:
-        raise ValueError("ood_entropy_threshold must be between 0 and 1")
-    if not 0 <= ood_margin_threshold <= 1:
-        raise ValueError("ood_margin_threshold must be between 0 and 1")
+    settings = validate_policy_settings(
+        abstain_below=abstain_below,
+        temperature=1.0,
+        reject_suspected_ood=reject_suspected_ood,
+        ood_entropy_threshold=ood_entropy_threshold,
+        ood_margin_threshold=ood_margin_threshold,
+    )
+    abstain_below = settings["abstain_below"]
+    reject_suspected_ood = settings["reject_suspected_ood"]
+    ood_entropy_threshold = settings["ood_entropy_threshold"]
+    ood_margin_threshold = settings["ood_margin_threshold"]
 
     candidates = tuple(probabilities)
     if not candidates:
