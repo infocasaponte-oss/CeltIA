@@ -6,7 +6,6 @@ import asyncio
 import json
 import os
 import tempfile
-import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -14,7 +13,7 @@ from core.config import settings
 from core.decision_runtime import CeltIADecisionRuntime
 from core.inference import build_llm
 from core.router import route
-from scripts.evaluate_decision_routes import load_cde_results, load_jsonl
+from scripts.evaluate_decision_routes import dataset_sha256, load_cde_results, load_jsonl
 
 ROUTES=("fast","think","code","agent","long")
 RESULT_FORMAT_VERSION=2
@@ -65,17 +64,6 @@ async def collect_one(runtime: CeltIADecisionRuntime, row: dict) -> dict:
     }
 
 
-def _dataset_sha256(paths: list[str]) -> str:
-    digest=hashlib.sha256()
-    for raw_path in paths:
-        path=Path(raw_path)
-        digest.update(str(path).encode("utf-8"))
-        digest.update(b"\0")
-        digest.update(path.read_bytes())
-        digest.update(b"\0")
-    return digest.hexdigest()
-
-
 def _load_manifest(path: Path) -> dict:
     try:
         value=json.loads(path.read_text(encoding="utf-8"))
@@ -93,7 +81,7 @@ def _runtime_manifest(runtime: CeltIADecisionRuntime, datasets: list[str]) -> di
     return {
         "format_version":RESULT_FORMAT_VERSION,
         "collected_at":datetime.now(timezone.utc).isoformat(),
-        "dataset_sha256":_dataset_sha256(datasets),
+        "dataset_sha256":dataset_sha256(datasets),
         "datasets":datasets,
         "backend":{
             "client_type":type(llm).__name__,
