@@ -35,10 +35,20 @@ class DecisionEngine:
             entropy_threshold=self.ood_entropy_threshold,
             margin_threshold=self.ood_margin_threshold,
         )
-        abstained = confidence < self.abstain_below or (
-            self.reject_suspected_ood and risk["suspected_ood"]
+        low_confidence = confidence < self.abstain_below
+        rejected_ood = self.reject_suspected_ood and risk["suspected_ood"]
+        abstained = low_confidence or rejected_ood
+        reason = "low_confidence" if low_confidence else ("suspected_ood" if rejected_ood else None)
+        return DecisionResult(
+            q.id,
+            pairs,
+            None if abstained else candidates[best],
+            confidence,
+            abstained,
+            reason,
+            risk["normalized_entropy"],
+            risk["margin"],
         )
-        return DecisionResult(q.id, pairs, None if abstained else candidates[best], confidence, abstained)
 
     @staticmethod
     def _softmax(values: Sequence[float]) -> list[float]:
