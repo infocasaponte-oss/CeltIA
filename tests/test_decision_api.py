@@ -16,7 +16,7 @@ class FakeGateway:
 
 
 class FakeDecisionRuntime:
-    async def decide(self, context, questions):
+    async def decide_with_usage(self, context, questions):
         return [
             SimpleNamespace(
                 id=questions[0]["id"],
@@ -25,7 +25,7 @@ class FakeDecisionRuntime:
                 confidence=0.9,
                 abstained=False,
             )
-        ]
+        ], {"prompt_tokens": 4, "completion_tokens": 2, "total_tokens": 6}
 
 
 def test_decide_uses_gateway_slot_and_records_metric(monkeypatch):
@@ -37,9 +37,10 @@ def test_decide_uses_gateway_slot_and_records_metric(monkeypatch):
         context={"x": 1},
         questions=[api_main.DecisionQuestionInput(id="q", prompt="safe?", type="boolean")],
     )
-    key = {"id": 7, "role": "user"}
+    key = {"id": None, "role": "user"}
     result = asyncio.run(api_main.decide(req, key))
 
     assert gateway.keys == [key]
     assert result["data"][0]["decision"] == "true"
     assert api_main.app.state.metrics["decision_requests"] == before + 1
+    assert result["usage"]["total_tokens"] == 6
