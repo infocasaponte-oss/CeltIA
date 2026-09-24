@@ -6,12 +6,18 @@ The admin report exposes sample count, agreement, abstention, mean confidence, m
 
 Promotion to controlled routing must not be based on agreement alone. A labeled evaluation set is required. The offline evaluation helper compares both the existing heuristic and CDE against expected routes and applies explicit minimum sample, coverage, labeled-sample and accuracy-delta gates.
 
-Default gate:
+Default CLI gate:
 - at least 200 total samples;
 - at least 80% CDE decision coverage;
-- at least 50 labeled samples;
-- at least 80% coverage on labeled samples;
-- CDE labeled accuracy at least 2 percentage points above the heuristic.
+- at least 50 labeled routing samples;
+- at least 80% coverage on labeled routing samples;
+- CDE labeled routing accuracy at least 2 percentage points above the heuristic;
+- at least 20 OOD-labeled samples spanning in-domain negatives and OOD positives;
+- at least 80% OOD-signal coverage;
+- at least 80% OOD recall;
+- at most 20% OOD false-positive rate.
+
+The reusable `promotion_gate()` function keeps OOD thresholds optional for backwards-compatible programmatic use. The evaluation CLI supplies the OOD thresholds above by default so a controlled-routing eligibility check cannot pass using routing accuracy alone.
 
 Passing the gate means eligible for a controlled experiment, not automatic activation. Tool authorization and security policy remain independent of routing.
 
@@ -35,4 +41,14 @@ Decision results expose `suspected_ood` separately from `abstention_reason`. Thi
 
 `evaluate_shadow` now reports OOD label coverage plus true/false positives and negatives, precision, recall, specificity, false-positive rate and accuracy whenever samples provide `expected_ood` and `suspected_ood`. Route labels and OOD labels are independent, so an in-domain route sample can contribute to both routing accuracy and OOD specificity.
 
-`benchmarks/decision_routes_ood.jsonl` is a small adversarial seed set containing malformed, injection-like and route-label-manipulation inputs. It is validated in CI but is not large enough for a promotion claim. The offline evaluator accepts `"expected": null, "ood": true` rows and optional `suspected_ood` values in CDE result JSONL.
+`benchmarks/decision_routes_ood.jsonl` is a small adversarial seed set containing malformed, injection-like and route-label-manipulation inputs. The normal routing benchmark is explicitly labeled `"ood": false`, while OOD rows use `"expected": null, "ood": true`. The evaluator accepts multiple repeatable `--dataset` arguments so both sets can be measured together, rejects duplicate texts across files, and consumes optional `suspected_ood` values from CDE-result JSONL. The seed set is validated in CI but is not large enough for a promotion claim.
+
+Example combined evaluation:
+
+```bash
+PYTHONPATH=. python scripts/evaluate_decision_routes.py \
+  --dataset benchmarks/decision_routes.jsonl \
+  --dataset benchmarks/decision_routes_ood.jsonl \
+  --cde-results results/cde_routes.jsonl \
+  --require-eligible
+```
