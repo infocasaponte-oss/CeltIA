@@ -17,6 +17,10 @@ class FakeResult:
 
 
 class FakeRuntime:
+    def __init__(self):
+        self.llm=type("FakeLLM", (), {"model":"fake-model"})()
+        self.engine_options={"abstain_below":.55,"temperature":1.0}
+
     async def decide(self, context, questions):
         return [FakeResult()]
 
@@ -86,3 +90,26 @@ def test_atomic_writer_preserves_destination_and_cleans_temp_on_replace_failure(
 
     assert json.loads(path.read_text(encoding="utf-8")) == {"text":"old"}
     assert not list(tmp_path.glob("results.jsonl.*.tmp"))
+
+
+def test_runtime_manifest_records_dataset_digest_backend_and_policy(tmp_path):
+    dataset=tmp_path / "dataset.jsonl"
+    dataset.write_text('{"text":"one","expected":"fast","ood":false}\n',encoding="utf-8")
+    runtime=FakeRuntime()
+    manifest=collector._runtime_manifest(runtime,[str(dataset)])
+    assert manifest["format_version"] == 2
+    assert manifest["datasets"] == [str(dataset)]
+    assert len(manifest["dataset_sha256"]) == 64
+    assert manifest["backend"]["client_type"] == "FakeLLM"
+    assert manifest["backend"]["model"] == "fake-model"
+    assert manifest["policy"]["abstain_below"] == .55
+    assert manifest["collected_at"].endswith("+00:00")
+
+
+def test_dataset_digest_changes_when_evaluation_data_changes(tmp_path):
+    dataset=tmp_path / "dataset.jsonl"
+    dataset.write_text("first\n",encoding="utf-8")
+    first=collector._dataset_sha256([str(dataset)])
+    dataset.write_text("second\n",encoding="utf-8")
+    second=collector._dataset_sha256([str(dataset)])
+    assert first != second
