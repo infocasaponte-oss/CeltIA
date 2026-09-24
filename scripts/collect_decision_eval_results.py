@@ -185,10 +185,10 @@ async def collect(args) -> dict:
     if output.exists() and not args.resume:
         raise ValueError("output already exists; use --resume or choose a new output path")
     if args.resume and output.exists():
-        existing=load_cde_results(output)
         if not manifest_output.exists():
             raise ValueError("resume requires the evaluation provenance manifest")
         resume_manifest=_load_manifest(manifest_output)
+        existing=load_cde_results(output,require_models_used=True)
         if resume_manifest.get("status") == "complete":
             expected_sha=resume_manifest.get("results_sha256")
             if not isinstance(expected_sha,str) or expected_sha != file_sha256(output):
