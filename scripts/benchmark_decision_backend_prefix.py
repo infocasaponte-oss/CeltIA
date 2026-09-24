@@ -6,7 +6,10 @@ import asyncio
 import json
 import time
 
-from celtia.decision.backend_prefix_eval import backend_prefix_report
+from celtia.decision.backend_prefix_eval import (
+    backend_prefix_round_report,
+    round_order_sequence,
+)
 from celtia.decision.llm_scorer import AsyncLLMDecisionScorer
 from celtia.decision.prefix_eval import evaluate_scorer_prefix_reuse
 from celtia.decision.schema import DecisionQuestion, DecisionType
@@ -21,17 +24,19 @@ def shared_context(size: int) -> dict:
     return {"shared": "S" * size}
 
 
-def control_context(size: int, index: int) -> dict:
-    prefix = f"{index:04d}:"
-    fill = chr(65 + (index % 26))
+def control_context(size: int, round_index: int, question_index: int) -> dict:
+    """Return a same-size context that differs near the start for every sample."""
+    prefix = f"control:{round_index:04d}:{question_index:04d}:"
+    fill = chr(65 + ((round_index + question_index) % 26))
     return {"shared": (prefix + fill * size)[:size]}
 
 
-def questions_for(count: int) -> tuple[DecisionQuestion, ...]:
+def questions_for(count: int, *, round_index: int = 0) -> tuple[DecisionQuestion, ...]:
+    """Keep the shared context stable while varying post-context prompt text by round."""
     return tuple(
         DecisionQuestion(
-            id=f"q{index}",
-            prompt=f"Synthetic routing question {index}: choose one route.",
+            id=f"r{round_index}-q{index}",
+            prompt=f"Synthetic routing round {round_index} question {index}: choose one route.",
             type=DecisionType.CHOICE,
             options=ROUTES,
         )
@@ -99,23 +104,31 @@ async def run_workload(
     return samples
 
 
-async def run(args) -> dict:
-    questions = questions_for(args.questions)
-    common = shared_context(args.context_chars)
+async def run_round(
+    llm: VLLMClient,
+    *,
+    round_index: int,
+    order: str,
+    context_chars: int,
+    question_count: int,
+    max_output_tokens: int,
+    timeout_seconds: float,
+) -> dict:
+    questions = questions_for(question_count, round_index=round_index)
+    common = shared_context(context_chars)
     shared_contexts = tuple(common for _ in questions)
     control_contexts = tuple(
-        control_context(args.context_chars, index)
+        control_context(context_chars, round_index, index)
         for index, _ in enumerate(questions)
     )
-    llm = VLLMClient(args.base_url, args.model)
 
     async def shared():
         return await run_workload(
             llm,
             questions,
             shared_contexts,
-            max_output_tokens=args.max_output_tokens,
-            timeout_seconds=args.timeout_seconds,
+            max_output_tokens=max_output_tokens,
+            timeout_seconds=timeout_seconds,
         )
 
     async def control():
@@ -123,11 +136,11 @@ async def run(args) -> dict:
             llm,
             questions,
             control_contexts,
-            max_output_tokens=args.max_output_tokens,
-            timeout_seconds=args.timeout_seconds,
+            max_output_tokens=max_output_tokens,
+            timeout_seconds=timeout_seconds,
         )
 
-    if args.order == "shared-first":
+    if order == "shared-first":
         shared_samples = await shared()
         control_samples = await control()
     else:
@@ -135,21 +148,49 @@ async def run(args) -> dict:
         shared_samples = await shared()
 
     return {
+        "round": round_index + 1,
+        "order": order,
+        "shared_samples": shared_samples,
+        "control_samples": control_samples,
+    }
+
+
+async def run(args) -> dict:
+    llm = VLLMClient(args.base_url, args.model)
+    orders = round_order_sequence(args.rounds, first=args.first_order)
+    rounds = []
+    for round_index, order in enumerate(orders):
+        rounds.append(
+            await run_round(
+                llm,
+                round_index=round_index,
+                order=order,
+                context_chars=args.context_chars,
+                question_count=args.questions,
+                max_output_tokens=args.max_output_tokens,
+                timeout_seconds=args.timeout_seconds,
+            )
+        )
+
+    structural_questions = questions_for(args.questions)
+    common = shared_context(args.context_chars)
+    return {
         "kind": "backend_prefix_cache_benchmark",
         "backend": {"base_url": args.base_url, "model": args.model},
         "workload": {
             "context_chars": args.context_chars,
-            "questions": args.questions,
+            "questions_per_round": args.questions,
+            "rounds": args.rounds,
             "max_output_tokens": args.max_output_tokens,
-            "order": args.order,
+            "round_orders": list(orders),
         },
-        "structural_shared_prefix": evaluate_scorer_prefix_reuse(common, questions),
-        "backend_report": backend_prefix_report(shared_samples, control_samples),
-        "shared_samples": shared_samples,
-        "control_samples": control_samples,
+        "structural_shared_prefix": evaluate_scorer_prefix_reuse(common, structural_questions),
+        "backend_report": backend_prefix_round_report(rounds),
+        "rounds": rounds,
         "note": (
-            "Latency evidence is backend/environment specific. Logical prompt token counts may stay constant "
-            "even when a backend reuses KV state; cached-token metadata is reported only when the backend exposes it."
+            "Latency evidence is backend/environment specific. Each workload's first call is treated as warm-up, "
+            "round order alternates, control prefixes are unique per sample, and post-context question text changes "
+            "between rounds. Cached-token metadata is reported only when the backend exposes it."
         ),
     }
 
@@ -162,13 +203,14 @@ def main() -> None:
     parser.add_argument("--model", default=settings.model_serve_name)
     parser.add_argument("--context-chars", type=int, default=12000)
     parser.add_argument("--questions", type=int, default=8)
+    parser.add_argument("--rounds", type=int, default=3)
+    parser.add_argument("--first-order", choices=("shared-first", "control-first"), default="control-first")
     parser.add_argument("--max-output-tokens", type=int, default=256)
     parser.add_argument("--timeout-seconds", type=float, default=120.0)
-    parser.add_argument("--order", choices=("shared-first", "control-first"), default="control-first")
     parser.add_argument(
         "--min-latency-reduction",
         type=float,
-        help="Optional manual gate. Exit 2 unless median shared-prefix latency reduction reaches this fraction.",
+        help="Optional manual gate. Exit 2 unless aggregate median latency reduction reaches this fraction.",
     )
     args = parser.parse_args()
 
@@ -176,6 +218,8 @@ def main() -> None:
         raise ValueError("context-chars must be between 0 and 50000")
     if not 2 <= args.questions <= 32:
         raise ValueError("questions must be between 2 and 32")
+    if not 1 <= args.rounds <= 20:
+        raise ValueError("rounds must be between 1 and 20")
     if not 64 <= args.max_output_tokens <= 2048:
         raise ValueError("max-output-tokens must be between 64 and 2048")
     if not 0 < args.timeout_seconds <= 1800:
