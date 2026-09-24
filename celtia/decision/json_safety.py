@@ -18,12 +18,12 @@ def validate_json_depth(value: object, *, max_depth: int = MAX_JSON_DEPTH) -> No
 
     while stack:
         current, depth, leaving = stack.pop()
-        is_mapping=isinstance(current, Mapping)
-        is_sequence=isinstance(current, (list, tuple))
+        is_mapping = isinstance(current, Mapping)
+        is_sequence = isinstance(current, (list, tuple))
         if not (is_mapping or is_sequence):
             continue
 
-        identity=id(current)
+        identity = id(current)
         if leaving:
             active_containers.remove(identity)
             continue
@@ -35,5 +35,5 @@ def validate_json_depth(value: object, *, max_depth: int = MAX_JSON_DEPTH) -> No
 
         active_containers.add(identity)
         stack.append((current, depth, True))
-        children=current.values() if is_mapping else current
+        children = current.values() if is_mapping else current
         stack.extend((item, depth + 1, False) for item in children)
