@@ -13,7 +13,7 @@ from core import files as files_mod
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from core import billing, diagnostics, oauth, persona
 from core.agent import Agent, tool_content
@@ -61,7 +61,14 @@ if web_dir.exists():
 memory = Memory(settings.sqlite_path)
 registry = builtins(policy=ToolPolicy())
 llm = VLLMClient(settings.vllm_base_url, settings.model_serve_name)
-decision_runtime = CeltIADecisionRuntime(llm, abstain_below=settings.decision_abstain_below, temperature=settings.decision_temperature)
+decision_runtime = CeltIADecisionRuntime(
+    llm,
+    abstain_below=settings.decision_abstain_below,
+    temperature=settings.decision_temperature,
+    reject_suspected_ood=settings.decision_reject_ood,
+    ood_entropy_threshold=settings.decision_ood_entropy_threshold,
+    ood_margin_threshold=settings.decision_ood_margin_threshold,
+)
 agent = Agent(llm, registry, policy=ToolPolicy(), planner=Planner())
 gateway = Gateway(settings.gateway_max_concurrency, settings.gateway_queue_wait_seconds,
                   month_usage=lambda key_id: memory.month_tokens(key_id),
@@ -136,7 +143,7 @@ class DecisionQuestionInput(BaseModel):
     id: str
     prompt: str
     type: str
-    options: list[str] = []
+    options: list[str] = Field(default_factory=list)
     minimum: int | None = None
     maximum: int | None = None
 
