@@ -180,6 +180,8 @@ async def collect(args) -> dict:
     manifest_output=Path(str(output) + ".manifest.json")
     existing={}
     resume_manifest=None
+    if output.exists() and not args.resume:
+        raise ValueError("output already exists; use --resume or choose a new output path")
     if args.resume and output.exists():
         existing=load_cde_results(output)
         if not manifest_output.exists():
@@ -202,6 +204,10 @@ async def collect(args) -> dict:
     written=0
     skipped=0
     output.parent.mkdir(parents=True,exist_ok=True)
+    if resume_manifest is None:
+        # Persist provenance before the first checkpoint so an interrupted fresh
+        # collection remains resumable once any result checkpoint exists.
+        _write_atomic_json(manifest_output,manifest)
     collected=[existing[row["text"]] for row in rows if row["text"] in existing]
     pending_since_checkpoint=0
 
