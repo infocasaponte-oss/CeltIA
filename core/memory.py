@@ -373,7 +373,7 @@ class Memory:
                                abstention_reason=None, suspected_ood=None, normalized_entropy=None, margin=None,
                                prompt_tokens=None, completion_tokens=None, total_tokens=None,
                                served_route=None, routing_source=None, fallback_reason=None,
-                               rollout_bucket=None, cde_latency_ms=None, telemetry_version=3,
+                               rollout_bucket=None, cde_latency_ms=None, telemetry_version=4,
                                rollout_percent=None):
         agreed = bool(cde_route and cde_route == heuristic_route and not abstained)
         self.db.execute(
@@ -449,7 +449,7 @@ class Memory:
             ],
             "avg_cde_latency_ms": avg_latency,
             "p95_cde_latency_ms": p95_latency,
-            "telemetry_version": 2,
+            "telemetry_version": 4,
         }
 
     def decision_canary_summary(self, rollout_percent, days=7):
