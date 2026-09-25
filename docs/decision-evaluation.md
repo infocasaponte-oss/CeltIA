@@ -180,3 +180,30 @@ Recommended sequence after a shadow observation window:
 6. `cde` only after the 100% canary is operationally stable.
 
 At every stage the rollback target remains `legacy`.
+
+
+### Shadow readiness gate
+
+Before moving from shadow to the first 5% canary, operators should use
+`GET /admin/decision-rollout-readiness?days=7`. The readiness decision uses
+fixed operational thresholds:
+
+- at least 200 observed CDE evaluations;
+- CDE evaluation error rate at most 1%;
+- CDE abstention rate at most 5%;
+- average CDE routing latency at most 3000 ms;
+- p95 CDE routing latency at most 8000 ms.
+
+Route disagreement is reported but is not an operational blocker because
+disagreement with the heuristic is not evidence of incorrectness. Offline
+holdouts remain the source of truth for routing/OOD accuracy. Failed CDE
+evaluations are persisted in shadow telemetry, including their latency and
+`fallback_reason=cde_error`, so readiness cannot be inflated by counting only
+successful scorer calls.
+
+
+Readiness uses only shadow telemetry version 2 rows. Version 2 starts when failed
+CDE evaluations are persisted alongside successful ones. Older rows remain
+available in the general shadow report but do not count toward the 200-sample
+readiness floor, because their historical error rate is not reconstructible
+without survivor bias.

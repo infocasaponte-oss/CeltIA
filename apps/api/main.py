@@ -30,6 +30,7 @@ from core.creator.sandbox import sandbox_configured, sandbox_for
 from core.creator.tools import CREATOR_TOOL_NAMES, build_creator_registry
 from core.inference import build_llm
 from core.decision_runtime import CeltIADecisionRuntime
+from core.decision_rollout import evaluate_shadow_readiness
 from core.decision_serving import effective_routing_mode, select_serving_route
 from core.memory import Memory
 from core.planner import Planner
@@ -500,6 +501,16 @@ async def metrics():
 async def decision_shadow_report(days: int = 30, _: bool = Depends(require_admin)):
     return memory.decision_shadow_summary(days=min(max(days, 1), 365))
 
+
+@app.get("/admin/decision-rollout-readiness")
+async def decision_rollout_readiness(days: int = 7, _: bool = Depends(require_admin)):
+    summary = memory.decision_shadow_readiness_summary(days=min(max(days, 1), 365))
+    return {
+        "days": summary["days"],
+        "shadow": summary,
+        "readiness": evaluate_shadow_readiness(summary),
+    }
+
 @app.get("/v1/models")
 async def models():
     return {"object":"list","data":[{"id":"CeltIA V4","object":"model","owned_by":"local"}]}
@@ -599,15 +610,15 @@ async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, 
         routing["routing_source"] = "manual_override"
         routing["fallback_reason"] = None
 
-    if routing.get("cde") is not None:
+    if routing.get("evaluated_cde"):
         logger.info("CDE routing decision: %s", routing)
         routing_usage = routing.get("usage") or {}
         memory.record_decision_shadow(
             key.get("id"),
             routing["heuristic"],
             routing["cde"],
-            routing["confidence"],
-            routing["abstained"],
+            routing.get("confidence"),
+            routing.get("abstained", False),
             abstention_reason=routing.get("abstention_reason"),
             suspected_ood=routing.get("suspected_ood"),
             normalized_entropy=routing.get("normalized_entropy"),
