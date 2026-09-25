@@ -382,7 +382,7 @@ class Memory:
                 api_key_id,
                 heuristic_route,
                 cde_route,
-                float(confidence),
+                float(confidence) if confidence is not None else None,
                 int(bool(abstained)),
                 abstention_reason,
                 int(bool(suspected_ood)) if suspected_ood is not None else None,
@@ -432,10 +432,25 @@ class Memory:
             "WHERE created_at>=datetime('now',?) AND fallback_reason IS NOT NULL "
             "GROUP BY fallback_reason ORDER BY COUNT(*) DESC", (since,)
         ).fetchall()
-        latency_row = self.db.execute(
-            "SELECT AVG(cde_latency_ms) FROM decision_shadow "
-            "WHERE created_at>=datetime('now',?) AND cde_latency_ms IS NOT NULL", (since,)
-        ).fetchone()
+        latency_values = [
+            row[0] for row in self.db.execute(
+                "SELECT cde_latency_ms FROM decision_shadow "
+                "WHERE created_at>=datetime('now',?) AND cde_latency_ms IS NOT NULL "
+                "ORDER BY cde_latency_ms",
+                (since,),
+            ).fetchall()
+        ]
+        avg_latency = (sum(latency_values) / len(latency_values)) if latency_values else None
+        p95_latency = (
+            latency_values[min(len(latency_values) - 1, max(0, (95 * len(latency_values) + 99) // 100 - 1))]
+            if latency_values else None
+        )
+        route_counts = self.db.execute(
+            "SELECT COALESCE(heuristic_route,'unknown'),COALESCE(cde_route,'none'),COUNT(*) "
+            "FROM decision_shadow WHERE created_at>=datetime('now',?) "
+            "GROUP BY heuristic_route,cde_route ORDER BY COUNT(*) DESC",
+            (since,),
+        ).fetchall()
         return {
             "days": max(1, int(days)), "samples": total, "agreements": agreed,
             "agreement_rate": (agreed / total) if total else None,
@@ -450,7 +465,12 @@ class Memory:
             "abstention_reasons": {reason: count for reason, count in abstention_reasons},
             "routing_sources": {source: count for source, count in routing_sources},
             "fallback_reasons": {reason: count for reason, count in fallback_reasons},
-            "avg_cde_latency_ms": latency_row[0] if latency_row else None,
+            "avg_cde_latency_ms": avg_latency,
+            "p95_cde_latency_ms": p95_latency,
+            "route_pairs": [
+                {"heuristic": heuristic, "cde": cde, "count": count}
+                for heuristic, cde, count in route_counts
+            ],
             "top_disagreements": [{"heuristic": a, "cde": b, "count": n} for a,b,n in disagreements],
         }
 
