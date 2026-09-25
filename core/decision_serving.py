@@ -55,6 +55,7 @@ async def select_serving_route(
         "fallback_reason": None,
         "rollout_bucket": bucket,
         "selected_for_cde": selected_for_cde,
+        "evaluated_cde": should_evaluate,
         "cde_latency_ms": None,
     }
     if not should_evaluate:
