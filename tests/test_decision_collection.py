@@ -36,7 +36,9 @@ def test_collect_one_matches_shadow_routing_shape():
     assert item["models_used"] == ["test-model"]
     context,questions=runtime.calls[0]
     assert context["user_message"] == row["text"]
-    assert context["heuristic_route"] in {"fast","think","code","agent","long"}
+    assert "heuristic_route" not in context
+    assert context["input_chars"] == len(row["text"])
+    assert context["long_context_chars"] == 12000
     assert questions == [{
         "id":"route",
         "prompt":"Select the most appropriate CeltIA execution route.",
