@@ -54,10 +54,10 @@
 {"text": "Analiza paso a paso os riscos de migrar unha base de datos sen tempo de inactividade.", "expected": "think", "ood": false}
 {"text": "Planifica un experimento A/B e xustifica o tamaño de mostra necesario.", "expected": "think", "ood": false}
 {"text": "Deriva a complexidade media de quicksort explicando cada paso.", "expected": "think", "ood": false}
-{"text": "Resume os puntos clave de todo este informe de 200 páxinas mantendo as referencias cruzadas.", "expected": "long", "ood": false}
-{"text": "Fusiona estes 40 documentos nun único resumo coherente sen perder detalles.", "expected": "long", "ood": false}
-{"text": "Le o arquivo completo de actas do último ano e crea unha cronoloxía.", "expected": "long", "ood": false}
-{"text": "Analiza este contrato extenso cláusula por cláusula e sinala contradicións entre seccións.", "expected": "long", "ood": false}
+{"text": "Resume os puntos clave de todo este informe de 200 páxinas mantendo as referencias cruzadas.", "expected": "long", "ood": false, "input_chars": 18000}
+{"text": "Fusiona estes 40 documentos nun único resumo coherente sen perder detalles.", "expected": "long", "ood": false, "input_chars": 26000}
+{"text": "Le o arquivo completo de actas do último ano e crea unha cronoloxía.", "expected": "long", "ood": false, "input_chars": 32000}
+{"text": "Analiza este contrato extenso cláusula por cláusula e sinala contradicións entre seccións.", "expected": "long", "ood": false, "input_chars": 22000}
 {"text": "Traduce ao inglés: Bos días, como estás?", "expected": "fast", "ood": false}
 {"text": "Dime un sinónimo de rápido.", "expected": "fast", "ood": false}
 {"text": "Ordena alfabeticamente: pera, mazá, uva.", "expected": "fast", "ood": false}
@@ -74,7 +74,7 @@
 {"text": "Razoa se compensa alugar ou mercar vivenda con estes números.", "expected": "think", "ood": false}
 {"text": "Deseña unha estratexia de probas para un sistema de pagos con fallos parciais.", "expected": "think", "ood": false}
 {"text": "Explica coidadosamente por que o problema do viaxante é NP-difícil.", "expected": "think", "ood": false}
-{"text": "Sintetiza este corpus de 300 correos e identifica os fíos de conversa.", "expected": "long", "ood": false}
-{"text": "Procesa o libro enteiro e extrae todos os personaxes con relacións.", "expected": "long", "ood": false}
-{"text": "Analiza os rexistros de todo un mes e resume os patróns de erro.", "expected": "long", "ood": false}
-{"text": "Le toda a documentación do proxecto e crea un índice temático.", "expected": "long", "ood": false}
+{"text": "Sintetiza este corpus de 300 correos e identifica os fíos de conversa.", "expected": "long", "ood": false, "input_chars": 40000}
+{"text": "Procesa o libro enteiro e extrae todos os personaxes con relacións.", "expected": "long", "ood": false, "input_chars": 50000}
+{"text": "Analiza os rexistros de todo un mes e resume os patróns de erro.", "expected": "long", "ood": false, "input_chars": 28000}
+{"text": "Le toda a documentación do proxecto e crea un índice temático.", "expected": "long", "ood": false, "input_chars": 36000}
