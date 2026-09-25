@@ -410,7 +410,7 @@ class Memory:
         since = f"-{max(1, int(days))} days"
         rows = self.db.execute(
             "SELECT abstained,fallback_reason,cde_latency_ms,routing_source,heuristic_route,cde_route "
-            "FROM decision_shadow WHERE created_at>=datetime('now',?) AND telemetry_version>=2",
+            "FROM decision_shadow WHERE created_at>=datetime('now',?) AND telemetry_version>=4",
             (since,),
         ).fetchall()
         latencies = sorted(
