@@ -96,7 +96,7 @@ def test_ood_contract_is_in_trusted_system_prompt_only():
     assert ROUTE_OOD_SYSTEM_GUIDANCE not in user
 
 
-def test_semantic_ood_forces_abstention_even_for_confident_route():
+def test_semantic_ood_marks_risk_without_destroying_evaluation_coverage():
     route_result=type(
         "RouteResult",
         (),
@@ -112,10 +112,10 @@ def test_semantic_ood_forces_abstention_even_for_confident_route():
     )()
     ood_result=type("OODResult",(),{"probabilities":{"false":.1,"true":.9}})()
     combined=combine_route_results(route_result,ood_result)
-    assert combined["decision"] is None
-    assert combined["abstained"] is True
+    assert combined["decision"] == "fast"
+    assert combined["abstained"] is False
     assert combined["suspected_ood"] is True
-    assert combined["abstention_reason"] == "semantic_ood"
+    assert combined["abstention_reason"] is None
     assert combined["ood_probability"] == .9
 
 
