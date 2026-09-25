@@ -124,7 +124,8 @@ def inspect_file(path: Path, sample_size: int) -> dict[str, Any]:
         hashes[h] += 1
     duplicate_docs = sum(n - 1 for n in hashes.values() if n > 1)
 
-    is_spanish_file = "castellano" in {p.lower() for p in path.parts}
+    lower_parts = {p.lower() for p in path.parts}
+    is_spanish_file = bool({"castellano", "derecho"} & lower_parts)
     spanish_ok = sum(1 for x in sample if spanish_signal(x["text"])) if is_spanish_file else None
 
     suspicious_code_paths = 0
@@ -190,7 +191,11 @@ def main() -> int:
     args = p.parse_args()
 
     root = args.root.resolve()
-    files = sorted((root / "castellano").glob("*.jsonl")) + sorted((root / "codigo").glob("*.jsonl"))
+    files = (
+        sorted((root / "castellano").glob("*.jsonl"))
+        + sorted((root / "derecho").glob("*.jsonl"))
+        + sorted((root / "codigo").glob("*.jsonl"))
+    )
     if not files:
         print(f"Non se atoparon JSONL en {root}", flush=True)
         return 2
