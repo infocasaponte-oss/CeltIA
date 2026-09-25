@@ -6,7 +6,7 @@ from scripts import collect_decision_eval_results as collector
 
 
 class FakeResult:
-    def __init__(self, decision="fast"):
+    def __init__(self, decision="fast", probabilities=None):
         self.decision=decision
         self.confidence=.9
         self.abstained=False
@@ -14,6 +14,7 @@ class FakeResult:
         self.abstention_reason=None
         self.normalized_entropy=.1
         self.margin=.8
+        self.probabilities=probabilities or {"fast":.9,"think":.025,"code":.025,"agent":.025,"long":.025}
 
 
 class FakeRuntime:
@@ -31,7 +32,10 @@ class FakeRuntime:
         return [FakeResult()]
 
     async def decide_with_usage(self, context, questions):
-        return [FakeResult()], {"prompt_tokens":1,"completion_tokens":1,"total_tokens":2,"models":["fake-model"]}
+        return [
+            FakeResult(),
+            FakeResult(decision="false", probabilities={"false":.9,"true":.1}),
+        ], {"prompt_tokens":2,"completion_tokens":2,"total_tokens":4,"models":["fake-model"]}
 
 
 def _args(tmp_path, *, resume=False, limit=0, checkpoint_every=2):
