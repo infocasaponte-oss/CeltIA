@@ -85,6 +85,22 @@ async def collect_one(runtime: CeltIADecisionRuntime, row: dict) -> dict:
     }
 
 
+COLLECT_ATTEMPTS=3
+
+
+async def collect_one_with_retry(runtime: CeltIADecisionRuntime, row: dict, attempts: int = COLLECT_ATTEMPTS) -> dict:
+    """The provider occasionally returns a malformed score envelope; retry the same
+    case instead of aborting a 200-case run. A persistent failure still raises, and
+    ``--resume`` continues from the last checkpoint."""
+    for attempt in range(1,attempts+1):
+        try:
+            return await collect_one(runtime,row)
+        except ValueError as exc:
+            if not str(exc).startswith("model returned") or attempt == attempts:
+                raise
+            await asyncio.sleep(0.5*attempt)
+
+
 def _endpoint_identity(client) -> str | None:
     raw=getattr(client,"base_url",None)
     if not isinstance(raw,str) or not raw.strip():
@@ -414,7 +430,7 @@ async def collect(args) -> dict:
         if row["text"] in existing:
             skipped+=1
             continue
-        item=await collect_one(runtime,row)
+        item=await collect_one_with_retry(runtime,row)
         validate_result_models(
             item.get("models_used"),
             require_models_used=True,
