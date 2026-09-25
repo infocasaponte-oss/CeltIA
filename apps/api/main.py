@@ -504,7 +504,7 @@ async def decision_shadow_report(days: int = 30, _: bool = Depends(require_admin
 
 @app.get("/admin/decision-rollout-readiness")
 async def decision_rollout_readiness(days: int = 7, _: bool = Depends(require_admin)):
-    summary = memory.decision_shadow_summary(days=min(max(days, 1), 365))
+    summary = memory.decision_shadow_readiness_summary(days=min(max(days, 1), 365))
     return {
         "days": summary["days"],
         "shadow": summary,
