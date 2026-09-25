@@ -5,16 +5,29 @@ import logging
 from core.decision_routes import combine_route_results, route_decision_context, route_decision_questions
 
 logger = logging.getLogger(__name__)
-async def evaluate_route_shadow(runtime, text: str, heuristic_route: str, *, long_context_chars: int = 12000) -> dict | None:
+async def evaluate_route_shadow(
+    runtime,
+    text: str,
+    heuristic_route: str,
+    *,
+    input_chars: int | None = None,
+    long_context_chars: int = 12000,
+) -> dict | None:
     """Evaluate CDE routing without changing the route selected by the production router."""
     try:
         results, usage = await runtime.decide_with_usage(
-            route_decision_context(text, long_context_chars=long_context_chars),
+            route_decision_context(text, input_chars=input_chars, long_context_chars=long_context_chars),
             route_decision_questions(),
         )
         if len(results) != 2:
             raise RuntimeError("CDE routing requires route and OOD results")
-        combined = combine_route_results(results[0], results[1], text, long_context_chars=long_context_chars)
+        combined = combine_route_results(
+            results[0],
+            results[1],
+            text,
+            input_chars=input_chars,
+            long_context_chars=long_context_chars,
+        )
         return {
             "heuristic": heuristic_route,
             "cde": combined["decision"],
