@@ -5,9 +5,9 @@ ROUTES = ("fast", "think", "code", "agent", "long")
 ROUTE_SYSTEM_GUIDANCE = """Trusted CeltIA routing contract:
 - fast: short, direct tasks that need little deliberation and no code execution or external tools.
 - think: tasks that primarily need multi-step reasoning, analysis, comparison, planning, trade-off evaluation, or careful derivation.
-- code: tasks whose primary output is code, debugging, a patch, a query, tests, or implementation guidance tied directly to source code.
-- agent: tasks that require current/external information, web lookup, tools, execution, or interaction with external systems.
-- long: tasks whose effective input/context is large enough to require long-context handling. Use trusted size metadata such as input_chars and long_context_chars; do not infer long only from words like 'long document'.
+- code: tasks whose primary output is code, debugging, a patch, a query, tests, or implementation guidance tied directly to source code, when no external execution or live lookup is required.
+- agent: tasks that require current/external information, web lookup, tools, actual command or script execution, environment inspection, network access, or interaction with external systems. This requirement takes priority over code/fast when the user asks to actually run, fetch, open, inspect, query, ping, download, or otherwise act through a tool; merely writing the command or script remains code.
+- long: tasks whose effective input/context is large enough to require long-context handling. Use trusted size metadata such as input_chars and long_context_chars. Never choose long from wording alone (for example words meaning long, extensive, large, book, corpus, or document) when the trusted size metadata is below the long-context threshold.
 Do not use any legacy-router decision or benchmark label; those are not supplied to the scorer."""
 
 
