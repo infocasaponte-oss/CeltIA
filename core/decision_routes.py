@@ -32,3 +32,43 @@ def route_decision_question() -> dict:
         "type": "choice",
         "options": list(ROUTES),
     }
+
+
+def route_ood_question() -> dict:
+    return {
+        "id": "route_ood",
+        "prompt": "Is this input outside the CeltIA routing domain?",
+        "type": "boolean",
+    }
+
+
+def route_decision_questions() -> list[dict]:
+    return [route_decision_question(), route_ood_question()]
+
+
+def combine_route_results(route_result, ood_result) -> dict:
+    try:
+        ood_probability = float(ood_result.probabilities["true"])
+        in_domain_probability = float(ood_result.probabilities["false"])
+    except (AttributeError, KeyError, TypeError, ValueError) as exc:
+        raise ValueError("invalid explicit OOD result") from exc
+    explicit_ood = ood_probability > in_domain_probability
+    suspected_ood = bool(route_result.suspected_ood) or explicit_ood
+    abstained = bool(route_result.abstained) or explicit_ood
+    reason = (
+        "semantic_ood"
+        if explicit_ood
+        else route_result.abstention_reason
+    )
+    return {
+        "decision": None if abstained else route_result.decision,
+        "confidence": route_result.confidence,
+        "abstained": abstained,
+        "abstention_reason": reason,
+        "suspected_ood": suspected_ood,
+        "normalized_entropy": route_result.normalized_entropy,
+        "margin": route_result.margin,
+        "ood_probability": ood_probability,
+        "ood_classifier_confidence": max(ood_probability, in_domain_probability),
+        "ood_classifier_decision": explicit_ood,
+    }
