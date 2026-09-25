@@ -685,6 +685,7 @@ async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, 
         settings.decision_shadow_routing,
     )
     bucket_key = f"api:{key.get('id')}" if key.get("id") is not None else f"session:{sid}"
+    shadow_job = None
     if routing_mode == "shadow":
         # Shadow must never add user-visible routing latency. Serve the heuristic
         # immediately and evaluate/persist the CDE decision in a retained task.
@@ -698,16 +699,16 @@ async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, 
             input_chars=input_chars,
             long_context_chars=settings.router_long_context_chars,
         )
-        _schedule_shadow_background(
-            api_key_id=key.get("id"),
-            text=text,
-            heuristic_route=r.mode,
-            bucket_key=bucket_key,
-            input_chars=input_chars,
-            long_context_chars=settings.router_long_context_chars,
-            rollout_percent=settings.decision_cde_rollout_percent,
-            manual_mode=req.mode,
-        )
+        shadow_job = {
+            "api_key_id": key.get("id"),
+            "text": text,
+            "heuristic_route": r.mode,
+            "bucket_key": bucket_key,
+            "input_chars": input_chars,
+            "long_context_chars": settings.router_long_context_chars,
+            "rollout_percent": settings.decision_cde_rollout_percent,
+            "manual_mode": req.mode,
+        }
     else:
         routing = await select_serving_route(
             decision_runtime,
@@ -869,6 +870,11 @@ async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, 
         customer_id = key.get("stripe_customer_id")
         if customer_id:
             asyncio.create_task(billing.report_usage(customer_id, prompt_tokens + completion_tokens))
+    # Run shadow only after the user response has been fully generated and
+    # accounted for, avoiding contention with the foreground model call.
+    if shadow_job is not None:
+        _schedule_shadow_background(**shadow_job)
+
     return {"id": "celtia-" + uuid.uuid4().hex, "object": "chat.completion", "model": PUBLIC_MODEL_NAME, "choices": [{"index": 0, "message": {"role": "assistant", "content": answer}, "finish_reason": "stop"}],
             "usage": {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens, "total_tokens": prompt_tokens + completion_tokens},
             "metadata": meta, "session_id": sid}
