@@ -162,3 +162,28 @@ Tamén está dispoñible `PleIAs/Spanish-PD-Newspapers`, pero non se activa por 
 ```
 
 Non mestures automaticamente unha fonte experimental co corpus final se o seu informe non pasa. Se falla só por OCR/repetición, é mellor aplicar unha limpeza específica e volver auditar que relaxar o gate global.
+
+
+## Corpus de dereito
+
+Engádese unha colección separada de dereito español baseada na API oficial de datos abertos da AEBOE. A API permite descargar e reutilizar a lexislación consolidada, incluído o texto e os metadatos de cada norma.
+
+```powershell
+.\.venv\Scripts\python.exe scripts\download_legal_corpus.py
+```
+
+Para unha proba curta:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\download_legal_corpus.py --limit 100
+```
+
+Saída:
+
+```text
+D:\corpus_llm_grande\derecho\boe_legislacion_consolidada.jsonl
+```
+
+Cada documento conserva o identificador BOE, xurisdición, tipo de documento e marca de fonte oficial. O auditor xeral tamén inclúe agora a carpeta `derecho`.
+
+EUR-Lex tamén é unha fonte oficial reutilizable e ofrece descargas masivas por idioma, pero require un fluxo diferente (EU Login/Data Dump ou CELLAR). Por iso non se activa automaticamente nesta primeira fase: é mellor incorporalo nun descargador específico e auditalo por separado antes de mesturalo co BOE.
