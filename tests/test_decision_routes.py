@@ -1,20 +1,32 @@
 import asyncio
 
-from core.decision_routes import (
-    ROUTE_DECISION_PROMPT,
-    route_decision_context,
-    route_decision_question,
-)
+from core.decision_routes import route_decision_context, route_decision_question
+from celtia.decision.llm_scorer import AsyncLLMDecisionScorer
+from celtia.decision.route_contract import ROUTES, ROUTE_SYSTEM_GUIDANCE
+from celtia.decision.schema import DecisionQuestion, DecisionType
 from scripts import collect_decision_eval_results as collector
 
 
 def test_route_contract_defines_all_execution_modes():
     question=route_decision_question()
-    assert question["options"] == ["fast","think","code","agent","long"]
-    for route in question["options"]:
-        assert f"- {route}:" in ROUTE_DECISION_PROMPT
-    assert "input_chars" in ROUTE_DECISION_PROMPT
-    assert "legacy-router" in ROUTE_DECISION_PROMPT
+    assert question["options"] == list(ROUTES)
+    for route in ROUTES:
+        assert f"- {route}:" in ROUTE_SYSTEM_GUIDANCE
+    assert "input_chars" in ROUTE_SYSTEM_GUIDANCE
+    assert "legacy-router" in ROUTE_SYSTEM_GUIDANCE
+
+
+def test_route_contract_is_in_trusted_system_prompt_only():
+    seen={}
+    async def chat(messages):
+        seen["messages"]=messages
+        return '{"scores":{"c0":0,"c1":1,"c2":0,"c3":0,"c4":0}}'
+    q=DecisionQuestion("route","Select the most appropriate CeltIA execution route.",DecisionType.CHOICE,ROUTES)
+    asyncio.run(AsyncLLMDecisionScorer(chat).score({"user_message":"compare options"},q,q.candidates()))
+    system=seen["messages"][0]["content"]
+    user=seen["messages"][1]["content"]
+    assert ROUTE_SYSTEM_GUIDANCE in system
+    assert ROUTE_SYSTEM_GUIDANCE not in user
 
 
 def test_route_context_exposes_size_without_heuristic_label():
