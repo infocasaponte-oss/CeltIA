@@ -30,6 +30,7 @@ from core.creator.sandbox import sandbox_configured, sandbox_for
 from core.creator.tools import CREATOR_TOOL_NAMES, build_creator_registry
 from core.inference import build_llm
 from core.decision_runtime import CeltIADecisionRuntime
+from core.decision_rollout import evaluate_shadow_readiness
 from core.decision_serving import effective_routing_mode, select_serving_route
 from core.memory import Memory
 from core.planner import Planner
@@ -499,6 +500,16 @@ async def metrics():
 @app.get("/admin/decision-shadow")
 async def decision_shadow_report(days: int = 30, _: bool = Depends(require_admin)):
     return memory.decision_shadow_summary(days=min(max(days, 1), 365))
+
+
+@app.get("/admin/decision-rollout-readiness")
+async def decision_rollout_readiness(days: int = 7, _: bool = Depends(require_admin)):
+    summary = memory.decision_shadow_summary(days=min(max(days, 1), 365))
+    return {
+        "days": summary["days"],
+        "shadow": summary,
+        "readiness": evaluate_shadow_readiness(summary),
+    }
 
 @app.get("/v1/models")
 async def models():
