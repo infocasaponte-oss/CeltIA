@@ -54,17 +54,12 @@ def combine_route_results(route_result, ood_result) -> dict:
         raise ValueError("invalid explicit OOD result") from exc
     explicit_ood = ood_probability > in_domain_probability
     suspected_ood = bool(route_result.suspected_ood) or explicit_ood
-    abstained = bool(route_result.abstained) or explicit_ood
-    reason = (
-        "semantic_ood"
-        if explicit_ood
-        else route_result.abstention_reason
-    )
+    abstained = bool(route_result.abstained)
     return {
         "decision": None if abstained else route_result.decision,
         "confidence": route_result.confidence,
         "abstained": abstained,
-        "abstention_reason": reason,
+        "abstention_reason": route_result.abstention_reason,
         "suspected_ood": suspected_ood,
         "normalized_entropy": route_result.normalized_entropy,
         "margin": route_result.margin,
