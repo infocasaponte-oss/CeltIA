@@ -117,3 +117,73 @@ Cada liña JSONL conserva polo menos `text`, `source` e `dataset`; para código 
 ## Licenzas
 
 Non asumas que “dataset público” significa “uso sen condicións”. Revisa e conserva os metadatos/licenzas antes de redistribuír o corpus ou un derivado. O descargador prioriza fontes con procedencia clara, pero a responsabilidade final de uso e redistribución segue dependendo da licenza de cada fonte/documento.
+
+
+## Auditoría antes de entrenar
+
+Despois dunha descarga parcial ou completa, executa:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\audit_curated_corpus.py
+```
+
+O auditor percorre os JSONL en streaming e crea:
+
+```text
+D:\corpus_llm_grande\audit_report.json
+```
+
+Comproba por ficheiro:
+- filas JSON mal formadas;
+- documentos baleiros;
+- duplicados exactos nunha mostra uniforme;
+- repetición anormal de liñas;
+- sinal de castelán >=95% para o corpus textual;
+- rutas sospeitosas de vendor/build/minificado para código;
+- distribución de linguaxes de programación;
+- cobertura de metadatos de licenza;
+- percentís de lonxitude de documento.
+
+O comando devolve código 0 só se todos os ficheiros pasan os checks. Isto permite usalo como gate antes de tokenizar/adestrar.
+
+Para unha mostra máis grande:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\audit_curated_corpus.py --sample-size 50000
+```
+
+### Prensa histórica experimental
+
+Tamén está dispoñible `PleIAs/Spanish-PD-Newspapers`, pero non se activa por defecto porque o OCR histórico pode introducir ruído. Para descargar libros e prensa de dominio público e sometelos despois á auditoría:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\download_curated_corpus.py --include-experimental
+.\.venv\Scripts\python.exe scripts\audit_curated_corpus.py --sample-size 50000
+```
+
+Non mestures automaticamente unha fonte experimental co corpus final se o seu informe non pasa. Se falla só por OCR/repetición, é mellor aplicar unha limpeza específica e volver auditar que relaxar o gate global.
+
+
+## Corpus de dereito
+
+Engádese unha colección separada de dereito español baseada na API oficial de datos abertos da AEBOE. A API permite descargar e reutilizar a lexislación consolidada, incluído o texto e os metadatos de cada norma.
+
+```powershell
+.\.venv\Scripts\python.exe scripts\download_legal_corpus.py
+```
+
+Para unha proba curta:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\download_legal_corpus.py --limit 100
+```
+
+Saída:
+
+```text
+D:\corpus_llm_grande\derecho\boe_legislacion_consolidada.jsonl
+```
+
+Cada documento conserva o identificador BOE, xurisdición, tipo de documento e marca de fonte oficial. O auditor xeral tamén inclúe agora a carpeta `derecho`.
+
+EUR-Lex tamén é unha fonte oficial reutilizable e ofrece descargas masivas por idioma, pero require un fluxo diferente (EU Login/Data Dump ou CELLAR). Por iso non se activa automaticamente nesta primeira fase: é mellor incorporalo nun descargador específico e auditalo por separado antes de mesturalo co BOE.
