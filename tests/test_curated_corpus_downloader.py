@@ -41,10 +41,12 @@ def test_default_sources_avoid_duplicate_web_fallbacks():
     m = load_module()
     class Args:
         include_fallback_web = False
+        include_experimental = False
         sources = None
         groups = ["all"]
     keys = {s.key for s in m.choose_sources(Args())}
     assert "culturax_es" in keys
+    assert "spanish_pd_books" not in keys
     assert "mc4_es" not in keys
     assert "oscar_es" not in keys
     assert "stackv2_edu" in keys
