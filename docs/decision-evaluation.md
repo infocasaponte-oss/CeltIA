@@ -273,3 +273,22 @@ Advance only through the guarded script:
 The last command changes routing mode from `canary` to `cde` only after the
 100% stage itself passes. Rollback remains independent and immediate through
 `scripts\rollback-cde.ps1`.
+
+
+### Non-blocking shadow execution
+
+Shadow routing is intentionally deferred until the foreground chat response has
+finished generating. This prevents the CDE scorer from competing with the main
+model call for the same backend/GPU and removes CDE latency from the user's
+critical path.
+
+Background shadow load is bounded by:
+
+- `DECISION_SHADOW_MAX_CONCURRENCY=1` by default;
+- `DECISION_SHADOW_MAX_PENDING=8` by default.
+
+When the backlog is full, a shadow sample is dropped rather than delaying or
+adding more load to user traffic. Dropped samples are visible in
+`decision_shadow_background_dropped`; started, completed and failed background
+evaluations are also exposed in application metrics. Canary and full CDE modes
+remain synchronous because the CDE result is authoritative for the served route.
