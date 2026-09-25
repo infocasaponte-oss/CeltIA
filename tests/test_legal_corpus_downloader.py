@@ -29,3 +29,10 @@ def test_list_id_pattern_contract():
     import re
     assert re.fullmatch(r"BOE-A-\d{4}-\d+", "BOE-A-2024-12345")
     assert not re.fullmatch(r"BOE-A-\d{4}-\d+", "OTRO-2024-1")
+
+
+def test_build_ssl_context_returns_context():
+    m = load_module()
+    ctx = m.build_ssl_context()
+    import ssl
+    assert isinstance(ctx, ssl.SSLContext)
