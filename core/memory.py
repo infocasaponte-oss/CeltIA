@@ -69,6 +69,11 @@ class Memory:
             "prompt_tokens": "INTEGER",
             "completion_tokens": "INTEGER",
             "total_tokens": "INTEGER",
+            "served_route": "TEXT",
+            "routing_source": "TEXT",
+            "fallback_reason": "TEXT",
+            "rollout_bucket": "INTEGER",
+            "cde_latency_ms": "INTEGER",
         }
         for column, decl in additions.items():
             if column not in existing:
@@ -364,12 +369,15 @@ class Memory:
 
     def record_decision_shadow(self, api_key_id, heuristic_route, cde_route, confidence, abstained,
                                abstention_reason=None, suspected_ood=None, normalized_entropy=None, margin=None,
-                               prompt_tokens=None, completion_tokens=None, total_tokens=None):
+                               prompt_tokens=None, completion_tokens=None, total_tokens=None,
+                               served_route=None, routing_source=None, fallback_reason=None,
+                               rollout_bucket=None, cde_latency_ms=None):
         agreed = bool(cde_route and cde_route == heuristic_route and not abstained)
         self.db.execute(
             "INSERT INTO decision_shadow(api_key_id,heuristic_route,cde_route,confidence,abstained,"
-            "abstention_reason,suspected_ood,normalized_entropy,margin,prompt_tokens,completion_tokens,total_tokens,agreed) "
-            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "abstention_reason,suspected_ood,normalized_entropy,margin,prompt_tokens,completion_tokens,total_tokens,"
+            "served_route,routing_source,fallback_reason,rollout_bucket,cde_latency_ms,agreed) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 api_key_id,
                 heuristic_route,
@@ -383,6 +391,11 @@ class Memory:
                 int(prompt_tokens) if prompt_tokens is not None else None,
                 int(completion_tokens) if completion_tokens is not None else None,
                 int(total_tokens) if total_tokens is not None else None,
+                served_route,
+                routing_source,
+                fallback_reason,
+                int(rollout_bucket) if rollout_bucket is not None else None,
+                int(cde_latency_ms) if cde_latency_ms is not None else None,
                 int(agreed),
             ),
         )
@@ -410,6 +423,19 @@ class Memory:
             "SELECT COALESCE(abstention_reason,'unknown'),COUNT(*) FROM decision_shadow "
             "WHERE created_at>=datetime('now',?) AND abstained=1 GROUP BY abstention_reason ORDER BY COUNT(*) DESC", (since,)
         ).fetchall()
+        routing_sources = self.db.execute(
+            "SELECT COALESCE(routing_source,'legacy'),COUNT(*) FROM decision_shadow "
+            "WHERE created_at>=datetime('now',?) GROUP BY routing_source ORDER BY COUNT(*) DESC", (since,)
+        ).fetchall()
+        fallback_reasons = self.db.execute(
+            "SELECT COALESCE(fallback_reason,'unknown'),COUNT(*) FROM decision_shadow "
+            "WHERE created_at>=datetime('now',?) AND fallback_reason IS NOT NULL "
+            "GROUP BY fallback_reason ORDER BY COUNT(*) DESC", (since,)
+        ).fetchall()
+        latency_row = self.db.execute(
+            "SELECT AVG(cde_latency_ms) FROM decision_shadow "
+            "WHERE created_at>=datetime('now',?) AND cde_latency_ms IS NOT NULL", (since,)
+        ).fetchone()
         return {
             "days": max(1, int(days)), "samples": total, "agreements": agreed,
             "agreement_rate": (agreed / total) if total else None,
@@ -422,6 +448,9 @@ class Memory:
             "total_tokens": total_tokens,
             "avg_tokens_per_sample": (total_tokens / total) if total else None,
             "abstention_reasons": {reason: count for reason, count in abstention_reasons},
+            "routing_sources": {source: count for source, count in routing_sources},
+            "fallback_reasons": {reason: count for reason, count in fallback_reasons},
+            "avg_cde_latency_ms": latency_row[0] if latency_row else None,
             "top_disagreements": [{"heuristic": a, "cde": b, "count": n} for a,b,n in disagreements],
         }
 
