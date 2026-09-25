@@ -599,15 +599,15 @@ async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, 
         routing["routing_source"] = "manual_override"
         routing["fallback_reason"] = None
 
-    if routing.get("cde") is not None:
+    if routing.get("evaluated_cde"):
         logger.info("CDE routing decision: %s", routing)
         routing_usage = routing.get("usage") or {}
         memory.record_decision_shadow(
             key.get("id"),
             routing["heuristic"],
             routing["cde"],
-            routing["confidence"],
-            routing["abstained"],
+            routing.get("confidence"),
+            routing.get("abstained", False),
             abstention_reason=routing.get("abstention_reason"),
             suspected_ood=routing.get("suspected_ood"),
             normalized_entropy=routing.get("normalized_entropy"),
