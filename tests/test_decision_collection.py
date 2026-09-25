@@ -10,15 +10,18 @@ class FakeRuntime:
 
     async def decide_with_usage(self, context, questions):
         self.calls.append((context, questions))
-        return [SimpleNamespace(
-            decision="think",
-            confidence=.8,
-            abstained=False,
-            suspected_ood=False,
-            abstention_reason=None,
-            normalized_entropy=.3,
-            margin=.5,
-        )], {"prompt_tokens":1,"completion_tokens":1,"total_tokens":2,"models":["test-model"]}
+        return [
+            SimpleNamespace(
+                decision="think",
+                confidence=.8,
+                abstained=False,
+                suspected_ood=False,
+                abstention_reason=None,
+                normalized_entropy=.3,
+                margin=.5,
+            ),
+            SimpleNamespace(probabilities={"false":.9,"true":.1}),
+        ], {"prompt_tokens":2,"completion_tokens":2,"total_tokens":4,"models":["test-model"]}
 
 
 def test_collect_one_matches_shadow_routing_shape():
@@ -31,6 +34,8 @@ def test_collect_one_matches_shadow_routing_shape():
     assert item["confidence"] == .8
     assert item["abstained"] is False
     assert item["suspected_ood"] is False
+    assert item["ood_probability"] == .1
+    assert item["ood_classifier_decision"] is False
     assert item["expected"] == "think"
     assert item["expected_ood"] is False
     assert item["models_used"] == ["test-model"]
@@ -39,12 +44,19 @@ def test_collect_one_matches_shadow_routing_shape():
     assert "heuristic_route" not in context
     assert context["input_chars"] == len(row["text"])
     assert context["long_context_chars"] == 12000
-    assert questions == [{
-        "id":"route",
-        "prompt":"Select the most appropriate CeltIA execution route.",
-        "type":"choice",
-        "options":["fast","think","code","agent","long"],
-    }]
+    assert questions == [
+        {
+            "id":"route",
+            "prompt":"Select the most appropriate CeltIA execution route.",
+            "type":"choice",
+            "options":["fast","think","code","agent","long"],
+        },
+        {
+            "id":"route_ood",
+            "prompt":"Is this input outside the CeltIA routing domain?",
+            "type":"boolean",
+        },
+    ]
 
 
 def test_load_datasets_combines_and_rejects_duplicate_text(tmp_path):
