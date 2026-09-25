@@ -26,7 +26,7 @@ def test_shadow_storage_keeps_cde_errors_and_latency():
         rollout_bucket=17,
         cde_latency_ms=1000,
     )
-    # A legacy row from before complete error telemetry must not count for readiness.
+    # Legacy rows from earlier telemetry generations must not count for v4 readiness.
     memory.record_decision_shadow(
         1,
         "fast",
@@ -36,7 +36,18 @@ def test_shadow_storage_keeps_cde_errors_and_latency():
         served_route="fast",
         routing_source="shadow",
         cde_latency_ms=900,
-        telemetry_version=None,
+        telemetry_version=2,
+    )
+    memory.record_decision_shadow(
+        1,
+        "fast",
+        "fast",
+        .9,
+        False,
+        served_route="fast",
+        routing_source="shadow",
+        cde_latency_ms=950,
+        telemetry_version=3,
     )
     summary=memory.decision_shadow_readiness_summary(days=1)
     assert summary["samples"] == 2
