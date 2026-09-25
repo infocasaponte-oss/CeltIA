@@ -25,13 +25,13 @@ function Test-Port($p) { [bool](Get-NetTCPConnection -LocalPort $p -State Listen
 function Stop-CeltiaApiListener {
     $listeners = Get-NetTCPConnection -LocalPort 8081 -State Listen -ErrorAction SilentlyContinue
     foreach ($listener in $listeners) {
-        $pid = [int]$listener.OwningProcess
-        $proc = Get-CimInstance Win32_Process -Filter "ProcessId=$pid" -ErrorAction SilentlyContinue
+        $processId = [int]$listener.OwningProcess
+        $proc = Get-CimInstance Win32_Process -Filter "ProcessId=$processId" -ErrorAction SilentlyContinue
         $cmd = if ($proc) { [string]$proc.CommandLine } else { "" }
         if ($cmd -notmatch "uvicorn" -or $cmd -notmatch "apps\.api\.main:app") {
-            throw "O porto 8081 está ocupado polo PID $pid, pero non parece ser a API de CeltIA. Non se matou ningún proceso."
+            throw "O porto 8081 está ocupado polo PID $processId, pero non parece ser a API de CeltIA. Non se matou ningún proceso."
         }
-        Stop-Process -Id $pid -Force -ErrorAction Stop
+        Stop-Process -Id $processId -Force -ErrorAction Stop
     }
     for ($i = 0; $i -lt 40 -and (Test-Port 8081); $i++) {
         Start-Sleep -Milliseconds 250
