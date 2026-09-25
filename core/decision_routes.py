@@ -1,17 +1,9 @@
 from __future__ import annotations
 
+from celtia.decision.route_contract import ROUTES
 from core.config import settings
 
-ROUTES = ("fast", "think", "code", "agent", "long")
-
-ROUTE_DECISION_PROMPT = """Select the most appropriate CeltIA execution route using this stable contract:
-- fast: short, direct tasks that need little deliberation and no code execution or external tools.
-- think: tasks that primarily need multi-step reasoning, analysis, comparison, planning, trade-off evaluation, or careful derivation.
-- code: tasks whose primary output is code, debugging, a patch, a query, tests, or implementation guidance tied directly to source code.
-- agent: tasks that require current/external information, web lookup, tools, execution, or interaction with external systems.
-- long: tasks whose effective input/context is large enough to require long-context handling; use the supplied input_chars and long_context_chars rather than merely words such as 'long document'.
-
-Choose based on the task itself. Do not use any legacy-router decision or benchmark label; those are not provided to the scorer."""
+ROUTE_DECISION_PROMPT = "Select the most appropriate CeltIA execution route."
 
 
 def route_decision_context(text: str, *, input_chars: int | None = None) -> dict:
