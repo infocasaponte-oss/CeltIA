@@ -10,3 +10,6 @@ cloudflared/
 # datos locales y temporales
 data/
 .scratch_*.json
+
+# Resultados xerados das probas CDE en vivo (evidencia local)
+results/
