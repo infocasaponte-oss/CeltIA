@@ -155,3 +155,22 @@ Any live evidence collected before this contract change remains useful as histor
 Routing OOD detection uses a dedicated semantic head in addition to the route head's entropy/margin signal. The semantic head is intentionally conservative: any plausibly actionable user task is in-domain, including short/simple tasks, code, reasoning, tool/web work and long-context work. It marks OOD only when there is clear evidence of router/candidate manipulation, fake routing metadata, prompt-injection whose primary purpose is to control routing, or content with no actionable task. Ambiguous inputs default to in-domain.
 
 The semantic OOD head records `ood_probability`, `ood_classifier_confidence` and `ood_classifier_decision` in collected evidence. OOD detection is evaluated independently from routing coverage. The policy thresholds (`decision_ood_entropy_threshold`, `decision_ood_margin_threshold`, and `decision_abstain_below`) are not changed as part of this prompt correction; any later calibration must use separately collected evidence rather than tuning the current run to pass the gate.
+
+
+## Separate robustness validation
+
+The repository now treats `benchmarks/holdout/decision_routes_holdout.jsonl` as a separate 80-case robustness validation set: 40 OOD cases plus 40 in-domain cases balanced at eight examples per route. CI verifies its schema, balance, uniqueness, and zero text overlap with the 200-case promotion datasets.
+
+This set is **not a blind final test**. An earlier run of the set was inspected and informed one subsequent OOD-contract adjustment, so later scores on the same examples are regression/robustness evidence rather than untouched confirmatory evidence. Do not use this set for additional prompt tuning and then describe the resulting score as independent generalization.
+
+Long-route validation rows now carry explicit `input_chars` above the production long-context threshold, matching the routing contract used by production and the primary benchmark. This changes the validation dataset digest; results collected against the earlier file must not be reused with the updated set.
+
+For a deliberate live regression check, run:
+
+```bash
+PYTHONPATH=. python scripts/run_cde_validation_evidence.py
+```
+
+The helper uses the same clean-checkout and credential guards as the 200-case live-evidence runner, collects only the separate 80-case validation set, and applies the same operational OOD thresholds as promotion (`recall >= 0.80`, false-positive rate `<= 0.20`) with sample-count floors scaled to this set. It does not replace the 200-case promotion gate and it does not activate controlled routing.
+
+Before any further OOD prompt adjustment, freeze a fresh confirmatory dataset that has not been inspected during tuning. Run that dataset once against the frozen code revision and preserve its schema-v4 result/manifest pair as the confirmatory record.
