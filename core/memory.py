@@ -74,6 +74,7 @@ class Memory:
             "fallback_reason": "TEXT",
             "rollout_bucket": "INTEGER",
             "cde_latency_ms": "INTEGER",
+            "telemetry_version": "INTEGER",
         }
         for column, decl in additions.items():
             if column not in existing:
@@ -371,13 +372,13 @@ class Memory:
                                abstention_reason=None, suspected_ood=None, normalized_entropy=None, margin=None,
                                prompt_tokens=None, completion_tokens=None, total_tokens=None,
                                served_route=None, routing_source=None, fallback_reason=None,
-                               rollout_bucket=None, cde_latency_ms=None):
+                               rollout_bucket=None, cde_latency_ms=None, telemetry_version=2):
         agreed = bool(cde_route and cde_route == heuristic_route and not abstained)
         self.db.execute(
             "INSERT INTO decision_shadow(api_key_id,heuristic_route,cde_route,confidence,abstained,"
             "abstention_reason,suspected_ood,normalized_entropy,margin,prompt_tokens,completion_tokens,total_tokens,"
-            "served_route,routing_source,fallback_reason,rollout_bucket,cde_latency_ms,agreed) "
-            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "served_route,routing_source,fallback_reason,rollout_bucket,cde_latency_ms,telemetry_version,agreed) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 api_key_id,
                 heuristic_route,
@@ -396,10 +397,43 @@ class Memory:
                 fallback_reason,
                 int(rollout_bucket) if rollout_bucket is not None else None,
                 int(cde_latency_ms) if cde_latency_ms is not None else None,
+                int(telemetry_version) if telemetry_version is not None else None,
                 int(agreed),
             ),
         )
         self.db.commit()
+
+    def decision_shadow_readiness_summary(self, days=7):
+        since = f"-{max(1, int(days))} days"
+        rows = self.db.execute(
+            "SELECT abstained,fallback_reason,cde_latency_ms FROM decision_shadow "
+            "WHERE created_at>=datetime('now',?) AND telemetry_version>=2",
+            (since,),
+        ).fetchall()
+        latencies = sorted(
+            int(latency) for _, _, latency in rows if latency is not None
+        )
+        samples = len(rows)
+        abstentions = sum(int(bool(abstained)) for abstained, _, _ in rows)
+        fallback_reasons = {}
+        for _, reason, _ in rows:
+            if reason:
+                fallback_reasons[reason] = fallback_reasons.get(reason, 0) + 1
+        avg_latency = (sum(latencies) / len(latencies)) if latencies else None
+        p95_latency = (
+            latencies[min(len(latencies) - 1, max(0, (95 * len(latencies) + 99) // 100 - 1))]
+            if latencies else None
+        )
+        return {
+            "days": max(1, int(days)),
+            "samples": samples,
+            "abstentions": abstentions,
+            "abstention_rate": (abstentions / samples) if samples else None,
+            "fallback_reasons": fallback_reasons,
+            "avg_cde_latency_ms": avg_latency,
+            "p95_cde_latency_ms": p95_latency,
+            "telemetry_version": 2,
+        }
 
     def decision_shadow_summary(self, days=30):
         since = f"-{max(1, int(days))} days"
