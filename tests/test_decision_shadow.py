@@ -38,7 +38,10 @@ def test_shadow_route_returns_usage_without_changing_heuristic():
         "usage": {"prompt_tokens": 11, "completion_tokens": 2, "total_tokens": 13},
     }
     context,questions=runtime.calls[0]
-    assert context["heuristic_route"] == "fast"
+    assert "heuristic_route" not in context
+    assert context["user_message"] == "analyze carefully"
+    assert context["input_chars"] == len("analyze carefully")
+    assert context["long_context_chars"] > context["input_chars"]
     assert questions[0]["options"] == ["fast","think","code","agent","long"]
 
 
