@@ -19,8 +19,11 @@ class FakeRuntime:
                 suspected_ood=False,
                 normalized_entropy=.3,
                 margin=.5,
-            )
-        ], {"prompt_tokens": 11, "completion_tokens": 2, "total_tokens": 13}
+            ),
+            SimpleNamespace(
+                probabilities={"false":.9,"true":.1},
+            ),
+        ], {"prompt_tokens": 22, "completion_tokens": 4, "total_tokens": 26}
 
 
 def test_shadow_route_returns_usage_without_changing_heuristic():
@@ -35,7 +38,10 @@ def test_shadow_route_returns_usage_without_changing_heuristic():
         "suspected_ood": False,
         "normalized_entropy": .3,
         "margin": .5,
-        "usage": {"prompt_tokens": 11, "completion_tokens": 2, "total_tokens": 13},
+        "ood_probability": .1,
+        "ood_classifier_confidence": .9,
+        "ood_classifier_decision": False,
+        "usage": {"prompt_tokens": 22, "completion_tokens": 4, "total_tokens": 26},
     }
     context,questions=runtime.calls[0]
     assert "heuristic_route" not in context
@@ -43,6 +49,11 @@ def test_shadow_route_returns_usage_without_changing_heuristic():
     assert context["input_chars"] == len("analyze carefully")
     assert context["long_context_chars"] > context["input_chars"]
     assert questions[0]["options"] == ["fast","think","code","agent","long"]
+    assert questions[1] == {
+        "id":"route_ood",
+        "prompt":"Is this input outside the CeltIA routing domain?",
+        "type":"boolean",
+    }
 
 
 class FailingRuntime:
