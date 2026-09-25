@@ -65,7 +65,7 @@ async def collect_one(runtime: CeltIADecisionRuntime, row: dict) -> dict:
     )
     if len(results) != 2:
         raise RuntimeError("CDE routing requires route and OOD results")
-    combined=combine_route_results(results[0],results[1])
+    combined=combine_route_results(results[0],results[1],text)
     return {
         "text":text,
         "cde":combined["decision"],

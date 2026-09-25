@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from celtia.decision.route_contract import ROUTES
+from core.ood_structure import structural_ood_reason
 
 DEFAULT_LONG_CONTEXT_CHARS = 12000
 ROUTE_DECISION_PROMPT = "Select the most appropriate CeltIA execution route."
@@ -46,14 +47,15 @@ def route_decision_questions() -> list[dict]:
     return [route_decision_question(), route_ood_question()]
 
 
-def combine_route_results(route_result, ood_result) -> dict:
+def combine_route_results(route_result, ood_result, text: str | None = None) -> dict:
     try:
         ood_probability = float(ood_result.probabilities["true"])
         in_domain_probability = float(ood_result.probabilities["false"])
     except (AttributeError, KeyError, TypeError, ValueError) as exc:
         raise ValueError("invalid explicit OOD result") from exc
     explicit_ood = ood_probability > in_domain_probability
-    suspected_ood = bool(route_result.suspected_ood) or explicit_ood
+    structural_reason = structural_ood_reason(text) if text is not None else None
+    suspected_ood = bool(route_result.suspected_ood) or explicit_ood or structural_reason is not None
     abstained = bool(route_result.abstained)
     return {
         "decision": None if abstained else route_result.decision,
