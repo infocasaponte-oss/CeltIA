@@ -75,6 +75,7 @@ class Memory:
             "rollout_bucket": "INTEGER",
             "cde_latency_ms": "INTEGER",
             "telemetry_version": "INTEGER",
+            "rollout_percent": "INTEGER",
         }
         for column, decl in additions.items():
             if column not in existing:
@@ -372,13 +373,14 @@ class Memory:
                                abstention_reason=None, suspected_ood=None, normalized_entropy=None, margin=None,
                                prompt_tokens=None, completion_tokens=None, total_tokens=None,
                                served_route=None, routing_source=None, fallback_reason=None,
-                               rollout_bucket=None, cde_latency_ms=None, telemetry_version=2):
+                               rollout_bucket=None, cde_latency_ms=None, telemetry_version=3,
+                               rollout_percent=None):
         agreed = bool(cde_route and cde_route == heuristic_route and not abstained)
         self.db.execute(
             "INSERT INTO decision_shadow(api_key_id,heuristic_route,cde_route,confidence,abstained,"
             "abstention_reason,suspected_ood,normalized_entropy,margin,prompt_tokens,completion_tokens,total_tokens,"
-            "served_route,routing_source,fallback_reason,rollout_bucket,cde_latency_ms,telemetry_version,agreed) "
-            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "served_route,routing_source,fallback_reason,rollout_bucket,cde_latency_ms,telemetry_version,rollout_percent,agreed) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 api_key_id,
                 heuristic_route,
@@ -398,6 +400,7 @@ class Memory:
                 int(rollout_bucket) if rollout_bucket is not None else None,
                 int(cde_latency_ms) if cde_latency_ms is not None else None,
                 int(telemetry_version) if telemetry_version is not None else None,
+                int(rollout_percent) if rollout_percent is not None else None,
                 int(agreed),
             ),
         )
@@ -447,6 +450,52 @@ class Memory:
             "avg_cde_latency_ms": avg_latency,
             "p95_cde_latency_ms": p95_latency,
             "telemetry_version": 2,
+        }
+
+    def decision_canary_summary(self, rollout_percent, days=7):
+        percent = int(rollout_percent)
+        if percent not in {5, 20, 50, 100}:
+            raise ValueError("rollout_percent must be one of 5, 20, 50, 100")
+        since = f"-{max(1, int(days))} days"
+        rows = self.db.execute(
+            "SELECT abstained,suspected_ood,fallback_reason,cde_latency_ms,routing_source,served_route "
+            "FROM decision_shadow WHERE created_at>=datetime('now',?) "
+            "AND telemetry_version>=3 AND rollout_percent=?",
+            (since, percent),
+        ).fetchall()
+        samples = len(rows)
+        latencies = sorted(int(r[3]) for r in rows if r[3] is not None)
+        fallbacks = {}
+        sources = {}
+        served_routes = {}
+        abstentions = 0
+        suspected_ood = 0
+        for abstained, ood, reason, _, source, served in rows:
+            abstentions += int(bool(abstained))
+            suspected_ood += int(bool(ood))
+            if reason:
+                fallbacks[reason] = fallbacks.get(reason, 0) + 1
+            source_key = source or "unknown"
+            sources[source_key] = sources.get(source_key, 0) + 1
+            route_key = served or "none"
+            served_routes[route_key] = served_routes.get(route_key, 0) + 1
+        avg_latency = (sum(latencies) / len(latencies)) if latencies else None
+        p95_latency = (
+            latencies[min(len(latencies) - 1, max(0, (95 * len(latencies) + 99) // 100 - 1))]
+            if latencies else None
+        )
+        return {
+            "days": max(1, int(days)),
+            "rollout_percent": percent,
+            "samples": samples,
+            "abstentions": abstentions,
+            "suspected_ood": suspected_ood,
+            "fallback_reasons": fallbacks,
+            "routing_sources": sources,
+            "served_routes": served_routes,
+            "avg_cde_latency_ms": avg_latency,
+            "p95_cde_latency_ms": p95_latency,
+            "telemetry_version": 3,
         }
 
     def decision_shadow_summary(self, days=30):
