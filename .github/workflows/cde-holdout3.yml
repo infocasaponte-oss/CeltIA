@@ -1,6 +1,12 @@
 name: CDE holdout3 sealed validation
 
 on:
+  workflow_dispatch:
+    inputs:
+      confirm_live_cost:
+        description: "Type RUN_HOLDOUT3 to confirm live provider usage/cost"
+        required: true
+        type: string
   push:
     branches:
       - cde-holdout3
@@ -10,7 +16,7 @@ permissions:
 
 jobs:
   validate:
-    if: ${{ contains(github.event.head_commit.message, '[run-live-holdout3]') }}
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.confirm_live_cost == 'RUN_HOLDOUT3') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[run-live-holdout3]')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 70
     env:
