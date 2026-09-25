@@ -60,7 +60,7 @@ async def collect_one(runtime: CeltIADecisionRuntime, row: dict) -> dict:
     text=row["text"]
     heuristic=route(text).mode
     results,usage=await runtime.decide_with_usage(
-        route_decision_context(text, input_chars=row.get("input_chars")),
+        route_decision_context(text, input_chars=row.get("input_chars"), long_context_chars=settings.router_long_context_chars),
         [route_decision_question()],
     )
     result=results[0]
