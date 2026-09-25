@@ -14,7 +14,7 @@ async def evaluate_route_shadow(runtime, text: str, heuristic_route: str, *, lon
         )
         if len(results) != 2:
             raise RuntimeError("CDE routing requires route and OOD results")
-        combined = combine_route_results(results[0], results[1], text)
+        combined = combine_route_results(results[0], results[1], text, long_context_chars=long_context_chars)
         return {
             "heuristic": heuristic_route,
             "cde": combined["decision"],
