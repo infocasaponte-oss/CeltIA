@@ -4,6 +4,7 @@ import math
 from collections.abc import Awaitable, Callable, Sequence
 from .json_safety import validate_json_depth
 from .schema import DecisionQuestion
+from .route_contract import ROUTES, ROUTE_SYSTEM_GUIDANCE
 
 
 class _DuplicateJSONKey(ValueError):
@@ -44,6 +45,9 @@ class AsyncLLMDecisionScorer:
             serialized = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
         except (TypeError, ValueError, RecursionError) as exc:
             raise ValueError("decision input must be JSON serializable") from exc
+        trusted_guidance = ""
+        if question.id == "route" and tuple(candidates) == ROUTES:
+            trusted_guidance = " " + ROUTE_SYSTEM_GUIDANCE
         return [
             {
                 "role": "system",
@@ -55,6 +59,7 @@ class AsyncLLMDecisionScorer:
                     + " with one finite numeric logit per supplied candidate ID; "
                     f"the scores object must contain all {len(candidates)} IDs. "
                     "Do not reveal chain-of-thought or add any other fields."
+                    + trusted_guidance
                 ),
             },
             {"role": "user", "content": serialized},
