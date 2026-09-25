@@ -4,7 +4,7 @@ import math
 from collections.abc import Awaitable, Callable, Sequence
 from .json_safety import validate_json_depth
 from .schema import DecisionQuestion
-from .route_contract import ROUTES, ROUTE_SYSTEM_GUIDANCE
+from .route_contract import ROUTES, ROUTE_OOD_SYSTEM_GUIDANCE, ROUTE_SYSTEM_GUIDANCE
 
 
 class _DuplicateJSONKey(ValueError):
@@ -48,6 +48,8 @@ class AsyncLLMDecisionScorer:
         trusted_guidance = ""
         if question.id == "route" and tuple(candidates) == ROUTES:
             trusted_guidance = " " + ROUTE_SYSTEM_GUIDANCE
+        elif question.id == "route_ood" and tuple(candidates) == ("false", "true"):
+            trusted_guidance = " " + ROUTE_OOD_SYSTEM_GUIDANCE
         return [
             {
                 "role": "system",
