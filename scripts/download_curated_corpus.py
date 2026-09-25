@@ -52,7 +52,9 @@ class Source:
 SOURCES = [
     Source("wikipedia_es", "spanish", "wikimedia/wikipedia", "20231101.es", max_gb=8),
     Source("culturax_es", "spanish", "uonlp/CulturaX", "es", gated=True, max_gb=40),
-    Source("spanish_pd_books", "spanish", "PleIAs/Spanish-PD-Books", max_gb=30),
+    # High-value public-domain books, but the current HF repository has shard schema
+    # inconsistencies; keep opt-in until upstream normalizes it.
+    Source("spanish_pd_books", "spanish_optional", "PleIAs/Spanish-PD-Books", enabled=False, max_gb=30),
     Source("stackv2_edu", "code", "common-pile/stackv2_edu_filtered", max_gb=60),
     # Optional fallbacks / expansion. Disabled to reduce overlap with CulturaX.
     Source("mc4_es", "spanish_optional", "allenai/c4", "es", enabled=False, max_gb=25),
@@ -303,6 +305,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--groups", nargs="+", choices=["spanish","code","all"], default=["all"])
     p.add_argument("--sources", nargs="*", help="Claves concretas; sobrescribe --groups.")
     p.add_argument("--include-fallback-web", action="store_true", help="Activa mC4 ES e OSCAR ES ademais de CulturaX.")
+    p.add_argument("--include-experimental", action="store_true", help="Activa fontes boas pero actualmente menos robustas, como Spanish-PD-Books.")
     p.add_argument("--max-gb", type=float, default=None, help="Límite por fonte. 0 = sen límite.")
     p.add_argument("--checkpoint-every", type=int, default=5000)
     p.add_argument("--hf-token", default=os.getenv("HF_TOKEN"))
@@ -311,10 +314,15 @@ def parse_args() -> argparse.Namespace:
 
 def choose_sources(args: argparse.Namespace) -> list[Source]:
     sources = list(SOURCES)
-    if args.include_fallback_web:
+    if args.include_fallback_web or args.include_experimental:
+        enabled_keys = set()
+        if args.include_fallback_web:
+            enabled_keys.update({"mc4_es", "oscar_es"})
+        if args.include_experimental:
+            enabled_keys.add("spanish_pd_books")
         sources = [
             Source(s.key, s.group, s.dataset, s.config, s.text_field, s.gated, True, s.max_gb)
-            if s.group == "spanish_optional" else s
+            if s.key in enabled_keys else s
             for s in sources
         ]
     if args.sources:
@@ -351,6 +359,7 @@ def main() -> int:
         "notes":[
             "CulturaX pode requirir aceptar condicións en Hugging Face e HF_TOKEN.",
             "OSCAR/mC4 están desactivados por defecto para evitar solapamento masivo con CulturaX.",
+            "Spanish-PD-Books queda opt-in porque o repositorio HF actual presenta inconsistencias de esquema entre shards.",
             "A deduplicación implementada é exacta por hash; non substitúe near-dedup semántica global.",
             "Revisa as licenzas/metadatos antes de redistribuír ou publicar o corpus resultante.",
         ],
