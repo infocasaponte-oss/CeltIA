@@ -406,19 +406,25 @@ class Memory:
     def decision_shadow_readiness_summary(self, days=7):
         since = f"-{max(1, int(days))} days"
         rows = self.db.execute(
-            "SELECT abstained,fallback_reason,cde_latency_ms FROM decision_shadow "
-            "WHERE created_at>=datetime('now',?) AND telemetry_version>=2",
+            "SELECT abstained,fallback_reason,cde_latency_ms,routing_source,heuristic_route,cde_route "
+            "FROM decision_shadow WHERE created_at>=datetime('now',?) AND telemetry_version>=2",
             (since,),
         ).fetchall()
         latencies = sorted(
-            int(latency) for _, _, latency in rows if latency is not None
+            int(latency) for _, _, latency, _, _, _ in rows if latency is not None
         )
         samples = len(rows)
-        abstentions = sum(int(bool(abstained)) for abstained, _, _ in rows)
+        abstentions = sum(int(bool(abstained)) for abstained, _, _, _, _, _ in rows)
         fallback_reasons = {}
-        for _, reason, _ in rows:
+        routing_sources = {}
+        route_pairs = {}
+        for _, reason, _, source, heuristic, cde in rows:
             if reason:
                 fallback_reasons[reason] = fallback_reasons.get(reason, 0) + 1
+            source_key = source or "unknown"
+            routing_sources[source_key] = routing_sources.get(source_key, 0) + 1
+            pair = (heuristic or "unknown", cde or "none")
+            route_pairs[pair] = route_pairs.get(pair, 0) + 1
         avg_latency = (sum(latencies) / len(latencies)) if latencies else None
         p95_latency = (
             latencies[min(len(latencies) - 1, max(0, (95 * len(latencies) + 99) // 100 - 1))]
@@ -430,6 +436,14 @@ class Memory:
             "abstentions": abstentions,
             "abstention_rate": (abstentions / samples) if samples else None,
             "fallback_reasons": fallback_reasons,
+            "routing_sources": routing_sources,
+            "route_pairs": [
+                {"heuristic": heuristic, "cde": cde, "count": count}
+                for (heuristic, cde), count in sorted(
+                    route_pairs.items(),
+                    key=lambda item: (-item[1], item[0][0], item[0][1]),
+                )
+            ],
             "avg_cde_latency_ms": avg_latency,
             "p95_cde_latency_ms": p95_latency,
             "telemetry_version": 2,
