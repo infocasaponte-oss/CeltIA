@@ -30,7 +30,7 @@ from core.creator.sandbox import sandbox_configured, sandbox_for
 from core.creator.tools import CREATOR_TOOL_NAMES, build_creator_registry
 from core.inference import build_llm
 from core.decision_runtime import CeltIADecisionRuntime
-from core.decision_rollout import evaluate_shadow_readiness
+from core.decision_rollout import evaluate_canary_readiness, evaluate_shadow_readiness
 from core.decision_serving import effective_routing_mode, select_serving_route
 from core.memory import Memory
 from core.planner import Planner
@@ -511,6 +511,27 @@ async def decision_rollout_readiness(days: int = 7, _: bool = Depends(require_ad
         "readiness": evaluate_shadow_readiness(summary),
     }
 
+
+@app.get("/admin/decision-canary-readiness")
+async def decision_canary_readiness(
+    percent: int,
+    days: int = 7,
+    _: bool = Depends(require_admin),
+):
+    try:
+        summary = memory.decision_canary_summary(
+            percent,
+            days=min(max(days, 1), 365),
+        )
+        readiness = evaluate_canary_readiness(summary)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    return {
+        "days": summary["days"],
+        "canary": summary,
+        "readiness": readiness,
+    }
+
 @app.get("/v1/models")
 async def models():
     return {"object":"list","data":[{"id":"CeltIA V4","object":"model","owned_by":"local"}]}
@@ -631,6 +652,7 @@ async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, 
             fallback_reason=routing.get("fallback_reason"),
             rollout_bucket=routing.get("rollout_bucket"),
             cde_latency_ms=routing.get("cde_latency_ms"),
+            rollout_percent=settings.decision_cde_rollout_percent,
         )
         emit({"type": "decision_shadow", **routing})
 
