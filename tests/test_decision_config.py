@@ -10,6 +10,8 @@ def test_decision_settings_accept_default_bounds_without_env_files():
     assert settings.decision_max_total_output_tokens >= settings.decision_max_questions * 64
     assert settings.decision_routing_mode == "legacy"
     assert settings.decision_cde_rollout_percent == 0
+    assert settings.decision_shadow_max_concurrency == 1
+    assert settings.decision_shadow_max_pending == 8
 
 
 def test_decision_settings_reject_invalid_scalar_bounds():
@@ -31,6 +33,10 @@ def test_decision_settings_reject_invalid_scalar_bounds():
         {"decision_routing_mode":"invalid"},
         {"decision_cde_rollout_percent":-1},
         {"decision_cde_rollout_percent":101},
+        {"decision_shadow_max_concurrency":0},
+        {"decision_shadow_max_concurrency":5},
+        {"decision_shadow_max_pending":0},
+        {"decision_shadow_max_pending":129},
     )
     for kwargs in invalid:
         try:

@@ -56,6 +56,8 @@ class Settings(BaseSettings):
     decision_shadow_routing: bool = False  # legacy compatibility: maps legacy -> shadow
     decision_routing_mode: str = Field(default="legacy", pattern=r"^(legacy|shadow|canary|cde)$")
     decision_cde_rollout_percent: int = Field(default=0, ge=0, le=100)
+    decision_shadow_max_concurrency: int = Field(default=1, ge=1, le=4)
+    decision_shadow_max_pending: int = Field(default=8, ge=1, le=128)
     decision_reject_ood: bool = True
     decision_ood_entropy_threshold: float = Field(default=0.90, ge=0.0, le=1.0, allow_inf_nan=False)
     decision_ood_margin_threshold: float = Field(default=0.10, ge=0.0, le=1.0, allow_inf_nan=False)
