@@ -8,6 +8,8 @@ def test_decision_settings_accept_default_bounds_without_env_files():
     assert settings.decision_abstain_below == 0.55
     assert settings.decision_max_questions == 32
     assert settings.decision_max_total_output_tokens >= settings.decision_max_questions * 64
+    assert settings.decision_routing_mode == "legacy"
+    assert settings.decision_cde_rollout_percent == 0
 
 
 def test_decision_settings_reject_invalid_scalar_bounds():
@@ -26,6 +28,9 @@ def test_decision_settings_reject_invalid_scalar_bounds():
         {"decision_max_total_prompt_chars":9999},
         {"decision_call_timeout_seconds":0},
         {"decision_request_timeout_seconds":1801},
+        {"decision_routing_mode":"invalid"},
+        {"decision_cde_rollout_percent":-1},
+        {"decision_cde_rollout_percent":101},
     )
     for kwargs in invalid:
         try:
