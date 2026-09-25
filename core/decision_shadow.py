@@ -1,8 +1,14 @@
 # Copyright (c) 2026 Luis Manuel Cousido Hermida. All rights reserved.
 from __future__ import annotations
+import asyncio
 import logging
 
-from core.decision_routes import combine_route_results, route_decision_context, route_decision_questions
+from core.decision_routes import (
+    combine_route_results,
+    route_decision_context,
+    route_decision_question,
+    route_ood_question,
+)
 
 logger = logging.getLogger(__name__)
 async def evaluate_route_shadow(
@@ -15,15 +21,29 @@ async def evaluate_route_shadow(
 ) -> dict | None:
     """Evaluate CDE routing without changing the route selected by the production router."""
     try:
-        results, usage = await runtime.decide_with_usage(
-            route_decision_context(text, input_chars=input_chars, long_context_chars=long_context_chars),
-            route_decision_questions(),
+        context = route_decision_context(
+            text,
+            input_chars=input_chars,
+            long_context_chars=long_context_chars,
         )
-        if len(results) != 2:
-            raise RuntimeError("CDE routing requires route and OOD results")
+        (route_results, route_usage), (ood_results, ood_usage) = await asyncio.gather(
+            runtime.decide_with_usage(context, [route_decision_question()]),
+            runtime.decide_with_usage(context, [route_ood_question()]),
+        )
+        if len(route_results) != 1 or len(ood_results) != 1:
+            raise RuntimeError("CDE routing requires one route and one OOD result")
+        usage = {
+            "prompt_tokens": int(route_usage.get("prompt_tokens", 0)) + int(ood_usage.get("prompt_tokens", 0)),
+            "completion_tokens": int(route_usage.get("completion_tokens", 0)) + int(ood_usage.get("completion_tokens", 0)),
+            "total_tokens": int(route_usage.get("total_tokens", 0)) + int(ood_usage.get("total_tokens", 0)),
+            "models": list(dict.fromkeys([
+                *(route_usage.get("models") or []),
+                *(ood_usage.get("models") or []),
+            ])),
+        }
         combined = combine_route_results(
-            results[0],
-            results[1],
+            route_results[0],
+            ood_results[0],
             text,
             input_chars=input_chars,
             long_context_chars=long_context_chars,

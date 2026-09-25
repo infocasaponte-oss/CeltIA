@@ -292,3 +292,16 @@ adding more load to user traffic. Dropped samples are visible in
 `decision_shadow_background_dropped`; started, completed and failed background
 evaluations are also exposed in application metrics. Canary and full CDE modes
 remain synchronous because the CDE result is authoritative for the served route.
+
+
+### Parallel route/OOD scoring and telemetry v4
+
+Routing CDE now evaluates the route head and explicit OOD head concurrently.
+They are independent scorer calls over the same trusted context, and their
+results are merged only after both complete. The generic multi-question
+Decision API remains unchanged.
+
+This optimization changes routing latency characteristics, so shadow readiness
+uses telemetry version 4 only. Older v2/v3 rows remain in the general audit
+report but do not count toward the 200-sample shadow readiness floor. This
+prevents pre-optimization latency from being mixed with the new implementation.

@@ -40,7 +40,7 @@ def test_shadow_storage_keeps_cde_errors_and_latency():
     )
     summary=memory.decision_shadow_readiness_summary(days=1)
     assert summary["samples"] == 2
-    assert summary["telemetry_version"] == 2
+    assert summary["telemetry_version"] == 4
     assert summary["fallback_reasons"]["cde_error"] == 1
     assert summary["routing_sources"]["shadow"] == 2
     assert summary["avg_cde_latency_ms"] == 2600

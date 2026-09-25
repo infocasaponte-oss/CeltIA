@@ -13,8 +13,9 @@ class Runtime:
 
     async def decide_with_usage(self, context, questions):
         self.contexts.append(context)
-        return [
-            SimpleNamespace(
+        question=questions[0]
+        if question["id"]=="route":
+            return [SimpleNamespace(
                 decision=self.route,
                 confidence=.95,
                 abstained=self.abstained,
@@ -22,9 +23,12 @@ class Runtime:
                 suspected_ood=self.suspected_ood,
                 normalized_entropy=.1,
                 margin=.8,
-            ),
-            SimpleNamespace(probabilities={"false":.95,"true":.05}),
-        ], {"prompt_tokens":10,"completion_tokens":2,"total_tokens":12}
+            )], {"prompt_tokens":6,"completion_tokens":1,"total_tokens":7,"models":[]}
+        if question["id"]=="route_ood":
+            return [SimpleNamespace(probabilities={"false":.95,"true":.05})], {
+                "prompt_tokens":4,"completion_tokens":1,"total_tokens":5,"models":[]
+            }
+        raise AssertionError(question["id"])
 
 
 class FailingRuntime:
