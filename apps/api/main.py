@@ -30,7 +30,7 @@ from core.creator.sandbox import sandbox_configured, sandbox_for
 from core.creator.tools import CREATOR_TOOL_NAMES, build_creator_registry
 from core.inference import build_llm
 from core.decision_runtime import CeltIADecisionRuntime
-from core.decision_shadow import evaluate_route_shadow
+from core.decision_serving import effective_routing_mode, select_serving_route
 from core.memory import Memory
 from core.planner import Planner
 from core.policy import ToolPolicy
@@ -40,7 +40,15 @@ from core.tools import PUBLIC_SAFE_TOOLS, Tool, builtins
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="CeltIA", version="1.0.0", docs_url=None, redoc_url=None, openapi_url=None)
-app.state.metrics = {"requests": 0, "agent_runs": 0, "tool_calls": 0, "stream_requests": 0, "decision_requests": 0}
+app.state.metrics = {
+    "requests": 0,
+    "agent_runs": 0,
+    "tool_calls": 0,
+    "stream_requests": 0,
+    "decision_requests": 0,
+    "decision_cde_served": 0,
+    "decision_cde_fallbacks": 0,
+}
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -564,37 +572,66 @@ async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, 
     if req.max_tokens:
         req.max_tokens = min(req.max_tokens, cap)
     user_msgs = [m.content for m in req.messages if m.role == "user"]
-    text = (user_msgs[-1] if user_msgs else "")[-20000:]
+    raw_text = user_msgs[-1] if user_msgs else ""
+    text = raw_text[-20000:]
+    input_chars = len(raw_text)
     r = route(text)
-    if settings.decision_shadow_routing:
-        shadow = await evaluate_route_shadow(
-            decision_runtime,
-            text,
-            r.mode,
-            long_context_chars=settings.router_long_context_chars,
+
+    routing_mode = effective_routing_mode(
+        settings.decision_routing_mode,
+        settings.decision_shadow_routing,
+    )
+    bucket_key = f"api:{key.get('id')}" if key.get("id") is not None else f"session:{sid}"
+    routing = await select_serving_route(
+        decision_runtime,
+        text,
+        r.mode,
+        mode=routing_mode,
+        rollout_percent=settings.decision_cde_rollout_percent,
+        bucket_key=bucket_key,
+        input_chars=input_chars,
+        long_context_chars=settings.router_long_context_chars,
+    )
+
+    # Explicit API mode remains authoritative during the CDE rollout.
+    if req.mode in {"fast", "think", "code", "long"}:
+        routing["served_route"] = req.mode
+        routing["routing_source"] = "manual_override"
+        routing["fallback_reason"] = None
+
+    if routing.get("cde") is not None:
+        logger.info("CDE routing decision: %s", routing)
+        routing_usage = routing.get("usage") or {}
+        memory.record_decision_shadow(
+            key.get("id"),
+            routing["heuristic"],
+            routing["cde"],
+            routing["confidence"],
+            routing["abstained"],
+            abstention_reason=routing.get("abstention_reason"),
+            suspected_ood=routing.get("suspected_ood"),
+            normalized_entropy=routing.get("normalized_entropy"),
+            margin=routing.get("margin"),
+            prompt_tokens=routing_usage.get("prompt_tokens"),
+            completion_tokens=routing_usage.get("completion_tokens"),
+            total_tokens=routing_usage.get("total_tokens"),
         )
-        if shadow:
-            logger.info("CDE shadow route: %s", shadow)
-            shadow_usage = shadow.get("usage") or {}
-            memory.record_decision_shadow(
-                key.get("id"),
-                shadow["heuristic"],
-                shadow["cde"],
-                shadow["confidence"],
-                shadow["abstained"],
-                abstention_reason=shadow.get("abstention_reason"),
-                suspected_ood=shadow.get("suspected_ood"),
-                normalized_entropy=shadow.get("normalized_entropy"),
-                margin=shadow.get("margin"),
-                prompt_tokens=shadow_usage.get("prompt_tokens"),
-                completion_tokens=shadow_usage.get("completion_tokens"),
-                total_tokens=shadow_usage.get("total_tokens"),
-            )
-            emit({"type": "decision_shadow", **shadow})
-    auto_agent = r.mode == "agent"
-    if not auto_agent and req.mode in {"fast", "think", "code", "long"}:
-        forced_tokens = 512 if req.mode == "fast" else 1024 if req.mode == "think" else 2048
-        r = r.__class__(req.mode, r.difficulty, req.mode in {"think", "code", "long"}, req.max_tokens or forced_tokens)
+        emit({"type": "decision_shadow", **routing})
+
+    if routing["routing_source"] == "cde":
+        app.state.metrics["decision_cde_served"] += 1
+    elif routing["routing_source"] == "legacy_fallback":
+        app.state.metrics["decision_cde_fallbacks"] += 1
+
+    served_mode = routing["served_route"]
+    if served_mode != r.mode:
+        forced_tokens = 512 if served_mode == "fast" else 1024 if served_mode == "think" else 2048
+        r = r.__class__(
+            served_mode,
+            r.difficulty,
+            served_mode in {"think", "code", "agent", "long"},
+            req.max_tokens or forced_tokens,
+        )
     role = key.get("role", "user")
     keep_history = role_has_history(role)
     stored = memory.history(sid, api_key_id=key.get("id")) if keep_history and len(req.messages) == 1 else []
