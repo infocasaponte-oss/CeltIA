@@ -207,3 +207,31 @@ CDE evaluations are persisted alongside successful ones. Older rows remain
 available in the general shadow report but do not count toward the 200-sample
 readiness floor, because their historical error rate is not reconstructible
 without survivor bias.
+
+
+### Operator scripts for first canary
+
+On the Windows host, the rollout can be checked and promoted without editing
+configuration files manually:
+
+```powershell
+.\scripts\check-cde-readiness.ps1
+.\scripts\promote-cde-canary.ps1
+```
+
+The promotion script calls the admin readiness endpoint first and exits without
+changing the environment unless `eligible_for_5pct_canary` is true. A successful
+promotion persists `DECISION_ROUTING_MODE=canary` and
+`DECISION_CDE_ROLLOUT_PERCENT=5` in the current user's environment. Restart the
+API process after promotion.
+
+Rollback is intentionally independent of readiness:
+
+```powershell
+.\scripts\rollback-cde.ps1
+```
+
+It persists `DECISION_ROUTING_MODE=legacy` and rollout 0%. Restart the API to
+apply it. The Windows launchers use shadow/0 only when no explicit rollout
+environment variables are present, so a persisted promotion or rollback is not
+silently overwritten.
