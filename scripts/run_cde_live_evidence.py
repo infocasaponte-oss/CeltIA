@@ -29,7 +29,13 @@ def _run(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
 
 
 def _require_clean_checkout() -> str:
-    revision = _run("git", "rev-parse", "HEAD").stdout.strip()
+    revision = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=True,
+    ).stdout.strip()
     dirty = subprocess.run(
         ["git", "status", "--porcelain", "--untracked-files=no"],
         cwd=ROOT,
