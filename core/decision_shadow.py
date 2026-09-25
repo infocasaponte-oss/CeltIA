@@ -5,11 +5,11 @@ import logging
 from core.decision_routes import route_decision_context, route_decision_question
 
 logger = logging.getLogger(__name__)
-async def evaluate_route_shadow(runtime, text: str, heuristic_route: str) -> dict | None:
+async def evaluate_route_shadow(runtime, text: str, heuristic_route: str, *, long_context_chars: int = 12000) -> dict | None:
     """Evaluate CDE routing without changing the route selected by the production router."""
     try:
         results, usage = await runtime.decide_with_usage(
-            route_decision_context(text),
+            route_decision_context(text, long_context_chars=long_context_chars),
             [route_decision_question()],
         )
         result = results[0]
