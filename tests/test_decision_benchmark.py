@@ -13,6 +13,10 @@ def test_route_benchmark_schema():
     counts={label: sum(r["expected"] == label for r in rows) for label in ALLOWED}
     assert counts == {label: 24 for label in ALLOWED}
     assert len({r["text"] for r in rows}) == len(rows)
+    long_rows=[r for r in rows if r["expected"] == "long"]
+    assert all(isinstance(r.get("input_chars"),int) and not isinstance(r.get("input_chars"),bool) for r in long_rows)
+    assert all(r["input_chars"] >= 12000 for r in long_rows)
+    assert all(r.get("input_chars") is None for r in rows if r["expected"] != "long")
 
 
 def test_route_ood_benchmark_schema():
