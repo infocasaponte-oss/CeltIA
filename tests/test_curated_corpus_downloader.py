@@ -1,4 +1,5 @@
 import importlib.util
+import sys
 from pathlib import Path
 
 
@@ -7,7 +8,11 @@ def load_module():
     spec = importlib.util.spec_from_file_location("download_curated_corpus", path)
     module = importlib.util.module_from_spec(spec)
     assert spec and spec.loader
-    spec.loader.exec_module(module)
+    sys.modules[spec.name] = module
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.modules.pop(spec.name, None)
     return module
 
 
