@@ -33,8 +33,17 @@ def test_holdout_validation_schema_and_balance():
     counts={route:sum(row["expected"] == route for row in in_domain) for route in ROUTES}
     assert counts == {route:8 for route in ROUTES}
 
+    long_rows=[row for row in in_domain if row["expected"] == "long"]
+    assert all(
+        isinstance(row.get("input_chars"),int)
+        and not isinstance(row.get("input_chars"),bool)
+        and row["input_chars"] >= 12000
+        for row in long_rows
+    )
+    assert all(row.get("input_chars") is None for row in in_domain if row["expected"] != "long")
 
-def test_holdout_validation_is_disjoint_from_promotion_evidence():
+
+def test_validation_set_is_disjoint_from_promotion_evidence():
     validation_texts={row["text"] for row in _rows(VALIDATION)}
     promotion_texts={
         row["text"]
