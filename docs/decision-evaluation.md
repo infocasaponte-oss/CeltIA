@@ -200,3 +200,10 @@ holdouts remain the source of truth for routing/OOD accuracy. Failed CDE
 evaluations are persisted in shadow telemetry, including their latency and
 `fallback_reason=cde_error`, so readiness cannot be inflated by counting only
 successful scorer calls.
+
+
+Readiness uses only shadow telemetry version 2 rows. Version 2 starts when failed
+CDE evaluations are persisted alongside successful ones. Older rows remain
+available in the general shadow report but do not count toward the 200-sample
+readiness floor, because their historical error rate is not reconstructible
+without survivor bias.
