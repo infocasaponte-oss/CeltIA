@@ -2,16 +2,15 @@
 from __future__ import annotations
 import logging
 
-logger = logging.getLogger(__name__)
-ROUTES = ("fast", "think", "code", "agent", "long")
+from core.decision_routes import route_decision_context, route_decision_question
 
+logger = logging.getLogger(__name__)
 async def evaluate_route_shadow(runtime, text: str, heuristic_route: str) -> dict | None:
     """Evaluate CDE routing without changing the route selected by the production router."""
     try:
         results, usage = await runtime.decide_with_usage(
-            {"user_message": text[-12000:], "heuristic_route": heuristic_route},
-            [{"id":"route","prompt":"Select the most appropriate CeltIA execution route.",
-              "type":"choice","options":list(ROUTES)}],
+            route_decision_context(text),
+            [route_decision_question()],
         )
         result = results[0]
         return {
