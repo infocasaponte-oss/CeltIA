@@ -55,6 +55,7 @@ SOURCES = [
     # High-value public-domain books, but the current HF repository has shard schema
     # inconsistencies; keep opt-in until upstream normalizes it.
     Source("spanish_pd_books", "spanish_optional", "PleIAs/Spanish-PD-Books", enabled=False, max_gb=30),
+    Source("spanish_pd_newspapers", "spanish_optional", "PleIAs/Spanish-PD-Newspapers", enabled=False, max_gb=20),
     Source("stackv2_edu", "code", "common-pile/stackv2_edu_filtered", max_gb=60),
     # Optional fallbacks / expansion. Disabled to reduce overlap with CulturaX.
     Source("mc4_es", "spanish_optional", "allenai/c4", "es", enabled=False, max_gb=25),
@@ -319,7 +320,7 @@ def choose_sources(args: argparse.Namespace) -> list[Source]:
         if args.include_fallback_web:
             enabled_keys.update({"mc4_es", "oscar_es"})
         if args.include_experimental:
-            enabled_keys.add("spanish_pd_books")
+            enabled_keys.update({"spanish_pd_books", "spanish_pd_newspapers"})
         sources = [
             Source(s.key, s.group, s.dataset, s.config, s.text_field, s.gated, True, s.max_gb)
             if s.key in enabled_keys else s
@@ -359,7 +360,7 @@ def main() -> int:
         "notes":[
             "CulturaX pode requirir aceptar condicións en Hugging Face e HF_TOKEN.",
             "OSCAR/mC4 están desactivados por defecto para evitar solapamento masivo con CulturaX.",
-            "Spanish-PD-Books queda opt-in porque o repositorio HF actual presenta inconsistencias de esquema entre shards.",
+            "Spanish-PD-Books e Spanish-PD-Newspapers quedan opt-in: son fontes de dominio público de alto valor, pero poden requirir limpeza adicional de OCR/esquema.",
             "A deduplicación implementada é exacta por hash; non substitúe near-dedup semántica global.",
             "Revisa as licenzas/metadatos antes de redistribuír ou publicar o corpus resultante.",
         ],
