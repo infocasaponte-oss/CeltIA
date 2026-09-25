@@ -52,8 +52,10 @@ app.state.metrics = {
     "decision_shadow_background_started": 0,
     "decision_shadow_background_completed": 0,
     "decision_shadow_background_errors": 0,
+    "decision_shadow_background_dropped": 0,
 }
 app.state.decision_shadow_tasks = set()
+app.state.decision_shadow_semaphore = asyncio.Semaphore(settings.decision_shadow_max_concurrency)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -620,16 +622,17 @@ async def _run_shadow_background(
     manual_mode=None,
 ):
     try:
-        routing = await select_serving_route(
-            decision_runtime,
-            text,
-            heuristic_route,
-            mode="shadow",
-            rollout_percent=rollout_percent,
-            bucket_key=bucket_key,
-            input_chars=input_chars,
-            long_context_chars=long_context_chars,
-        )
+        async with app.state.decision_shadow_semaphore:
+            routing = await select_serving_route(
+                decision_runtime,
+                text,
+                heuristic_route,
+                mode="shadow",
+                rollout_percent=rollout_percent,
+                bucket_key=bucket_key,
+                input_chars=input_chars,
+                long_context_chars=long_context_chars,
+            )
         if manual_mode in {"fast", "think", "code", "long"}:
             routing["served_route"] = manual_mode
             routing["routing_source"] = "manual_override"
@@ -645,10 +648,18 @@ async def _run_shadow_background(
 
 
 def _schedule_shadow_background(**kwargs):
+    if len(app.state.decision_shadow_tasks) >= settings.decision_shadow_max_pending:
+        app.state.metrics["decision_shadow_background_dropped"] += 1
+        logger.warning(
+            "dropping CDE shadow sample because background backlog reached %s",
+            settings.decision_shadow_max_pending,
+        )
+        return None
     app.state.metrics["decision_shadow_background_started"] += 1
     task = asyncio.create_task(_run_shadow_background(**kwargs))
     app.state.decision_shadow_tasks.add(task)
     task.add_done_callback(app.state.decision_shadow_tasks.discard)
+    return task
 
 
 async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, stream_tokens=False):
