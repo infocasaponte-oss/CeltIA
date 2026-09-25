@@ -1,0 +1,85 @@
+name: CDE live evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_live_cost:
+        description: "Type RUN_LIVE_CDE to confirm provider usage/cost"
+        required: true
+        type: string
+  push:
+    branches:
+      - feature/cde-rollout-evidence-v1
+
+permissions:
+  contents: read
+
+jobs:
+  collect:
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.confirm_live_cost == 'RUN_LIVE_CDE') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[run-live-cde]')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PYTHONUNBUFFERED: "1"
+      PYTHONPATH: .
+      LLM_PRIMARY_ENABLED: "true"
+      LLM_PRIMARY_API_KEY: ${{ secrets.LLM_PRIMARY_API_KEY }}
+      XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+      IMAGE_API_KEY: ${{ secrets.IMAGE_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify live provider credential
+        shell: bash
+        run: |
+          if [ -z "$LLM_PRIMARY_API_KEY" ] && [ -z "$XAI_API_KEY" ] && [ -z "$IMAGE_API_KEY" ]; then
+            echo "No supported live-provider secret is configured."
+            exit 2
+          fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install collector dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Collect 200-case live CDE evidence
+        run: |
+          mkdir -p results
+          python scripts/collect_decision_eval_results.py \
+            --dataset benchmarks/decision_routes.jsonl \
+            --dataset benchmarks/decision_routes_ood.jsonl \
+            --output results/cde_routes.jsonl \
+            --checkpoint-every 10 \
+            --sleep-seconds 0.05
+
+      - name: Evaluate promotion gate
+        shell: bash
+        run: |
+          set +e
+          python scripts/evaluate_decision_routes.py \
+            --dataset benchmarks/decision_routes.jsonl \
+            --dataset benchmarks/decision_routes_ood.jsonl \
+            --cde-results results/cde_routes.jsonl \
+            --require-eligible | tee results/evaluation.json
+          code=${PIPESTATUS[0]}
+          echo "$code" > results/evaluation-exit-code.txt
+          exit 0
+
+      - name: Upload live evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cde-live-evidence
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            results/cde_routes.jsonl
+            results/cde_routes.jsonl.manifest.json
+            results/evaluation.json
+            results/evaluation-exit-code.txt
