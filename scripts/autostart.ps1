@@ -1,3 +1,7 @@
+param(
+    [switch]$RestartApi
+)
+
 # Arranca API (8081) e web demo (4173) sen ventás, sen --reload. Úsao a tarefa programada "CeltIA-Autostart".
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location $root
@@ -17,6 +21,29 @@ if ([string]::IsNullOrWhiteSpace($env:DECISION_CDE_ROLLOUT_PERCENT)) {
 }
 
 function Test-Port($p) { [bool](Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue) }
+
+function Stop-CeltiaApiListener {
+    $listeners = Get-NetTCPConnection -LocalPort 8081 -State Listen -ErrorAction SilentlyContinue
+    foreach ($listener in $listeners) {
+        $pid = [int]$listener.OwningProcess
+        $proc = Get-CimInstance Win32_Process -Filter "ProcessId=$pid" -ErrorAction SilentlyContinue
+        $cmd = if ($proc) { [string]$proc.CommandLine } else { "" }
+        if ($cmd -notmatch "uvicorn" -or $cmd -notmatch "apps\.api\.main:app") {
+            throw "O porto 8081 está ocupado polo PID $pid, pero non parece ser a API de CeltIA. Non se matou ningún proceso."
+        }
+        Stop-Process -Id $pid -Force -ErrorAction Stop
+    }
+    for ($i = 0; $i -lt 40 -and (Test-Port 8081); $i++) {
+        Start-Sleep -Milliseconds 250
+    }
+    if (Test-Port 8081) {
+        throw "A API antiga non liberou o porto 8081."
+    }
+}
+
+if ($RestartApi -and (Test-Port 8081)) {
+    Stop-CeltiaApiListener
+}
 
 if (-not (Test-Port 8081)) {
     Start-Process $py -ArgumentList "-m","uvicorn","apps.api.main:app","--host","127.0.0.1","--port","8081" -WorkingDirectory $root -WindowStyle Hidden
