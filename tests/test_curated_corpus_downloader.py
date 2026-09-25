@@ -31,7 +31,10 @@ def test_spanish_filter_rejects_noise():
 
 def test_code_filter_rejects_vendor_and_minified_paths():
     m = load_module()
-    code = "def suma(a, b):\n    return a + b\n" * 20
+    code = "\n".join(
+        f"def funcion_{i}(a, b):\n    resultado = a + b + {i}\n    return resultado"
+        for i in range(20)
+    )
     assert m.code_quality(code, {"metadata": {"path": "src/math.py"}})
     assert not m.code_quality(code, {"metadata": {"path": "vendor/math.py", "is_vendor": True}})
 
