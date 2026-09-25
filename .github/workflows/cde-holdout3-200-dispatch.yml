@@ -1,0 +1,172 @@
+name: Dispatch CDE holdout3 200
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_live_cost:
+        description: "Type RUN_HOLDOUT3_200 to confirm live provider usage/cost"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    if: ${{ inputs.confirm_live_cost == 'RUN_HOLDOUT3_200' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 110
+    env:
+      PYTHONUNBUFFERED: "1"
+      PYTHONPATH: .
+      LLM_PRIMARY_ENABLED: "true"
+      LLM_PRIMARY_API_KEY: ${{ secrets.LLM_PRIMARY_API_KEY }}
+      XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+      IMAGE_API_KEY: ${{ secrets.IMAGE_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: cde-holdout3-200
+
+      - name: Verify exact validation head
+        shell: bash
+        run: |
+          test "$(git branch --show-current)" = "cde-holdout3-200"
+          git rev-parse HEAD | tee /tmp/evaluated-sha.txt
+
+      - name: Verify live provider credential
+        shell: bash
+        run: |
+          if [ -z "$LLM_PRIMARY_API_KEY" ] && [ -z "$XAI_API_KEY" ] && [ -z "$IMAGE_API_KEY" ]; then
+            echo "No supported live-provider secret is configured."
+            exit 2
+          fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run tests and record SHA
+        shell: bash
+        run: |
+          pytest -q tests
+          mkdir -p results
+          cp /tmp/evaluated-sha.txt results/holdout3_sha.txt
+          test -z "$(git status --porcelain --untracked-files=no)"
+
+      - name: Collect sealed 200-case holdout3
+        shell: bash
+        run: |
+          set +e
+          for attempt in 1 2 3; do
+            extra=""
+            [ "$attempt" -gt 1 ] && extra="--resume"
+            python scripts/collect_decision_eval_results.py               --dataset benchmarks/holdout/decision_routes_holdout3.jsonl               --output results/holdout3_200.jsonl               --checkpoint-every 10               --sleep-seconds 0.05               $extra
+            code=$?
+            [ "$code" -eq 0 ] && exit 0
+            echo "collector attempt $attempt failed with $code; resuming same output"
+          done
+          exit "$code"
+
+      - name: Evaluate holdout3 once after all 200 rows
+        shell: bash
+        run: |
+          set +e
+          python - <<'PY' | tee results/holdout3_200_evaluation.json
+          import json
+          from collections import Counter
+
+          rows=[json.loads(line) for line in open("results/holdout3_200.jsonl",encoding="utf-8") if line.strip()]
+          assert len(rows)==200, len(rows)
+          ind=[r for r in rows if not r["expected_ood"]]
+          ood=[r for r in rows if r["expected_ood"]]
+          assert len(ind)==100 and len(ood)==100
+
+          route_total=Counter(r["expected"] for r in ind)
+          route_ok=Counter(r["expected"] for r in ind if r["cde"]==r["expected"])
+          assert set(route_total)=={"fast","code","agent","think","long"}
+          assert all(route_total[k]==20 for k in route_total)
+
+          route_accuracy={k:route_ok[k]/route_total[k] for k in sorted(route_total)}
+          in_acc=sum(r["cde"]==r["expected"] for r in ind)/len(ind)
+          tp=sum(bool(r["suspected_ood"]) and bool(r["expected_ood"]) for r in rows)
+          fn=sum((not bool(r["suspected_ood"])) and bool(r["expected_ood"]) for r in rows)
+          fp=sum(bool(r["suspected_ood"]) and (not bool(r["expected_ood"])) for r in rows)
+          tn=sum((not bool(r["suspected_ood"])) and (not bool(r["expected_ood"])) for r in rows)
+          recall=tp/(tp+fn)
+          specificity=tn/(tn+fp)
+          precision=tp/(tp+fp) if tp+fp else 0.0
+          ties=sum(abs(float(r["ood_probability"])-0.5)<1e-12 for r in rows)
+
+          checks={
+            "in_domain_accuracy_gte_0_98": in_acc >= 0.98,
+            "each_route_accuracy_gte_0_90": min(route_accuracy.values()) >= 0.90,
+            "agent_accuracy_gte_0_90": route_accuracy["agent"] >= 0.90,
+            "ood_recall_gte_0_80": recall >= 0.80,
+            "ood_specificity_gte_0_85": specificity >= 0.85,
+            "ood_precision_gte_0_80": precision >= 0.80,
+            "ood_ties_eq_0": ties == 0,
+          }
+          out={
+            "rows":len(rows),
+            "in_domain_rows":len(ind),
+            "ood_rows":len(ood),
+            "in_domain_accuracy":in_acc,
+            "route_accuracy":route_accuracy,
+            "ood":{"tp":tp,"fn":fn,"fp":fp,"tn":tn,"recall":recall,"specificity":specificity,"precision":precision,"ties":ties},
+            "checks":checks,
+            "holdout3_pass":all(checks.values()),
+          }
+          print(json.dumps(out,ensure_ascii=False,indent=2,sort_keys=True))
+          raise SystemExit(0 if out["holdout3_pass"] else 2)
+          PY
+          echo "${PIPESTATUS[0]}" > results/holdout3_200-exit-code.txt
+          exit 0
+
+      - name: Collect official 200-case gate evidence
+        shell: bash
+        run: |
+          set +e
+          for attempt in 1 2 3; do
+            extra=""
+            [ "$attempt" -gt 1 ] && extra="--resume"
+            python scripts/collect_decision_eval_results.py               --dataset benchmarks/decision_routes.jsonl               --dataset benchmarks/decision_routes_ood.jsonl               --output results/cde_routes_run8.jsonl               --checkpoint-every 10               --sleep-seconds 0.05               $extra
+            code=$?
+            [ "$code" -eq 0 ] && exit 0
+            echo "gate collector attempt $attempt failed with $code; resuming same output"
+          done
+          exit "$code"
+
+      - name: Evaluate official promotion gate
+        shell: bash
+        run: |
+          set +e
+          python scripts/evaluate_decision_routes.py             --dataset benchmarks/decision_routes.jsonl             --dataset benchmarks/decision_routes_ood.jsonl             --cde-results results/cde_routes_run8.jsonl             --require-eligible | tee results/run8_evaluation.json
+          code=${PIPESTATUS[0]}
+          echo "$code" > results/run8-exit-code.txt
+          exit 0
+
+      - name: Upload sealed validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cde-holdout3-200-validation
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            results/holdout3_sha.txt
+            results/holdout3_200.jsonl
+            results/holdout3_200.jsonl.manifest.json
+            results/holdout3_200_evaluation.json
+            results/holdout3_200-exit-code.txt
+            results/cde_routes_run8.jsonl
+            results/cde_routes_run8.jsonl.manifest.json
+            results/run8_evaluation.json
+            results/run8-exit-code.txt
