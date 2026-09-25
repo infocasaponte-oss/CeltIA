@@ -46,6 +46,14 @@ Decision results expose `suspected_ood` separately from `abstention_reason`. Thi
 
 `benchmarks/decision_routes_ood.jsonl` now contains 80 adversarial cases spanning malformed, injection-like, candidate-label and route-manipulation inputs. The in-domain routing benchmark contains 120 balanced cases (24 each for `fast`, `think`, `code`, `agent` and `long`). The normal routing benchmark is explicitly labeled `"ood": false`, while OOD rows use `"expected": null, "ood": true`. The evaluator accepts multiple repeatable `--dataset` arguments so both sets can be measured together, rejects duplicate texts across files, and consumes optional `suspected_ood` values from CDE-result JSONL. Both sets are schema- and cardinality-validated in CI. Together they now reach the 200-sample promotion floor structurally. This only removes the sample-count blocker: promotion still requires a real CDE result artifact whose coverage, routing accuracy, per-route metrics and OOD behavior satisfy every gate.
 
+For local live collection when the provider key already lives in `.env` or `.env.local`, use the repository helper:
+
+```bash
+PYTHONPATH=. python scripts/run_cde_live_evidence.py
+```
+
+The helper refuses to collect from a tracked-dirty checkout, verifies that CeltIA can resolve a live-provider credential without printing it, runs the full 200-case collector, and then evaluates the promotion gate. If the gate fails, the JSONL and v4 manifest are intentionally kept for inspection. Use `--resume` to continue a compatible interrupted run.
+
 Example combined evaluation:
 
 ```bash
