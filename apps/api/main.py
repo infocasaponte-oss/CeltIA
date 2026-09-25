@@ -615,6 +615,11 @@ async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, 
             prompt_tokens=routing_usage.get("prompt_tokens"),
             completion_tokens=routing_usage.get("completion_tokens"),
             total_tokens=routing_usage.get("total_tokens"),
+            served_route=routing.get("served_route"),
+            routing_source=routing.get("routing_source"),
+            fallback_reason=routing.get("fallback_reason"),
+            rollout_bucket=routing.get("rollout_bucket"),
+            cde_latency_ms=routing.get("cde_latency_ms"),
         )
         emit({"type": "decision_shadow", **routing})
 
