@@ -235,3 +235,41 @@ It persists `DECISION_ROUTING_MODE=legacy` and rollout 0%. Restart the API to
 apply it. The Windows launchers use shadow/0 only when no explicit rollout
 environment variables are present, so a persisted promotion or rollback is not
 silently overwritten.
+
+
+### Canary stage gates
+
+Every canary percentage is evaluated only against telemetry v3 rows collected
+at that exact `rollout_percent`. Evidence from earlier percentages is not
+pooled into later stages.
+
+Pre-registered operational floors:
+
+- 5%: at least 100 CDE-evaluated canary requests;
+- 20%: at least 200;
+- 50%: at least 300;
+- 100%: at least 500.
+
+Every stage additionally requires CDE evaluation errors <=1%, abstentions <=5%,
+operational fallback rate <=5%, average CDE latency <=3000 ms and p95 <=8000 ms.
+`cde_suspected_ood` fallback is reported separately and is not counted as an
+operational failure because it is an intentional serving policy.
+
+Check a stage with:
+
+```powershell
+.\scripts\check-cde-canary.ps1 -Percent 5
+```
+
+Advance only through the guarded script:
+
+```powershell
+.\scripts\promote-cde-stage.ps1 -CurrentPercent 5
+.\scripts\promote-cde-stage.ps1 -CurrentPercent 20
+.\scripts\promote-cde-stage.ps1 -CurrentPercent 50
+.\scripts\promote-cde-stage.ps1 -CurrentPercent 100
+```
+
+The last command changes routing mode from `canary` to `cde` only after the
+100% stage itself passes. Rollback remains independent and immediate through
+`scripts\rollback-cde.ps1`.
