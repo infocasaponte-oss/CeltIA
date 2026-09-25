@@ -2,12 +2,12 @@
 {"text":"Explica paso a paso por que este algoritmo ten complexidade O(n log n) e compara alternativas.","expected":"think","ood":false}
 {"text":"Implementa unha función Python que valide JWT e escribe tests unitarios.","expected":"code","ood":false}
 {"text":"Busca na web as novidades publicadas hoxe sobre este proxecto e resume as fontes.","expected":"agent","ood":false}
-{"text":"Analiza este documento moi longo e mantén coherencia entre todas as súas seccións.","expected":"long","ood":false}
+{"text":"Analiza este documento moi longo e mantén coherencia entre todas as súas seccións.","expected":"long","ood":false,"input_chars":20000}
 {"text":"Traduceme esta frase ao galego: Good morning.","expected":"fast","ood":false}
 {"text":"Deseña unha estratexia de migración con riscos, trade-offs e plan de rollback.","expected":"think","ood":false}
 {"text":"Corrixe este bug de TypeScript e propón un patch con probas.","expected":"code","ood":false}
 {"text":"Investiga información actualizada en internet e contrasta polo menos tres fontes.","expected":"agent","ood":false}
-{"text":"Traballa sobre un contexto superior ao límite normal e sintetiza todos os apartados.","expected":"long","ood":false}
+{"text":"Traballa sobre un contexto superior ao límite normal e sintetiza todos os apartados.","expected":"long","ood":false,"input_chars":20000}
 {"text":"Dime en una frase qué significa HTTP 404.","expected":"fast","ood":false}
 {"text":"Convierte este título a minúsculas: INTRODUCCIÓN A CELTIA.","expected":"fast","ood":false}
 {"text":"Clasifica esta palabra como sustantivo o verbo: correr.","expected":"fast","ood":false}
@@ -48,16 +48,16 @@
 {"text":"Investiga cambios desta semana nun proxecto open source e resume commits ou releases relevantes.","expected":"agent","ood":false}
 {"text":"Verifica nunha web oficial os límites actuais dunha API e devolve os enlaces.","expected":"agent","ood":false}
 {"text":"Busca documentación e exemplos recentes para confirmar se unha opción de configuración segue soportada.","expected":"agent","ood":false}
-{"text":"Analiza este expediente de 80 páxinas, crea unha cronoloxía e mantén referencias cruzadas entre anexos.","expected":"long","ood":false}
-{"text":"Sintetiza un repositorio documental moi extenso e produce un mapa de temas sen perder contradicións entre seccións.","expected":"long","ood":false}
-{"text":"Revisa un contrato longo cláusula por cláusula e conserva unha táboa de referencias internas durante toda a análise.","expected":"long","ood":false}
-{"text":"Resume unha transcrición de varias horas mantendo participantes, decisións e asuntos pendentes ao longo de todo o texto.","expected":"long","ood":false}
-{"text":"Compara dous manuais técnicos completos e identifica cambios semánticos sección por sección.","expected":"long","ood":false}
-{"text":"Procesa un contexto de decenas de miles de caracteres e constrúe unha síntese xerárquica consistente.","expected":"long","ood":false}
-{"text":"Analiza un conxunto grande de notas de investigación e agrúpaas por hipótese mantendo as citas orixinais.","expected":"long","ood":false}
-{"text":"Le un informe anual completo e relaciona riscos, cifras e notas ao pé sen perder contexto.","expected":"long","ood":false}
-{"text":"Traballa sobre unha especificación moi longa e xera unha matriz completa de requisitos e dependencias.","expected":"long","ood":false}
-{"text":"Resume unha colección extensa de incidencias e detecta patróns recorrentes mantendo os detalles de cada caso.","expected":"long","ood":false}
+{"text":"Analiza este expediente de 80 páxinas, crea unha cronoloxía e mantén referencias cruzadas entre anexos.","expected":"long","ood":false,"input_chars":20000}
+{"text":"Sintetiza un repositorio documental moi extenso e produce un mapa de temas sen perder contradicións entre seccións.","expected":"long","ood":false,"input_chars":20000}
+{"text":"Revisa un contrato longo cláusula por cláusula e conserva unha táboa de referencias internas durante toda a análise.","expected":"long","ood":false,"input_chars":20000}
+{"text":"Resume unha transcrición de varias horas mantendo participantes, decisións e asuntos pendentes ao longo de todo o texto.","expected":"long","ood":false,"input_chars":20000}
+{"text":"Compara dous manuais técnicos completos e identifica cambios semánticos sección por sección.","expected":"long","ood":false,"input_chars":20000}
+{"text":"Procesa un contexto de decenas de miles de caracteres e constrúe unha síntese xerárquica consistente.","expected":"long","ood":false,"input_chars":20000}
+{"text":"Analiza un conxunto grande de notas de investigación e agrúpaas por hipótese mantendo as citas orixinais.","expected":"long","ood":false,"input_chars":20000}
+{"text":"Le un informe anual completo e relaciona riscos, cifras e notas ao pé sen perder contexto.","expected":"long","ood":false,"input_chars":20000}
+{"text":"Traballa sobre unha especificación moi longa e xera unha matriz completa de requisitos e dependencias.","expected":"long","ood":false,"input_chars":20000}
+{"text":"Resume unha colección extensa de incidencias e detecta patróns recorrentes mantendo os detalles de cada caso.","expected":"long","ood":false,"input_chars":20000}
 {"text":"Reduce esta lista a unha frase curta: servidor activo, base de datos conectada, cola baleira.","expected":"fast","ood":false}
 {"text":"Corrixe a puntuación desta frase: Ola como estás espero que ben.","expected":"fast","ood":false}
 {"text":"Converte 2500 milisegundos a segundos.","expected":"fast","ood":false}
@@ -106,15 +106,15 @@
 {"text":"Busca cambios recentes nun estándar técnico e resume só os puntos confirmados pola fonte oficial.","expected":"agent","ood":false}
 {"text":"Investiga se unha CVE concreta ten parche oficial dispoñible e cita vendor advisory e base de datos pública.","expected":"agent","ood":false}
 {"text":"Comproba a documentación actual de dúas APIs para saber cal soporta streaming e enlaza as seccións relevantes.","expected":"agent","ood":false}
-{"text":"Analiza unha exportación completa de tickets de soporte dun ano e crea unha taxonomía mantendo exemplos e referencias a cada ticket.","expected":"long","ood":false}
-{"text":"Le tres especificacións extensas relacionadas e constrúe unha matriz de compatibilidade con referencias cruzadas precisas.","expected":"long","ood":false}
-{"text":"Resume un libro técnico completo por capítulos e mantén unha lista consistente de conceptos que evolucionan ao longo do texto.","expected":"long","ood":false}
-{"text":"Procesa un historial de chat de centos de páxinas e extrae decisións, responsables e cambios de criterio ao longo do tempo.","expected":"long","ood":false}
-{"text":"Analiza un dossier legal extenso e conecta cada conclusión coas cláusulas e anexos correspondentes.","expected":"long","ood":false}
-{"text":"Compara dúas versións completas dunha especificación e produce un changelog semántico con referencias de sección.","expected":"long","ood":false}
-{"text":"Sintetiza varios informes anuais dunha empresa mantendo tendencias plurianuais, cifras e notas explicativas.","expected":"long","ood":false}
-{"text":"Le unha base documental extensa dun proxecto e crea unha arquitectura conceptual que conserve dependencias entre módulos.","expected":"long","ood":false}
-{"text":"Analiza unha transcrición longa de investigación e agrupa evidencias por hipótese sen perder quen dixo cada cousa nin cando.","expected":"long","ood":false}
-{"text":"Resume un manual operativo de centos de páxinas e produce runbooks por incidente mantendo referencias ás seccións fonte.","expected":"long","ood":false}
-{"text":"Procesa un conxunto moi grande de RFCs e identifica decisións incompatibles ou superseded mantendo trazabilidade.","expected":"long","ood":false}
-{"text":"Analiza unha documentación técnica que supera amplamente o contexto curto e constrúe un índice xerárquico con síntese por sección.","expected":"long","ood":false}
+{"text":"Analiza unha exportación completa de tickets de soporte dun ano e crea unha taxonomía mantendo exemplos e referencias a cada ticket.","expected":"long","ood":false,"input_chars":20000}
+{"text":"Le tres especificacións extensas relacionadas e constrúe unha matriz de compatibilidade con referencias cruzadas precisas.","expected":"long","ood":false,"input_chars":20000}
+{"text":"Resume un libro técnico completo por capítulos e mantén unha lista consistente de conceptos que evolucionan ao longo do texto.","expected":"long","ood":false,"input_chars":20000}
+{"text":"Procesa un historial de chat de centos de páxinas e extrae decisións, responsables e cambios de criterio ao longo do tempo.","expected":"long","ood":false,"input_chars":20000}
+{"text":"Analiza un dossier legal extenso e conecta cada conclusión coas cláusulas e anexos correspondentes.","expected":"long","ood":false,"input_chars":20000}
+{"text":"Compara dúas versións completas dunha especificación e produce un changelog semántico con referencias de sección.","expected":"long","ood":false,"input_chars":20000}
+{"text":"Sintetiza varios informes anuais dunha empresa mantendo tendencias plurianuais, cifras e notas explicativas.","expected":"long","ood":false,"input_chars":20000}
+{"text":"Le unha base documental extensa dun proxecto e crea unha arquitectura conceptual que conserve dependencias entre módulos.","expected":"long","ood":false,"input_chars":20000}
+{"text":"Analiza unha transcrición longa de investigación e agrupa evidencias por hipótese sen perder quen dixo cada cousa nin cando.","expected":"long","ood":false,"input_chars":20000}
+{"text":"Resume un manual operativo de centos de páxinas e produce runbooks por incidente mantendo referencias ás seccións fonte.","expected":"long","ood":false,"input_chars":20000}
+{"text":"Procesa un conxunto moi grande de RFCs e identifica decisións incompatibles ou superseded mantendo trazabilidade.","expected":"long","ood":false,"input_chars":20000}
+{"text":"Analiza unha documentación técnica que supera amplamente o contexto curto e constrúe un índice xerárquico con síntese por sección.","expected":"long","ood":false,"input_chars":20000}
