@@ -15,7 +15,7 @@ from pathlib import Path
 
 from core.config import settings
 from core.decision_runtime import CeltIADecisionRuntime
-from core.decision_routes import route_decision_context, route_decision_question
+from core.decision_routes import combine_route_results, route_decision_context, route_decision_questions
 from core.inference import build_llm
 from core.router import route
 from scripts.evaluate_decision_routes import (
@@ -61,18 +61,23 @@ async def collect_one(runtime: CeltIADecisionRuntime, row: dict) -> dict:
     heuristic=route(text).mode
     results,usage=await runtime.decide_with_usage(
         route_decision_context(text, input_chars=row.get("input_chars"), long_context_chars=settings.router_long_context_chars),
-        [route_decision_question()],
+        route_decision_questions(),
     )
-    result=results[0]
+    if len(results) != 2:
+        raise RuntimeError("CDE routing requires route and OOD results")
+    combined=combine_route_results(results[0],results[1])
     return {
         "text":text,
-        "cde":result.decision,
-        "confidence":result.confidence,
-        "abstained":result.abstained,
-        "suspected_ood":result.suspected_ood,
-        "abstention_reason":result.abstention_reason,
-        "normalized_entropy":result.normalized_entropy,
-        "margin":result.margin,
+        "cde":combined["decision"],
+        "confidence":combined["confidence"],
+        "abstained":combined["abstained"],
+        "suspected_ood":combined["suspected_ood"],
+        "abstention_reason":combined["abstention_reason"],
+        "normalized_entropy":combined["normalized_entropy"],
+        "margin":combined["margin"],
+        "ood_probability":combined["ood_probability"],
+        "ood_classifier_confidence":combined["ood_classifier_confidence"],
+        "ood_classifier_decision":combined["ood_classifier_decision"],
         "heuristic":heuristic,
         "expected":row.get("expected"),
         "expected_ood":row.get("ood"),
