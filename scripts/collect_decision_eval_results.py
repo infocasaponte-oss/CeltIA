@@ -15,6 +15,7 @@ from pathlib import Path
 
 from core.config import settings
 from core.decision_runtime import CeltIADecisionRuntime
+from core.decision_routes import route_decision_context, route_decision_question
 from core.inference import build_llm
 from core.router import route
 from scripts.evaluate_decision_routes import (
@@ -35,7 +36,6 @@ from scripts.evaluate_decision_routes import (
     validate_selection_provenance,
 )
 
-ROUTES=("fast","think","code","agent","long")
 DEFAULT_CHECKPOINT_EVERY=10
 
 
@@ -60,13 +60,8 @@ async def collect_one(runtime: CeltIADecisionRuntime, row: dict) -> dict:
     text=row["text"]
     heuristic=route(text).mode
     results,usage=await runtime.decide_with_usage(
-        {"user_message": text[-12000:], "heuristic_route": heuristic},
-        [{
-            "id":"route",
-            "prompt":"Select the most appropriate CeltIA execution route.",
-            "type":"choice",
-            "options":list(ROUTES),
-        }],
+        route_decision_context(text, input_chars=row.get("input_chars")),
+        [route_decision_question()],
     )
     result=results[0]
     return {
