@@ -8,6 +8,9 @@ $env:MODEL_SERVE_NAME = "celtia-qwen3"
 $env:MODEL_CONTEXT = "8192"
 $env:GATEWAY_MAX_CONCURRENCY = "4"
 $env:PUBLIC_BASE_URL = "https://celtiaia.com"
+# Primeiro paso do rollout CDE: observar decisións sen cambiar a ruta servida.
+$env:DECISION_ROUTING_MODE = "shadow"
+$env:DECISION_CDE_ROLLOUT_PERCENT = "0"
 
 function Test-Port($p) { [bool](Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue) }
 
