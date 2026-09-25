@@ -49,7 +49,11 @@ app.state.metrics = {
     "decision_requests": 0,
     "decision_cde_served": 0,
     "decision_cde_fallbacks": 0,
+    "decision_shadow_background_started": 0,
+    "decision_shadow_background_completed": 0,
+    "decision_shadow_background_errors": 0,
 }
+app.state.decision_shadow_tasks = set()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -580,6 +584,73 @@ async def _inject_linked_pages(msgs, user_text, allowed_tools, key, emit):
                                             "no digas que no puedes acceder a enlaces):\n\n" + "\n\n".join(sections)}
     return msgs[:-1] + [context] + msgs[-1:]
 
+def _persist_routing_decision(api_key_id, routing, rollout_percent):
+    routing_usage = routing.get("usage") or {}
+    memory.record_decision_shadow(
+        api_key_id,
+        routing["heuristic"],
+        routing.get("cde"),
+        routing.get("confidence"),
+        routing.get("abstained", False),
+        abstention_reason=routing.get("abstention_reason"),
+        suspected_ood=routing.get("suspected_ood"),
+        normalized_entropy=routing.get("normalized_entropy"),
+        margin=routing.get("margin"),
+        prompt_tokens=routing_usage.get("prompt_tokens"),
+        completion_tokens=routing_usage.get("completion_tokens"),
+        total_tokens=routing_usage.get("total_tokens"),
+        served_route=routing.get("served_route"),
+        routing_source=routing.get("routing_source"),
+        fallback_reason=routing.get("fallback_reason"),
+        rollout_bucket=routing.get("rollout_bucket"),
+        cde_latency_ms=routing.get("cde_latency_ms"),
+        rollout_percent=rollout_percent,
+    )
+
+
+async def _run_shadow_background(
+    *,
+    api_key_id,
+    text,
+    heuristic_route,
+    bucket_key,
+    input_chars,
+    long_context_chars,
+    rollout_percent,
+    manual_mode=None,
+):
+    try:
+        routing = await select_serving_route(
+            decision_runtime,
+            text,
+            heuristic_route,
+            mode="shadow",
+            rollout_percent=rollout_percent,
+            bucket_key=bucket_key,
+            input_chars=input_chars,
+            long_context_chars=long_context_chars,
+        )
+        if manual_mode in {"fast", "think", "code", "long"}:
+            routing["served_route"] = manual_mode
+            routing["routing_source"] = "manual_override"
+            routing["fallback_reason"] = None
+        logger.info("CDE background shadow decision: %s", routing)
+        _persist_routing_decision(api_key_id, routing, rollout_percent)
+        app.state.metrics["decision_shadow_background_completed"] += 1
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        app.state.metrics["decision_shadow_background_errors"] += 1
+        logger.exception("CDE background shadow evaluation failed")
+
+
+def _schedule_shadow_background(**kwargs):
+    app.state.metrics["decision_shadow_background_started"] += 1
+    task = asyncio.create_task(_run_shadow_background(**kwargs))
+    app.state.decision_shadow_tasks.add(task)
+    task.add_done_callback(app.state.decision_shadow_tasks.discard)
+
+
 async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, stream_tokens=False):
     def emit(event):
         if on_event is not None:
@@ -614,16 +685,40 @@ async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, 
         settings.decision_shadow_routing,
     )
     bucket_key = f"api:{key.get('id')}" if key.get("id") is not None else f"session:{sid}"
-    routing = await select_serving_route(
-        decision_runtime,
-        text,
-        r.mode,
-        mode=routing_mode,
-        rollout_percent=settings.decision_cde_rollout_percent,
-        bucket_key=bucket_key,
-        input_chars=input_chars,
-        long_context_chars=settings.router_long_context_chars,
-    )
+    if routing_mode == "shadow":
+        # Shadow must never add user-visible routing latency. Serve the heuristic
+        # immediately and evaluate/persist the CDE decision in a retained task.
+        routing = await select_serving_route(
+            decision_runtime,
+            text,
+            r.mode,
+            mode="legacy",
+            rollout_percent=settings.decision_cde_rollout_percent,
+            bucket_key=bucket_key,
+            input_chars=input_chars,
+            long_context_chars=settings.router_long_context_chars,
+        )
+        _schedule_shadow_background(
+            api_key_id=key.get("id"),
+            text=text,
+            heuristic_route=r.mode,
+            bucket_key=bucket_key,
+            input_chars=input_chars,
+            long_context_chars=settings.router_long_context_chars,
+            rollout_percent=settings.decision_cde_rollout_percent,
+            manual_mode=req.mode,
+        )
+    else:
+        routing = await select_serving_route(
+            decision_runtime,
+            text,
+            r.mode,
+            mode=routing_mode,
+            rollout_percent=settings.decision_cde_rollout_percent,
+            bucket_key=bucket_key,
+            input_chars=input_chars,
+            long_context_chars=settings.router_long_context_chars,
+        )
 
     # Explicit API mode remains authoritative during the CDE rollout.
     if req.mode in {"fast", "think", "code", "long"}:
@@ -631,28 +726,12 @@ async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, 
         routing["routing_source"] = "manual_override"
         routing["fallback_reason"] = None
 
-    if routing.get("evaluated_cde"):
+    if routing_mode != "shadow" and routing.get("evaluated_cde"):
         logger.info("CDE routing decision: %s", routing)
-        routing_usage = routing.get("usage") or {}
-        memory.record_decision_shadow(
+        _persist_routing_decision(
             key.get("id"),
-            routing["heuristic"],
-            routing["cde"],
-            routing.get("confidence"),
-            routing.get("abstained", False),
-            abstention_reason=routing.get("abstention_reason"),
-            suspected_ood=routing.get("suspected_ood"),
-            normalized_entropy=routing.get("normalized_entropy"),
-            margin=routing.get("margin"),
-            prompt_tokens=routing_usage.get("prompt_tokens"),
-            completion_tokens=routing_usage.get("completion_tokens"),
-            total_tokens=routing_usage.get("total_tokens"),
-            served_route=routing.get("served_route"),
-            routing_source=routing.get("routing_source"),
-            fallback_reason=routing.get("fallback_reason"),
-            rollout_bucket=routing.get("rollout_bucket"),
-            cde_latency_ms=routing.get("cde_latency_ms"),
-            rollout_percent=settings.decision_cde_rollout_percent,
+            routing,
+            settings.decision_cde_rollout_percent,
         )
         emit({"type": "decision_shadow", **routing})
 
