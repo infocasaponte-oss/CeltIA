@@ -155,3 +155,28 @@ Any live evidence collected before this contract change remains useful as histor
 Routing OOD detection uses a dedicated semantic head in addition to the route head's entropy/margin signal. The semantic head is intentionally conservative: any plausibly actionable user task is in-domain, including short/simple tasks, code, reasoning, tool/web work and long-context work. It marks OOD only when there is clear evidence of router/candidate manipulation, fake routing metadata, prompt-injection whose primary purpose is to control routing, or content with no actionable task. Ambiguous inputs default to in-domain.
 
 The semantic OOD head records `ood_probability`, `ood_classifier_confidence` and `ood_classifier_decision` in collected evidence. OOD detection is evaluated independently from routing coverage. The policy thresholds (`decision_ood_entropy_threshold`, `decision_ood_margin_threshold`, and `decision_abstain_below`) are not changed as part of this prompt correction; any later calibration must use separately collected evidence rather than tuning the current run to pass the gate.
+
+
+## Serving rollout
+
+Production routing is controlled by `DECISION_ROUTING_MODE`:
+
+- `legacy`: only the heuristic router is used.
+- `shadow`: CDE is evaluated and logged, but the heuristic route remains authoritative.
+- `canary`: CDE serves only stable hash buckets below `DECISION_CDE_ROLLOUT_PERCENT`.
+- `cde`: CDE is the primary router.
+
+Any CDE error, abstention, invalid route or suspected-OOD signal falls back to the heuristic during serving rollout. OOD detection is therefore observational for routing promotion and does not block a chat request.
+
+The Windows autostart and local UI launcher intentionally start in `shadow` with a 0% canary. Rollback is immediate: set `DECISION_ROUTING_MODE=legacy` and restart the API process. Do not advance to canary based on heuristic/CDE agreement alone; inspect CDE latency, fallback rate, route distribution and application/tool failures first.
+
+Recommended sequence after a shadow observation window:
+
+1. `shadow`, 0% serving from CDE.
+2. `canary`, 5%.
+3. `canary`, 20%.
+4. `canary`, 50%.
+5. `canary`, 100%.
+6. `cde` only after the 100% canary is operationally stable.
+
+At every stage the rollback target remains `legacy`.
