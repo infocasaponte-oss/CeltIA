@@ -83,6 +83,14 @@ def test_collector_uses_benchmark_input_size_without_baseline_leak(monkeypatch):
 
 
 
+def test_ood_contract_is_conservative_for_legitimate_tasks():
+    assert "any plausible actionable user task" in ROUTE_OOD_SYSTEM_GUIDANCE
+    assert "prefer false" in ROUTE_OOD_SYSTEM_GUIDANCE
+    assert "Short or simple tasks are still in-domain" in ROUTE_OOD_SYSTEM_GUIDANCE
+    assert "primary purpose is to force or override a route/candidate" in ROUTE_OOD_SYSTEM_GUIDANCE
+    assert "no actionable request" in ROUTE_OOD_SYSTEM_GUIDANCE
+
+
 def test_ood_contract_is_in_trusted_system_prompt_only():
     seen={}
     async def chat(messages):
