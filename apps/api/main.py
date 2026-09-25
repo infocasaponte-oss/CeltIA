@@ -567,7 +567,12 @@ async def _build_response(req: ChatRequest, sid: str, key: dict, on_event=None, 
     text = (user_msgs[-1] if user_msgs else "")[-20000:]
     r = route(text)
     if settings.decision_shadow_routing:
-        shadow = await evaluate_route_shadow(decision_runtime, text, r.mode)
+        shadow = await evaluate_route_shadow(
+            decision_runtime,
+            text,
+            r.mode,
+            long_context_chars=settings.router_long_context_chars,
+        )
         if shadow:
             logger.info("CDE shadow route: %s", shadow)
             shadow_usage = shadow.get("usage") or {}
