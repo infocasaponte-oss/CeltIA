@@ -53,7 +53,9 @@ class Settings(BaseSettings):
 
     decision_abstain_below: float = Field(default=0.55, ge=0.0, le=1.0, allow_inf_nan=False)
     decision_temperature: float = Field(default=1.0, gt=0.0, allow_inf_nan=False)
-    decision_shadow_routing: bool = False
+    decision_shadow_routing: bool = False  # legacy compatibility: maps legacy -> shadow
+    decision_routing_mode: str = Field(default="legacy", pattern=r"^(legacy|shadow|canary|cde)$")
+    decision_cde_rollout_percent: int = Field(default=0, ge=0, le=100)
     decision_reject_ood: bool = True
     decision_ood_entropy_threshold: float = Field(default=0.90, ge=0.0, le=1.0, allow_inf_nan=False)
     decision_ood_margin_threshold: float = Field(default=0.10, ge=0.0, le=1.0, allow_inf_nan=False)
